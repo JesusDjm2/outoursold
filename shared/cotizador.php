@@ -26,14 +26,14 @@ require_once __DIR__ . '/auth.php';
                 <p class="text-slate-600">Sistema completo de cotización y gestión de datos</p>
             </div>
             <div class="flex items-center space-x-3 mt-2">
-                <button id="switch-moneda" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:opacity-90 transition">
+                <button id="switch-moneda" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#e80c13] to-[#bb3135] text-white hover:opacity-90 transition">
                     <?= htmlspecialchars($switchLabel) ?>
                 </button>
-                <a href="../itinerario/index.html" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:opacity-90 transition">
+                <a href="../itinerario/index.html" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#e80c13] to-[#bb3135] text-white hover:opacity-90 transition">
                     <i class="fas fa-route mr-1"></i> Generar Itinerario
                 </a>
                 <?php if (is_admin()): ?>
-                <a href="../shared/usuarios.php" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:opacity-90 transition">
+                <a href="../shared/usuarios.php" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#e80c13] to-[#bb3135] text-white hover:opacity-90 transition">
                     <i class="fas fa-users-cog mr-1"></i> Gestionar Usuarios
                 </a>
                 <?php endif; ?>
@@ -55,7 +55,7 @@ require_once __DIR__ . '/auth.php';
                 <section class="lg:col-span-1 card p-3">
                     <div class="flex items-center justify-between mb-2">
                         <h2 class="text-base font-medium">1. Datos Pax</h2>
-                        <span class="text-xs px-2 py-1 rounded" style="background:rgba(16,185,129,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
+                        <span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
                     </div>
                     <form id="form-pax" class="grid grid-cols-2 gap-2 small">
                         <label class="col-span-2">Agente <input class="input w-full rounded px-2 py-1 border" type="text" name="agente" placeholder="Agente"></label>

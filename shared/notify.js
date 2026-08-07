@@ -3,15 +3,15 @@
 // e itinerario.js en vez de alert()/confirm() nativos repetidos por todo el sistema.
 
 function notifyError(msg) {
-    return Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#06b6d4' });
+    return Swal.fire({ icon: 'error', title: 'Error', text: msg, confirmButtonColor: '#e80c13' });
 }
 
 function notifySuccess(msg) {
-    return Swal.fire({ icon: 'success', title: '¡Listo!', text: msg, confirmButtonColor: '#06b6d4' });
+    return Swal.fire({ icon: 'success', title: '¡Listo!', text: msg, confirmButtonColor: '#e80c13' });
 }
 
 function notifyWarning(msg) {
-    return Swal.fire({ icon: 'warning', text: msg, confirmButtonColor: '#06b6d4' });
+    return Swal.fire({ icon: 'warning', text: msg, confirmButtonColor: '#e80c13' });
 }
 
 async function confirmAction(msg, confirmText = 'Sí', cancelText = 'Cancelar') {
@@ -21,7 +21,7 @@ async function confirmAction(msg, confirmText = 'Sí', cancelText = 'Cancelar') 
         showCancelButton: true,
         confirmButtonText: confirmText,
         cancelButtonText: cancelText,
-        confirmButtonColor: '#06b6d4',
+        confirmButtonColor: '#e80c13',
         cancelButtonColor: '#e2e8f0'
     });
     return result.isConfirmed;

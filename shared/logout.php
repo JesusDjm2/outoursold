@@ -1,11 +1,13 @@
 <?php
 // shared/logout.php
-session_start();
+require_once 'auth.php';
 
-// Eliminar todas las variables de sesi¨®n
+forget_remember_cookie($_SESSION['user_id'] ?? null);
+
+// Eliminar todas las variables de sesiï¿½ï¿½n
 $_SESSION = array();
 
-// Si se usa cookie de sesi¨®n, eliminarla
+// Si se usa cookie de sesiï¿½ï¿½n, eliminarla
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -14,7 +16,7 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// Destruir la sesi¨®n
+// Destruir la sesiï¿½ï¿½n
 session_destroy();
 
 // Redirigir al login

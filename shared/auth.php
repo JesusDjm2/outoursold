@@ -24,7 +24,7 @@ function authenticate($usuario, $pass) {
 
 function is_logged_in() {
     if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-        return false;
+        return try_remember_login();
     }
     // Revalida contra la BD en cada request: si el admin pausó esta cuenta,
     // el acceso se corta de inmediato aunque la sesión siga viva.
@@ -38,6 +38,68 @@ function is_logged_in() {
         return false;
     }
     return true;
+}
+
+// Intenta iniciar sesión a partir de la cookie "recordarme". Si es válida,
+// rota el token (por seguridad) y deja la sesión igual que un login normal.
+function try_remember_login() {
+    if (empty($_COOKIE['remember_me'])) {
+        return false;
+    }
+    [$userId, $token] = array_pad(explode(':', $_COOKIE['remember_me'], 2), 2, null);
+    if (!$userId || !$token) {
+        forget_remember_cookie();
+        return false;
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, usuario, rol, activo, remember_token, remember_expires FROM usuarios WHERE id = ?");
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+
+    $valid = $row && $row['activo'] && $row['remember_token'] && $row['remember_expires']
+        && strtotime($row['remember_expires']) > time()
+        && hash_equals($row['remember_token'], hash('sha256', $token));
+
+    if (!$valid) {
+        forget_remember_cookie($row['id'] ?? null);
+        return false;
+    }
+
+    $_SESSION['logged_in'] = true;
+    $_SESSION['user_id'] = $row['id'];
+    $_SESSION['usuario'] = $row['usuario'];
+    $_SESSION['rol'] = $row['rol'];
+    set_remember_cookie($row['id']);
+    return true;
+}
+
+// Genera un token nuevo, lo guarda (hasheado) en la BD y lo manda como cookie httponly.
+function set_remember_cookie($userId) {
+    $token = bin2hex(random_bytes(32));
+    $expires = time() + 60 * 60 * 24 * 30; // 30 días
+
+    $db = getDB();
+    $stmt = $db->prepare("UPDATE usuarios SET remember_token = ?, remember_expires = ? WHERE id = ?");
+    $stmt->execute([hash('sha256', $token), date('Y-m-d H:i:s', $expires), $userId]);
+
+    setcookie('remember_me', $userId . ':' . $token, [
+        'expires' => $expires,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure' => !empty($_SERVER['HTTPS']),
+    ]);
+}
+
+// Invalida la cookie "recordarme" y, si se conoce el usuario, borra el token en BD.
+function forget_remember_cookie($userId = null) {
+    if ($userId) {
+        $db = getDB();
+        $stmt = $db->prepare("UPDATE usuarios SET remember_token = NULL, remember_expires = NULL WHERE id = ?");
+        $stmt->execute([$userId]);
+    }
+    setcookie('remember_me', '', ['expires' => time() - 3600, 'path' => '/']);
 }
 
 function is_admin() {

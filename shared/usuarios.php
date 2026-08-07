@@ -26,7 +26,7 @@ if (!is_admin()) {
                 <h1 class="text-3xl font-bold text-slate-800 mb-2">Gestión de Usuarios</h1>
                 <p class="text-slate-600">Crear cuentas, asignar roles y pausar el acceso.</p>
             </div>
-            <a href="../pen/" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-cyan-500 to-emerald-500 text-white hover:opacity-90 transition">
+            <a href="../pen/" class="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#e80c13] to-[#bb3135] text-white hover:opacity-90 transition">
                 <i class="fas fa-arrow-left mr-1"></i> Volver al Cotizador
             </a>
         </header>
