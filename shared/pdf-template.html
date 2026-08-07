@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>E-Cotizaci&oacute;n</title>
+    <link rel="stylesheet" href="pdf-styles.css">
+</head>
+<body>
+    <div class="pdf-page">
+        <header class="header">
+            <div class="company-details">
+                <img src="logo.png" alt="Logo de la empresa" class="logo">
+                <div class="company-info">
+                    <span class="company-name">OUTOORS AGENCIA DE VIAJES</span>
+                    <span class="company-ruc">RUC: 20609305755</span>
+                    <span class="company-address">Jose Carlos Mariategui F-2, Cusco, Per&uacute;</span>
+                    <span class="company-address">Telf: (084)</span>
+                    <span class="company-address">Cel: (+51) 970-824-536 / (+51) 935-095-895</span>
+                    <span class="company-address">Whatsapp: (+51) 935-095-895</span>
+                </div>
+            </div>
+            <div class="quote-details">
+                <h1 class="e-quote-title">E-COTIZACI&Oacute;N</h1>
+                <span class="quote-id">{{cotizacionId}}</span>
+                <span class="quote-meta">{{fechaCotizacion}}</span>
+                <span class="quote-meta">Agente de reservas: {{agente}}</span>
+            </div>
+        </header>
+
+        <section class="client-section">
+            <div class="client-name">
+                {{nombrePax}} {{contactoPax}}
+            </div>
+            <div class="reservation-callout">
+                Reserva tu paquete con el {{porcentajeReserva}}% ({{montoReserva}})
+            </div>
+        </section>
+
+        <section class="travel-dates">
+            <div class="date-box">
+                <span class="date-title">Llegada</span>
+                <span class="date-full">{{fechaLlegada}}</span>
+                <span class="date-time">{{horaLlegada}}</span>
+            </div>
+            <div class="date-box">
+                <span class="date-title">Salida</span>
+                <span class="date-full">{{fechaSalida}}</span>
+                <span class="date-time">{{horaSalida}}</span>
+            </div>
+        </section>
+
+      <table class="items-table">
+            <thead>
+                <tr class="table-top-spacer"> <th class="left col-hotel-cin"><div>Fecha</div></th>
+                    <th class="left" colspan="2"><div>Tour/Actividad</div></th>
+                    <th class="center"><div></div></th> 
+                    <th class="right"><div>Cant.</div></th>
+                    <th class="center"><div>P.Reg.</div></th>
+                    <th class="center"><div>P. Promo</div></th>
+                    <th class="right"><div>Total l&iacute;nea</div></th>
+                </tr>
+            </thead>
+            <tbody>
+                {{tableRows}}
+            </tbody>
+        </table>
+
+        <footer class="summary-section">
+            <div class="notes-section">
+                <strong>NOTA:</strong>
+                <div class="notes-content">{{notas}}</div>
+            </div>
+
+            <div class="totals-wrapper">
+                <div class="totals-section">
+                    <div class="total-row">
+                        <span>Cantidad base total</span>
+                        <span>{{totalRegular}}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>(-) Descuento Total</span>
+                        <span>{{descuentoTotal}}</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Precio adicional:</span>
+                        <span>{{precioAdicional}}</span>
+                    </div>
+                    <div class="total-row final-total">
+                        <strong>Total final</strong>
+                        <strong>{{totalFinal}}</strong>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

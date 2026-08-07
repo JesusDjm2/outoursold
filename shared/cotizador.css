@@ -1,0 +1,85 @@
+:root {
+    --accent-1: #06b6d4;
+    --accent-2: #10b981;
+    --accent-3: #fb923c;
+    --muted-border: rgba(15, 23, 42, 0.06);
+}
+body {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background: linear-gradient(to bottom, #f0f9ff, #ffffff);
+    min-height: 100vh;
+}
+.card {
+    border: 1px solid var(--muted-border);
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
+}
+.input { appearance: none; }
+.draggable { cursor: grab; }
+tr.draggable:active { cursor: grabbing; }
+.handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.03), rgba(2, 6, 23, 0.01));
+}
+.accent-header {
+    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+    color: white;
+}
+.opacity-60 { opacity: 0.6; }
+.nav-tab { transition: all 0.3s; }
+.nav-tab.active {
+    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+    color: white;
+}
+.btn {
+    transition: all 0.3s;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+}
+.btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+.btn-primary {
+    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+    color: white;
+}
+.btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.btn-secondary { background-color: #e2e8f0; color: #475569; }
+.btn-danger {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+    color: white;
+}
+.small { font-size: 0.78rem; }
+th { background-color: #f8fafc; white-space: nowrap; }
+.hidden { display: none; }
+input[readonly] {
+    background-color: #f1f5f9;
+    cursor: not-allowed;
+}
+.modal-overlay {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.modal-content {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+}

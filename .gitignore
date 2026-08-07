@@ -1,0 +1,6 @@
+**/error_log
+config.php
+cliklico_cotiv2.sql
+coti2026.zip
+itinerario/uploads/*
+!itinerario/uploads/.htaccess
