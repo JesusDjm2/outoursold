@@ -32,6 +32,8 @@ let toursData = [];
 let hotelsData = [];
 let cotizaciones = {};
 let currentCotizacionId = null;
+let toursFilter = '';
+let hotelsFilter = '';
 
 // ===== UTILIDADES =====
 const fmt = (v) => {
@@ -63,7 +65,7 @@ async function cargarDatosIniciales() {
         toursData = toursRes;
         hotelsData = hotelesRes;
         cotizaciones = {};
-        cotizacionesRes.forEach(c => {
+        (cotizacionesRes.results || []).forEach(c => {
             cotizaciones[c.id] = c.data;
         });
         updateDatalists();
@@ -97,37 +99,193 @@ function updateDatalists() {
     });
 }
 
-// ===== RENDER TABLAS (gestión) =====
+// ===== RENDER TABLAS (gestión) — CRUD de tours y hoteles =====
 function renderTours() {
     const tbody = document.getElementById('tours-table-body');
     tbody.innerHTML = '';
-    toursData.sort((a,b) => a.tour.localeCompare(b.tour)).forEach(t => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="p-3 font-medium">${t.tour}</td>
-            <td class="p-3">${t.distr}</td>
-            <td class="p-3">${fmt(t.preg)}</td>
-            <td class="p-3">${fmt(t.ppromo)}</td>
-        `;
-        tbody.appendChild(row);
-    });
+    const visibles = toursData
+        .filter(t => t.tour.toLowerCase().includes(toursFilter))
+        .sort((a, b) => a.tour.localeCompare(b.tour));
+    if (visibles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
+    } else {
+        visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
+    }
     updateDatalists();
+}
+
+function buildTourRow(t) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="p-3 font-medium">${t.tour}</td>
+        <td class="p-3">${t.distr || ''}</td>
+        <td class="p-3">${fmt(t.preg)}</td>
+        <td class="p-3">${fmt(t.ppromo)}</td>
+        <td class="p-3 text-right whitespace-nowrap">
+            <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
+            <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
+        </td>
+    `;
+    const [editBtn, delBtn] = tr.querySelectorAll('button');
+    editBtn.addEventListener('click', () => tr.replaceWith(buildTourEditRow(t)));
+    delBtn.addEventListener('click', () => eliminarTour(t));
+    return tr;
+}
+
+function buildTourEditRow(t) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.tour}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.distr || ''}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.preg}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.ppromo}"></td>
+        <td class="p-2 text-right whitespace-nowrap">
+            <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
+            <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
+        </td>
+    `;
+    const [tourI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
+    saveBtn.addEventListener('click', () => guardarTour({
+        id: t.id, tour: tourI.value.trim(), distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+    }));
+    cancelBtn.addEventListener('click', () => tr.replaceWith(buildTourRow(t)));
+    return tr;
+}
+
+async function guardarTour(payload) {
+    if (!payload.tour) { notifyError('El nombre del tour es obligatorio.'); return false; }
+    try {
+        const res = await fetch(`${API_URL}?path=guardar-tour`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(payload.id ? 'Tour actualizado.' : 'Tour agregado.');
+        await refrescarTours();
+        return true;
+    } catch (e) {
+        notifyError('Error al guardar el tour: ' + e.message);
+        return false;
+    }
+}
+
+async function eliminarTour(t) {
+    if (!await confirmAction(`¿Eliminar "${t.tour}" del catálogo de tours?`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-tour`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: t.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Tour eliminado.');
+        await refrescarTours();
+    } catch (e) {
+        notifyError('Error al eliminar el tour: ' + e.message);
+    }
+}
+
+async function refrescarTours() {
+    toursData = await fetch(`${API_URL}?path=tours`).then(r => r.json());
+    renderTours();
 }
 
 function renderHotels() {
     const tbody = document.getElementById('hotels-table-body');
     tbody.innerHTML = '';
-    hotelsData.sort((a,b) => a.aloj.localeCompare(b.aloj)).forEach(h => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="p-3 font-medium">${h.aloj}</td>
-            <td class="p-3">${h.distr}</td>
-            <td class="p-3">${fmt(h.preg)}</td>
-            <td class="p-3">${fmt(h.ppromo)}</td>
-        `;
-        tbody.appendChild(row);
-    });
+    const visibles = hotelsData
+        .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
+        .sort((a, b) => a.aloj.localeCompare(b.aloj));
+    if (visibles.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
+    } else {
+        visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
+    }
     updateDatalists();
+}
+
+function buildHotelRow(h) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="p-3 font-medium">${h.aloj}</td>
+        <td class="p-3">${h.distr || ''}</td>
+        <td class="p-3">${fmt(h.preg)}</td>
+        <td class="p-3">${fmt(h.ppromo)}</td>
+        <td class="p-3 text-right whitespace-nowrap">
+            <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
+            <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
+        </td>
+    `;
+    const [editBtn, delBtn] = tr.querySelectorAll('button');
+    editBtn.addEventListener('click', () => tr.replaceWith(buildHotelEditRow(h)));
+    delBtn.addEventListener('click', () => eliminarHotel(h));
+    return tr;
+}
+
+function buildHotelEditRow(h) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.aloj}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.distr || ''}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.preg}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.ppromo}"></td>
+        <td class="p-2 text-right whitespace-nowrap">
+            <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
+            <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
+        </td>
+    `;
+    const [alojI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
+    saveBtn.addEventListener('click', () => guardarHotel({
+        id: h.id, aloj: alojI.value.trim(), distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+    }));
+    cancelBtn.addEventListener('click', () => tr.replaceWith(buildHotelRow(h)));
+    return tr;
+}
+
+async function guardarHotel(payload) {
+    if (!payload.aloj) { notifyError('El nombre del alojamiento es obligatorio.'); return false; }
+    try {
+        const res = await fetch(`${API_URL}?path=guardar-hotel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(payload.id ? 'Alojamiento actualizado.' : 'Alojamiento agregado.');
+        await refrescarHoteles();
+        return true;
+    } catch (e) {
+        notifyError('Error al guardar el alojamiento: ' + e.message);
+        return false;
+    }
+}
+
+async function eliminarHotel(h) {
+    if (!await confirmAction(`¿Eliminar "${h.aloj}" del catálogo de hoteles?`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-hotel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: h.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Alojamiento eliminado.');
+        await refrescarHoteles();
+    } catch (e) {
+        notifyError('Error al eliminar el alojamiento: ' + e.message);
+    }
+}
+
+async function refrescarHoteles() {
+    hotelsData = await fetch(`${API_URL}?path=hoteles`).then(r => r.json());
+    renderHotels();
 }
 
 // ===== FILAS =====
@@ -136,7 +294,14 @@ function createTourRow(data = {}) {
     tr.className = 'draggable';
     tr.draggable = true;
 
-    const initialCant = Number(data.cant) || 0;
+    // Si la fila no trae cantidad explícita (fila nueva), se autocompleta con
+    // N° PAX y queda "auto": seguirá sincronizándose si N° PAX cambia, hasta
+    // que el usuario la edite a mano.
+    const isAutoCant = data.cant === undefined;
+    const nPax = parseFloat(document.querySelector('input[name="n_pax"]')?.value) || 0;
+    const initialCant = isAutoCant ? nPax : (Number(data.cant) || 0);
+    tr.dataset.autoCant = isAutoCant ? 'true' : 'false';
+
     const initialPpromo = Number(data.ppromo) || 0;
     const initialTotal = initialCant * initialPpromo;
 
@@ -153,6 +318,7 @@ function createTourRow(data = {}) {
     `;
     tr.querySelector('button').onclick = () => { tr.remove(); calcularResumen(); };
     tr.querySelector('input.cant').addEventListener('input', () => {
+        tr.dataset.autoCant = 'false';
         const cant = parseFloat(tr.querySelector('.cant').value) || 0;
         const ppromo = parseFloat(tr.querySelector('.ppromo').value) || 0;
         tr.querySelector('.total-line').textContent = fmt(cant * ppromo);
@@ -186,6 +352,20 @@ function createTourRow(data = {}) {
     });
     addDragHandlers(tr);
     return tr;
+}
+
+// Propaga N° PAX a la Cant. de cada fila de tour que siga en modo "auto"
+// (no editada a mano). Las filas editadas manualmente ya no se tocan.
+function sincronizarCantidadTours() {
+    const nPax = parseFloat(document.querySelector('input[name="n_pax"]').value) || 0;
+    document.querySelectorAll('#tours-body tr').forEach(tr => {
+        if (tr.dataset.autoCant === 'false') return;
+        const cantInput = tr.querySelector('.cant');
+        const ppromo = parseFloat(tr.querySelector('.ppromo').value) || 0;
+        cantInput.value = nPax;
+        tr.querySelector('.total-line').textContent = fmt(nPax * ppromo);
+    });
+    calcularResumen();
 }
 
 function createHotelRow(data = {}) {
@@ -422,6 +602,7 @@ async function cargarCotizacion(id) {
         document.getElementById('notas_cotizacion').value = data.notas || '';
         document.getElementById('porcentaje_reserva').value = data.porcentaje_reserva || 30;
         calcularResumen();
+        cotizaciones[id] = data;
         currentCotizacionId = id;
         document.getElementById('current-cot-id-display').textContent = id;
         actualizarUltimasCotizaciones();
@@ -447,49 +628,73 @@ function nuevaCotizacion(showAlert = true) {
     if(showAlert) notifySuccess('Formulario limpiado para una nueva cotización.');
 }
 
-function showSearchModal(term) {
-    const resultsContainer = document.getElementById('search-results');
-    resultsContainer.innerHTML = '';
-    const modal = document.getElementById('search-modal');
-    fetch(`${API_URL}?path=cotizaciones&q=${encodeURIComponent(term)}`)
-        .then(r => r.json())
-        .then(results => {
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-slate-500">No se encontraron cotizaciones.</p>';
-            } else {
-                results.forEach(cot => {
-                    const resultEl = document.createElement('div');
-                    resultEl.className = 'p-3 border rounded-lg cursor-pointer hover:bg-slate-50';
-                    resultEl.innerHTML = `
-                        <p class="font-semibold">${cot.data.pax.nombre_pax || 'Sin Nombre'}</p>
-                        <p class="text-sm text-slate-600">${cot.id} - ${cot.data.pax.contacto || 'Sin contacto'}</p>
-                    `;
-                    resultEl.addEventListener('click', () => {
-                        cargarCotizacion(cot.id);
-                        modal.classList.add('hidden');
-                    });
-                    resultsContainer.appendChild(resultEl);
-                });
-            }
-        })
-        .catch(() => {
-            resultsContainer.innerHTML = '<p class="text-red-500">Error al buscar.</p>';
+// ===== MODAL DE REGISTROS (tabla completa, con búsqueda y paginación) =====
+const RECORDS_PAGE_SIZE = 15;
+const recordsState = { term: '', offset: 0, total: 0 };
+
+function openRecordsModal(term = '') {
+    recordsState.term = term;
+    recordsState.offset = 0;
+    document.getElementById('records-search-input').value = term;
+    document.getElementById('records-modal').classList.remove('hidden');
+    cargarRegistros();
+}
+
+async function cargarRegistros() {
+    const tbody = document.getElementById('records-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
+    try {
+        const params = new URLSearchParams({
+            q: recordsState.term,
+            limit: RECORDS_PAGE_SIZE,
+            offset: recordsState.offset
         });
-    modal.classList.remove('hidden');
+        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`);
+        const { results, total } = await res.json();
+        recordsState.total = total;
+        tbody.innerHTML = '';
+        if (results.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Sin resultados.</td></tr>';
+        } else {
+            results.forEach(cot => {
+                const pax = cot.data.pax || {};
+                const tr = document.createElement('tr');
+                tr.className = 'border-t hover:bg-slate-50 cursor-pointer';
+                tr.innerHTML = `
+                    <td class="p-2 font-medium">${cot.id}</td>
+                    <td class="p-2">${pax.nombre_pax || '-'}</td>
+                    <td class="p-2">${pax.contacto || '-'}</td>
+                    <td class="p-2">${pax.fecha_cot || '-'}</td>
+                    <td class="p-2">${pax.n_pax || '-'}</td>
+                    <td class="p-2 text-right"><i class="fas fa-arrow-right text-slate-400"></i></td>
+                `;
+                tr.addEventListener('click', () => {
+                    cargarCotizacion(cot.id);
+                    document.getElementById('records-modal').classList.add('hidden');
+                });
+                tbody.appendChild(tr);
+            });
+        }
+        const shown = recordsState.offset + results.length;
+        document.getElementById('records-page-info').textContent = total === 0 ? '' : `${recordsState.offset + 1}-${shown} de ${total}`;
+        document.getElementById('records-prev').disabled = recordsState.offset === 0;
+        document.getElementById('records-next').disabled = shown >= total;
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
+    }
 }
 
 function actualizarUltimasCotizaciones() {
-    fetch(`${API_URL}?path=cotizaciones`)
+    fetch(`${API_URL}?path=cotizaciones&limit=5`)
         .then(r => r.json())
-        .then(cots => {
+        .then(({ results }) => {
             const container = document.getElementById('ultimas-cotizaciones');
             container.innerHTML = '';
-            const ultimas = cots.slice(0, 5);
-            if (ultimas.length === 0) {
+            if (!results || results.length === 0) {
                 container.innerHTML = '<span class="text-slate-400">Ninguna</span>';
                 return;
             }
-            ultimas.forEach(cot => {
+            results.forEach(cot => {
                 const badge = document.createElement('span');
                 badge.className = 'px-2 py-1 rounded bg-slate-100 text-slate-700 cursor-pointer hover:bg-slate-200';
                 badge.textContent = cot.id;
@@ -696,17 +901,6 @@ async function generarCotizacionPdf() {
     }
 }
 
-// ===== BOTONES SUPERIORES =====
-document.getElementById('switch-moneda').addEventListener('click', () => {
-    window.location.href = window.APP_CONFIG.switchTarget;
-});
-
-document.getElementById('cerrar-sesion').addEventListener('click', async () => {
-    if (await confirmAction('¿Cerrar sesión?')) {
-        window.location.href = '../shared/logout.php';
-    }
-});
-
 // ===== INICIALIZACIÓN =====
 async function init() {
     await cargarDatosIniciales();
@@ -721,23 +915,57 @@ async function init() {
         });
     });
 
+    document.querySelectorAll('.subnav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.subnav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+            tab.classList.add('active');
+            document.getElementById(`gestion-${tab.dataset.subtab}`).classList.remove('hidden');
+        });
+    });
+
+    document.getElementById('tours-search').addEventListener('input', (e) => {
+        toursFilter = e.target.value.trim().toLowerCase();
+        renderTours();
+    });
+    document.getElementById('hoteles-search').addEventListener('input', (e) => {
+        hotelsFilter = e.target.value.trim().toLowerCase();
+        renderHotels();
+    });
+
     document.getElementById('generar-cotizacion-html').addEventListener('click', generarCotizacionPdf);
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.getElementById('nueva-cotizacion').addEventListener('click', () => nuevaCotizacion());
+    document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
     document.getElementById('buscar-cotizacion-input').addEventListener('keyup', e => {
-        if (e.key === 'Enter') showSearchModal(e.target.value);
+        if (e.key === 'Enter') openRecordsModal(e.target.value.trim());
     });
     document.getElementById('btn-buscar').addEventListener('click', () => {
-        const term = document.getElementById('buscar-cotizacion-input').value.trim();
-        if (term) showSearchModal(term);
+        openRecordsModal(document.getElementById('buscar-cotizacion-input').value.trim());
     });
-    document.getElementById('search-modal').addEventListener('click', (e) => {
-        if (e.target === document.getElementById('search-modal')) {
-            document.getElementById('search-modal').classList.add('hidden');
+    document.getElementById('ver-registros').addEventListener('click', () => openRecordsModal(''));
+    document.getElementById('records-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('records-modal')) {
+            document.getElementById('records-modal').classList.add('hidden');
         }
     });
-    document.getElementById('close-modal-btn').addEventListener('click', () => {
-        document.getElementById('search-modal').classList.add('hidden');
+    document.getElementById('close-records-modal-btn').addEventListener('click', () => {
+        document.getElementById('records-modal').classList.add('hidden');
+    });
+    document.getElementById('records-search-input').addEventListener('keyup', e => {
+        if (e.key === 'Enter') {
+            recordsState.term = e.target.value.trim();
+            recordsState.offset = 0;
+            cargarRegistros();
+        }
+    });
+    document.getElementById('records-prev').addEventListener('click', () => {
+        recordsState.offset = Math.max(0, recordsState.offset - RECORDS_PAGE_SIZE);
+        cargarRegistros();
+    });
+    document.getElementById('records-next').addEventListener('click', () => {
+        recordsState.offset += RECORDS_PAGE_SIZE;
+        cargarRegistros();
     });
     document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow()));
     document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow()));
@@ -748,6 +976,24 @@ async function init() {
     document.getElementById('descuento-especial').addEventListener('input', calcularResumen);
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);
+    document.getElementById('tour-new-add').addEventListener('click', async () => {
+        const ok = await guardarTour({
+            tour: document.getElementById('tour-new-nombre').value.trim(),
+            distr: document.getElementById('tour-new-distr').value.trim(),
+            preg: document.getElementById('tour-new-preg').value,
+            ppromo: document.getElementById('tour-new-ppromo').value
+        });
+        if (ok) ['tour-new-nombre', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+    });
+    document.getElementById('hotel-new-add').addEventListener('click', async () => {
+        const ok = await guardarHotel({
+            aloj: document.getElementById('hotel-new-nombre').value.trim(),
+            distr: document.getElementById('hotel-new-distr').value.trim(),
+            preg: document.getElementById('hotel-new-preg').value,
+            ppromo: document.getElementById('hotel-new-ppromo').value
+        });
+        if (ok) ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+    });
     setupDragDrop();
 }
 

@@ -2,6 +2,5 @@
 // pen/index.php
 $pageTitle = 'Cotizador Turístico Pro (PEN)';
 $currencySymbol = 'S/';
-$switchLabel = 'Cambiar a USD';
-$switchTarget = '../usd/';
+$navActive = 'pen';
 require __DIR__ . '/../shared/cotizador.php';

@@ -1,3 +1,11 @@
+<?php
+// itinerario/index.php
+require_once __DIR__ . '/../shared/auth.php';
+require_login();
+$navRoot = '../';
+$navShared = '../shared/';
+$navActive = 'itinerario';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -14,6 +22,9 @@
     <link rel="stylesheet" href="itinerario.css">
 </head>
 <body class="p-4 md:p-6">
+    <?php require __DIR__ . '/../shared/sidebar.php'; ?>
+
+    <div class="app-content">
     <div class="max-w-7xl mx-auto">
         <header class="mb-6 flex justify-between items-center">
             <div>
@@ -128,6 +139,7 @@
                 </section>
             </div>
         </main>
+    </div>
     </div>
 
     <div id="loading-modal" class="modal">

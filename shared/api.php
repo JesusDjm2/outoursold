@@ -24,33 +24,128 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     switch ($path) {
         case 'tours':
-            $stmt = $db->query("SELECT tour, distr, preg, ppromo FROM $tablaTours ORDER BY tour");
+            $stmt = $db->query("SELECT id, tour, distr, preg, ppromo FROM $tablaTours ORDER BY tour");
             echo json_encode($stmt->fetchAll());
             break;
 
         case 'hoteles':
-            $stmt = $db->query("SELECT aloj, distr, preg, ppromo FROM $tablaHoteles ORDER BY aloj");
+            $stmt = $db->query("SELECT id, aloj, distr, preg, ppromo FROM $tablaHoteles ORDER BY aloj");
             echo json_encode($stmt->fetchAll());
+            break;
+
+        case 'guardar-tour':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $tour = trim($data['tour'] ?? '');
+            if ($tour === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'El nombre del tour es obligatorio']);
+                break;
+            }
+            $distr = trim($data['distr'] ?? '');
+            $preg = floatval($data['preg'] ?? 0);
+            $ppromo = floatval($data['ppromo'] ?? 0);
+            if (!empty($data['id'])) {
+                $stmt = $db->prepare("UPDATE $tablaTours SET tour = ?, distr = ?, preg = ?, ppromo = ? WHERE id = ?");
+                $stmt->execute([$tour, $distr, $preg, $ppromo, $data['id']]);
+                echo json_encode(['success' => true, 'id' => $data['id']]);
+            } else {
+                $stmt = $db->prepare("INSERT INTO $tablaTours (tour, distr, preg, ppromo) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$tour, $distr, $preg, $ppromo]);
+                echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
+            }
+            break;
+
+        case 'eliminar-tour':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (empty($data['id'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID requerido']);
+                break;
+            }
+            $stmt = $db->prepare("DELETE FROM $tablaTours WHERE id = ?");
+            $stmt->execute([$data['id']]);
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'guardar-hotel':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $aloj = trim($data['aloj'] ?? '');
+            if ($aloj === '') {
+                http_response_code(400);
+                echo json_encode(['error' => 'El nombre del alojamiento es obligatorio']);
+                break;
+            }
+            $distr = trim($data['distr'] ?? '');
+            $preg = floatval($data['preg'] ?? 0);
+            $ppromo = floatval($data['ppromo'] ?? 0);
+            if (!empty($data['id'])) {
+                $stmt = $db->prepare("UPDATE $tablaHoteles SET aloj = ?, distr = ?, preg = ?, ppromo = ? WHERE id = ?");
+                $stmt->execute([$aloj, $distr, $preg, $ppromo, $data['id']]);
+                echo json_encode(['success' => true, 'id' => $data['id']]);
+            } else {
+                $stmt = $db->prepare("INSERT INTO $tablaHoteles (aloj, distr, preg, ppromo) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$aloj, $distr, $preg, $ppromo]);
+                echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
+            }
+            break;
+
+        case 'eliminar-hotel':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (empty($data['id'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID requerido']);
+                break;
+            }
+            $stmt = $db->prepare("DELETE FROM $tablaHoteles WHERE id = ?");
+            $stmt->execute([$data['id']]);
+            echo json_encode(['success' => true]);
             break;
 
         case 'cotizaciones':
             $term = $_GET['q'] ?? '';
-            $sql = "SELECT id, data FROM $tablaCotizaciones";
+            $limit = max(1, min(100, (int)($_GET['limit'] ?? 20)));
+            $offset = max(0, (int)($_GET['offset'] ?? 0));
+
+            $where = '';
             $params = [];
             if ($term) {
-                $sql .= " WHERE id LIKE ? OR JSON_EXTRACT(data, '$.pax.nombre_pax') LIKE ? OR JSON_EXTRACT(data, '$.pax.contacto') LIKE ?";
+                $where = " WHERE id LIKE ? OR JSON_EXTRACT(data, '$.pax.nombre_pax') LIKE ? OR JSON_EXTRACT(data, '$.pax.contacto') LIKE ?";
                 $like = "%$term%";
                 $params = [$like, $like, $like];
             }
-            $sql .= " ORDER BY fecha_guardado DESC LIMIT 20";
-            $stmt = $db->prepare($sql);
+
+            $countStmt = $db->prepare("SELECT COUNT(*) FROM $tablaCotizaciones" . $where);
+            $countStmt->execute($params);
+            $total = (int)$countStmt->fetchColumn();
+
+            $stmt = $db->prepare("SELECT id, data FROM $tablaCotizaciones$where ORDER BY fecha_guardado DESC LIMIT $limit OFFSET $offset");
             $stmt->execute($params);
             $results = [];
             while ($row = $stmt->fetch()) {
                 $row['data'] = json_decode($row['data'], true);
                 $results[] = $row;
             }
-            echo json_encode($results);
+            echo json_encode(['results' => $results, 'total' => $total]);
             break;
 
         case 'cotizacion':
