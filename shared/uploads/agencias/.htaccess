@@ -1,0 +1,12 @@
+# Evita la ejecución de scripts en esta carpeta de subidas
+<FilesMatch "\.(php|php\d|phtml|pht|phar|cgi|pl|py|sh|exe)$">
+    Require all denied
+</FilesMatch>
+
+# Compatibilidad con Apache 2.2 (por si el hosting usa mod_access viejo)
+<IfModule !mod_authz_core.c>
+    <FilesMatch "\.(php|php\d|phtml|pht|phar|cgi|pl|py|sh|exe)$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>

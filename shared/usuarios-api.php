@@ -20,7 +20,12 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     switch ($path) {
         case 'listar':
-            $stmt = $db->query("SELECT id, usuario, rol, activo, creado_en FROM usuarios ORDER BY creado_en DESC");
+            $stmt = $db->query(
+                "SELECT u.id, u.usuario, u.rol, u.activo, u.creado_en, u.agencia_id, a.nombre AS agencia_nombre
+                 FROM usuarios u
+                 LEFT JOIN agencias a ON a.id = u.agencia_id
+                 ORDER BY u.creado_en DESC"
+            );
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -34,6 +39,7 @@ try {
             $usuario = trim($data['usuario'] ?? '');
             $password = $data['password'] ?? '';
             $rol = $data['rol'] ?? '';
+            $agenciaId = !empty($data['agencia_id']) ? intval($data['agencia_id']) : null;
 
             if (!$usuario || !$password || !in_array($rol, $ROLES_VALIDOS, true)) {
                 http_response_code(400);
@@ -43,9 +49,48 @@ try {
 
             try {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare("INSERT INTO usuarios (usuario, password_hash, rol, creado_por) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$usuario, $hash, $rol, $_SESSION['user_id']]);
+                $stmt = $db->prepare("INSERT INTO usuarios (usuario, password_hash, rol, agencia_id, creado_por) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$usuario, $hash, $rol, $agenciaId, $_SESSION['user_id']]);
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
+            } catch (PDOException $e) {
+                if ($e->getCode() === '23000') {
+                    http_response_code(409);
+                    echo json_encode(['error' => 'Ese nombre de usuario ya existe.']);
+                } else {
+                    throw $e;
+                }
+            }
+            break;
+
+        case 'editar':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $id = intval($data['id'] ?? 0);
+            $usuario = trim($data['usuario'] ?? '');
+            $password = $data['password'] ?? '';
+            $rol = $data['rol'] ?? '';
+            $agenciaId = !empty($data['agencia_id']) ? intval($data['agencia_id']) : null;
+
+            if (!$id || !$usuario || !in_array($rol, $ROLES_VALIDOS, true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Usuario y un rol válido son requeridos.']);
+                break;
+            }
+
+            try {
+                if ($password !== '') {
+                    $hash = password_hash($password, PASSWORD_DEFAULT);
+                    $stmt = $db->prepare("UPDATE usuarios SET usuario = ?, password_hash = ?, rol = ?, agencia_id = ? WHERE id = ?");
+                    $stmt->execute([$usuario, $hash, $rol, $agenciaId, $id]);
+                } else {
+                    $stmt = $db->prepare("UPDATE usuarios SET usuario = ?, rol = ?, agencia_id = ? WHERE id = ?");
+                    $stmt->execute([$usuario, $rol, $agenciaId, $id]);
+                }
+                echo json_encode(['success' => true]);
             } catch (PDOException $e) {
                 if ($e->getCode() === '23000') {
                     http_response_code(409);

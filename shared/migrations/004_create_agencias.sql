@@ -1,0 +1,14 @@
+CREATE TABLE agencias (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    ruc VARCHAR(20) NULL,
+    direccion VARCHAR(255) NULL,
+    telefono VARCHAR(50) NULL,
+    whatsapp VARCHAR(50) NULL,
+    logo VARCHAR(255) NULL,
+    creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE usuarios
+    ADD COLUMN agencia_id INT NULL,
+    ADD FOREIGN KEY (agencia_id) REFERENCES agencias(id) ON DELETE SET NULL;

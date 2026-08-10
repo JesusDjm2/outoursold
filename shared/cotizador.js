@@ -34,6 +34,10 @@ let cotizaciones = {};
 let currentCotizacionId = null;
 let toursFilter = '';
 let hotelsFilter = '';
+let paquetesData = [];
+let paqueteEditandoId = null;
+let pdfPreviewUrl = null;
+let pdfPreviewFilename = '';
 
 // ===== UTILIDADES =====
 const fmt = (v) => {
@@ -57,21 +61,20 @@ function safeJsonParse(str) {
 // ===== CARGA DE DATOS =====
 async function cargarDatosIniciales() {
     try {
-        const [toursRes, hotelesRes, cotizacionesRes] = await Promise.all([
+        const [toursRes, hotelesRes, paquetesRes] = await Promise.all([
             fetch(`${API_URL}?path=tours`).then(r => r.json()),
             fetch(`${API_URL}?path=hoteles`).then(r => r.json()),
-            fetch(`${API_URL}?path=cotizaciones`).then(r => r.json())
+            fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json())
         ]);
         toursData = toursRes;
         hotelsData = hotelesRes;
+        paquetesData = paquetesRes;
         cotizaciones = {};
-        (cotizacionesRes.results || []).forEach(c => {
-            cotizaciones[c.id] = c.data;
-        });
         updateDatalists();
         renderTours();
         renderHotels();
-        actualizarUltimasCotizaciones();
+        renderPaquetesList();
+        renderAplicarPaqueteSelect();
     } catch (error) {
         console.error('Error al cargar datos:', error);
         notifyError('Error al conectar con el servidor. Revisa tu conexión.');
@@ -80,23 +83,112 @@ async function cargarDatosIniciales() {
 
 // ===== ACTUALIZAR DATALISTS =====
 function updateDatalists() {
-    ['tours', 'hotels'].forEach(type => {
-        let list = document.getElementById(type + '-list');
+    const listas = {
+        'hotels-list': [...new Set(hotelsData.map(h => h.aloj))],
+        'destinos-list': [...new Set(toursData.map(t => t.destino).filter(Boolean))],
+        'categorias-list': [...new Set(toursData.map(t => t.categoria).filter(Boolean))]
+    };
+    Object.entries(listas).forEach(([id, items]) => {
+        let list = document.getElementById(id);
         if (!list) {
             list = document.createElement('datalist');
-            list.id = type + '-list';
+            list.id = id;
             document.body.appendChild(list);
         }
         list.innerHTML = '';
-        const items = type === 'tours'
-            ? [...new Set(toursData.map(t => t.tour))]
-            : [...new Set(hotelsData.map(h => h.aloj))];
         items.sort().forEach(item => {
             const opt = document.createElement('option');
             opt.value = item;
             list.appendChild(opt);
         });
     });
+}
+
+// ===== SELECTOR EN CASCADA: Destino → Categoría → Actividad =====
+// Reemplaza el antiguo autocompletado plano de "Tour/Actividad" en Data Tours y en
+// el armador de Paquetes, para que elegir una actividad sea manejable aunque el
+// catálogo crezca mucho.
+const SIN_DESTINO = 'Sin clasificar';
+const SIN_CATEGORIA = 'Sin categoría';
+
+function destinoDe(t) { return t.destino || SIN_DESTINO; }
+function categoriaDe(t) { return t.categoria || SIN_CATEGORIA; }
+
+function getDestinos() {
+    return [...new Set(toursData.map(destinoDe))].sort();
+}
+function getCategorias(destino) {
+    return [...new Set(toursData.filter(t => destinoDe(t) === destino).map(categoriaDe))].sort();
+}
+function getActividades(destino, categoria) {
+    return toursData
+        .filter(t => destinoDe(t) === destino && categoriaDe(t) === categoria)
+        .sort((a, b) => a.tour.localeCompare(b.tour));
+}
+
+// initialTourName: nombre de tour ya elegido (al cargar una cotización o aplicar un paquete).
+// onResolved(tourName): se llama cada vez que la cascada termina en una actividad concreta,
+// o con '' mientras el usuario todavía está eligiendo destino/categoría.
+function buildTourSelector(initialTourName, onResolved) {
+    const wrap = document.createElement('div');
+    wrap.className = 'grid grid-cols-3 gap-1';
+    wrap.innerHTML = `
+        <select class="input rounded px-1 py-1 border sel-destino" style="font-size:0.72rem"><option value="">Destino...</option></select>
+        <select class="input rounded px-1 py-1 border sel-categoria" style="font-size:0.72rem" disabled><option value="">Categoría...</option></select>
+        <select class="input rounded px-1 py-1 border sel-actividad" style="font-size:0.72rem" disabled><option value="">Actividad...</option></select>
+    `;
+    const destinoSel = wrap.querySelector('.sel-destino');
+    const categoriaSel = wrap.querySelector('.sel-categoria');
+    const actividadSel = wrap.querySelector('.sel-actividad');
+
+    function llenarDestinos() {
+        destinoSel.innerHTML = '<option value="">Destino...</option>' +
+            getDestinos().map(d => `<option value="${d}">${d}</option>`).join('');
+    }
+    function llenarCategorias(destino) {
+        categoriaSel.innerHTML = '<option value="">Categoría...</option>' +
+            getCategorias(destino).map(c => `<option value="${c}">${c}</option>`).join('');
+        categoriaSel.disabled = !destino;
+    }
+    function llenarActividades(destino, categoria) {
+        actividadSel.innerHTML = '<option value="">Actividad...</option>' +
+            getActividades(destino, categoria).map(t => `<option value="${t.tour}">${t.tour}</option>`).join('');
+        actividadSel.disabled = !destino || !categoria;
+    }
+
+    llenarDestinos();
+    llenarCategorias('');
+    llenarActividades('', '');
+
+    destinoSel.addEventListener('change', () => {
+        llenarCategorias(destinoSel.value);
+        llenarActividades('', '');
+        onResolved('');
+    });
+    categoriaSel.addEventListener('change', () => {
+        llenarActividades(destinoSel.value, categoriaSel.value);
+        onResolved('');
+    });
+    actividadSel.addEventListener('change', () => onResolved(actividadSel.value));
+
+    if (initialTourName) {
+        const match = toursData.find(t => t.tour === initialTourName);
+        if (match) {
+            const destino = destinoDe(match);
+            const categoria = categoriaDe(match);
+            destinoSel.value = destino;
+            llenarCategorias(destino);
+            categoriaSel.value = categoria;
+            llenarActividades(destino, categoria);
+            actividadSel.value = initialTourName;
+        } else {
+            // El tour ya no está en el catálogo (borrado/renombrado) — se preserva el nombre igual.
+            actividadSel.innerHTML = `<option value="${initialTourName}" selected>${initialTourName} (fuera de catálogo)</option>`;
+            actividadSel.disabled = false;
+        }
+    }
+
+    return wrap;
 }
 
 // ===== RENDER TABLAS (gestión) — CRUD de tours y hoteles =====
@@ -107,7 +199,7 @@ function renderTours() {
         .filter(t => t.tour.toLowerCase().includes(toursFilter))
         .sort((a, b) => a.tour.localeCompare(b.tour));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
     } else {
         visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
     }
@@ -118,9 +210,12 @@ function buildTourRow(t) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-3 font-medium">${t.tour}</td>
+        <td class="p-3">${t.destino || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3">${t.categoria || '<span class="text-slate-400">—</span>'}</td>
         <td class="p-3">${t.distr || ''}</td>
         <td class="p-3">${fmt(t.preg)}</td>
         <td class="p-3">${fmt(t.ppromo)}</td>
+        <td class="p-3 text-slate-500">${t.creado_por_nombre || '—'}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
@@ -136,18 +231,22 @@ function buildTourEditRow(t) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.tour}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.destino || ''}" list="destinos-list"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.categoria || ''}" list="categorias-list"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.ppromo}"></td>
+        <td class="p-2 text-slate-500">${t.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
         </td>
     `;
-    const [tourI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const [tourI, destinoI, categoriaI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
     const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarTour({
-        id: t.id, tour: tourI.value.trim(), distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+        id: t.id, tour: tourI.value.trim(), destino: destinoI.value.trim(), categoria: categoriaI.value.trim(),
+        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
     }));
     cancelBtn.addEventListener('click', () => tr.replaceWith(buildTourRow(t)));
     return tr;
@@ -201,7 +300,7 @@ function renderHotels() {
         .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
         .sort((a, b) => a.aloj.localeCompare(b.aloj));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
     } else {
         visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
     }
@@ -215,6 +314,7 @@ function buildHotelRow(h) {
         <td class="p-3">${h.distr || ''}</td>
         <td class="p-3">${fmt(h.preg)}</td>
         <td class="p-3">${fmt(h.ppromo)}</td>
+        <td class="p-3 text-slate-500">${h.creado_por_nombre || '—'}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
@@ -233,6 +333,7 @@ function buildHotelEditRow(h) {
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.ppromo}"></td>
+        <td class="p-2 text-slate-500">${h.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
@@ -288,6 +389,160 @@ async function refrescarHoteles() {
     renderHotels();
 }
 
+// ===== PAQUETES DE TOURS (combos reutilizables para Data Tours) =====
+async function cargarPaquetes() {
+    try {
+        paquetesData = await fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json());
+        renderPaquetesList();
+        renderAplicarPaqueteSelect();
+    } catch (e) {
+        console.error('Error al cargar paquetes:', e);
+    }
+}
+
+function agregarFilaPaquete(data = {}) {
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center paquete-builder-row';
+
+    const tourInput = document.createElement('input');
+    tourInput.type = 'hidden';
+    tourInput.className = 'paquete-row-tour';
+    tourInput.value = data.tour || '';
+
+    const selector = buildTourSelector(data.tour || '', (tourName) => {
+        tourInput.value = tourName;
+    });
+    selector.classList.add('flex-1');
+
+    const cantInput = document.createElement('input');
+    cantInput.className = 'input rounded px-2 py-1 border text-right paquete-row-cant';
+    cantInput.type = 'number';
+    cantInput.min = '1';
+    cantInput.value = data.cant || 1;
+    cantInput.style.width = '80px';
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-500 small paquete-row-del';
+    delBtn.title = 'Quitar';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', () => row.remove());
+
+    row.append(selector, tourInput, cantInput, delBtn);
+    document.getElementById('paquete-builder-rows').appendChild(row);
+}
+
+function resetPaqueteBuilder() {
+    document.getElementById('paquete-nombre').value = '';
+    document.getElementById('paquete-builder-rows').innerHTML = '';
+    agregarFilaPaquete();
+    paqueteEditandoId = null;
+    document.getElementById('paquete-cancelar-edicion').classList.add('hidden');
+}
+
+async function guardarPaquete() {
+    const nombre = document.getElementById('paquete-nombre').value.trim();
+    if (!nombre) { notifyError('El nombre del paquete es obligatorio.'); return; }
+    const tours = Array.from(document.querySelectorAll('.paquete-builder-row')).map(row => ({
+        tour: row.querySelector('.paquete-row-tour').value.trim(),
+        cant: row.querySelector('.paquete-row-cant').value
+    })).filter(t => t.tour);
+    if (tours.length === 0) { notifyError('Agrega al menos un tour al paquete.'); return; }
+    try {
+        const payload = { nombre, tours };
+        if (paqueteEditandoId) payload.id = paqueteEditandoId;
+        const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(paqueteEditandoId ? 'Paquete actualizado.' : 'Paquete guardado.');
+        resetPaqueteBuilder();
+        await cargarPaquetes();
+    } catch (e) {
+        notifyError('Error al guardar el paquete: ' + e.message);
+    }
+}
+
+function editarPaquete(paquete) {
+    document.getElementById('paquete-nombre').value = paquete.nombre;
+    document.getElementById('paquete-builder-rows').innerHTML = '';
+    paquete.tours.forEach(t => agregarFilaPaquete(t));
+    paqueteEditandoId = paquete.id;
+    document.getElementById('paquete-cancelar-edicion').classList.remove('hidden');
+}
+
+async function eliminarPaquete(paquete) {
+    if (!await confirmAction(`¿Eliminar el paquete "${paquete.nombre}"?`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-paquete-tour`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: paquete.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Paquete eliminado.');
+        if (paqueteEditandoId === paquete.id) resetPaqueteBuilder();
+        await cargarPaquetes();
+    } catch (e) {
+        notifyError('Error al eliminar el paquete: ' + e.message);
+    }
+}
+
+function renderPaquetesList() {
+    const container = document.getElementById('paquetes-list');
+    container.innerHTML = '';
+    if (paquetesData.length === 0) {
+        container.innerHTML = '<p class="text-slate-400 text-sm">Sin paquetes guardados.</p>';
+        return;
+    }
+    paquetesData.forEach(p => {
+        const preview = p.tours.map(t => `${t.tour} x${t.cant}`).join(', ');
+        const div = document.createElement('div');
+        div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3 flex-wrap';
+        div.innerHTML = `
+            <div class="min-w-0">
+                <div class="font-medium">${p.nombre}</div>
+                <div class="text-xs text-slate-500 truncate">${preview}</div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
+                <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
+                <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+        div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
+        div.querySelector('.paquete-editar-btn').addEventListener('click', () => editarPaquete(p));
+        div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
+        container.appendChild(div);
+    });
+}
+
+function renderAplicarPaqueteSelect() {
+    const select = document.getElementById('aplicar-paquete-select');
+    select.innerHTML = '<option value="">Aplicar paquete...</option>';
+    paquetesData.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.nombre;
+        select.appendChild(opt);
+    });
+}
+
+function aplicarPaquete(paquete) {
+    const toursBody = document.getElementById('tours-body');
+    paquete.tours.forEach(item => {
+        const tr = createTourRow({ tour: item.tour, cant: item.cant });
+        toursBody.appendChild(tr);
+        tr.querySelector('.tour-name').dispatchEvent(new Event('input'));
+    });
+    calcularResumen();
+    notifySuccess(`Se agregaron ${paquete.tours.length} tour(s) del paquete "${paquete.nombre}".`);
+    irATabCotizador();
+}
+
 // ===== FILAS =====
 function createTourRow(data = {}) {
     const tr = document.createElement('tr');
@@ -308,7 +563,7 @@ function createTourRow(data = {}) {
     tr.innerHTML = `
         <td class="pl-2"><div class="handle">≡</div></td>
         <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.fecha || ''}"></td>
-        <td><input class="input w-full rounded px-2 py-1 border tour-name" type="text" value="${data.tour || ''}" list="tours-list"></td>
+        <td class="tour-selector-cell"></td>
         <td><input class="input w-full rounded px-2 py-1 border text-right cant" type="number" min="0" value="${initialCant}"></td>
         <td><input class="input w-full rounded px-2 py-1 border distr" type="text" value="${data.distr || ''}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
@@ -325,18 +580,10 @@ function createTourRow(data = {}) {
         calcularResumen();
     });
 
-    const tourInput = tr.querySelector('.tour-name');
-
-    let originalValue = data.tour || '';
-    tourInput.addEventListener('mousedown', function() {
-        originalValue = this.value;
-        this.value = '';
-    });
-    tourInput.addEventListener('blur', function() {
-        if (this.value === '') {
-            this.value = originalValue;
-        }
-    });
+    const tourInput = document.createElement('input');
+    tourInput.type = 'hidden';
+    tourInput.className = 'tour-name';
+    tourInput.value = data.tour || '';
 
     tourInput.addEventListener('input', function() {
         const tour = toursData.find(t => t.tour === this.value);
@@ -347,9 +594,17 @@ function createTourRow(data = {}) {
             const cant = parseFloat(tr.querySelector('.cant').value) || 0;
             tr.querySelector('.total-line').textContent = fmt(cant * tour.ppromo);
             calcularResumen();
-            originalValue = this.value;
         }
     });
+
+    const selector = buildTourSelector(data.tour || '', (tourName) => {
+        tourInput.value = tourName;
+        tourInput.dispatchEvent(new Event('input'));
+    });
+    const cell = tr.querySelector('.tour-selector-cell');
+    cell.appendChild(selector);
+    cell.appendChild(tourInput);
+
     addDragHandlers(tr);
     return tr;
 }
@@ -570,8 +825,8 @@ async function guardarCotizacion() {
             cotizaciones[id] = data;
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;
-            actualizarUltimasCotizaciones();
-            notifySuccess(`Cotización guardada con ID: ${id}`);
+            const generarPdf = await notifySuccessAction(`Cotización guardada con ID: ${id}`, 'Generar PDF');
+            if (generarPdf) mostrarVistaPreviaPdf(id);
         } else {
             throw new Error(result.error);
         }
@@ -605,7 +860,6 @@ async function cargarCotizacion(id) {
         cotizaciones[id] = data;
         currentCotizacionId = id;
         document.getElementById('current-cot-id-display').textContent = id;
-        actualizarUltimasCotizaciones();
     } catch (error) {
         notifyError("Error al cargar cotización: " + error.message);
     }
@@ -628,111 +882,155 @@ function nuevaCotizacion(showAlert = true) {
     if(showAlert) notifySuccess('Formulario limpiado para una nueva cotización.');
 }
 
-// ===== MODAL DE REGISTROS (tabla completa, con búsqueda y paginación) =====
-const RECORDS_PAGE_SIZE = 15;
-const recordsState = { term: '', offset: 0, total: 0 };
+// ===== COTIZACIONES GUARDADAS (pestaña con tabla, búsqueda y paginación) =====
+const COT_PAGE_SIZE = 15;
+const cotState = { term: '', offset: 0, total: 0 };
+let cotSearchDebounce = null;
 
-function openRecordsModal(term = '') {
-    recordsState.term = term;
-    recordsState.offset = 0;
-    document.getElementById('records-search-input').value = term;
-    document.getElementById('records-modal').classList.remove('hidden');
-    cargarRegistros();
-}
-
-async function cargarRegistros() {
-    const tbody = document.getElementById('records-table-body');
+async function cargarCotizacionesGuardadas() {
+    const tbody = document.getElementById('cot-table-body');
     tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
     try {
         const params = new URLSearchParams({
-            q: recordsState.term,
-            limit: RECORDS_PAGE_SIZE,
-            offset: recordsState.offset
+            q: cotState.term,
+            limit: COT_PAGE_SIZE,
+            offset: cotState.offset
         });
         const res = await fetch(`${API_URL}?path=cotizaciones&${params}`);
         const { results, total } = await res.json();
-        recordsState.total = total;
+        cotState.total = total;
         tbody.innerHTML = '';
         if (results.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Sin resultados.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
         } else {
-            results.forEach(cot => {
-                const pax = cot.data.pax || {};
-                const tr = document.createElement('tr');
-                tr.className = 'border-t hover:bg-slate-50 cursor-pointer';
-                tr.innerHTML = `
-                    <td class="p-2 font-medium">${cot.id}</td>
-                    <td class="p-2">${pax.nombre_pax || '-'}</td>
-                    <td class="p-2">${pax.contacto || '-'}</td>
-                    <td class="p-2">${pax.fecha_cot || '-'}</td>
-                    <td class="p-2">${pax.n_pax || '-'}</td>
-                    <td class="p-2 text-right"><i class="fas fa-arrow-right text-slate-400"></i></td>
-                `;
-                tr.addEventListener('click', () => {
-                    cargarCotizacion(cot.id);
-                    document.getElementById('records-modal').classList.add('hidden');
-                });
-                tbody.appendChild(tr);
-            });
+            results.forEach(cot => tbody.appendChild(buildCotRow(cot)));
         }
-        const shown = recordsState.offset + results.length;
-        document.getElementById('records-page-info').textContent = total === 0 ? '' : `${recordsState.offset + 1}-${shown} de ${total}`;
-        document.getElementById('records-prev').disabled = recordsState.offset === 0;
-        document.getElementById('records-next').disabled = shown >= total;
+        const shown = cotState.offset + results.length;
+        document.getElementById('cot-page-info').textContent = total === 0 ? '' : `${cotState.offset + 1}-${shown} de ${total}`;
+        document.getElementById('cot-prev').disabled = cotState.offset === 0;
+        document.getElementById('cot-next').disabled = shown >= total;
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
     }
 }
 
-function actualizarUltimasCotizaciones() {
-    fetch(`${API_URL}?path=cotizaciones&limit=5`)
-        .then(r => r.json())
-        .then(({ results }) => {
-            const container = document.getElementById('ultimas-cotizaciones');
-            container.innerHTML = '';
-            if (!results || results.length === 0) {
-                container.innerHTML = '<span class="text-slate-400">Ninguna</span>';
-                return;
-            }
-            results.forEach(cot => {
-                const badge = document.createElement('span');
-                badge.className = 'px-2 py-1 rounded bg-slate-100 text-slate-700 cursor-pointer hover:bg-slate-200';
-                badge.textContent = cot.id;
-                badge.title = `${cot.data.pax.nombre_pax || 'Sin nombre'} - ${cot.data.pax.contacto || ''}`;
-                badge.addEventListener('click', () => cargarCotizacion(cot.id));
-                container.appendChild(badge);
-            });
-        })
-        .catch(() => {
-            document.getElementById('ultimas-cotizaciones').innerHTML = '<span class="text-red-500">Error</span>';
-        });
+function buildCotRow(cot) {
+    const pax = cot.data.pax || {};
+    const tr = document.createElement('tr');
+    tr.className = 'border-t hover:bg-slate-50';
+    tr.innerHTML = `
+        <td class="p-3 font-medium">${cot.id}</td>
+        <td class="p-3">${pax.nombre_pax || '-'}</td>
+        <td class="p-3">${pax.contacto || '-'}</td>
+        <td class="p-3">${pax.fecha_cot || '-'}</td>
+        <td class="p-3">${pax.n_pax || '-'}</td>
+        <td class="p-3 text-right whitespace-nowrap"></td>
+    `;
+    const actionsCell = tr.querySelector('td:last-child');
+
+    const abrirBtn = document.createElement('button');
+    abrirBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    abrirBtn.title = 'Abrir';
+    abrirBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
+    abrirBtn.addEventListener('click', () => abrirCotizacionGuardada(cot.id));
+
+    const dupBtn = document.createElement('button');
+    dupBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    dupBtn.title = 'Duplicar';
+    dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+    dupBtn.addEventListener('click', () => duplicarCotizacionGuardada(cot.id));
+
+    const pdfBtn = document.createElement('button');
+    pdfBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    pdfBtn.title = 'Ver / Descargar PDF';
+    pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+    pdfBtn.addEventListener('click', () => verPdfCotizacionGuardada(cot.id, pdfBtn));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-500 hover:text-red-700';
+    delBtn.title = 'Eliminar';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', () => eliminarCotizacionGuardada(cot.id, pax.nombre_pax));
+
+    actionsCell.append(abrirBtn, dupBtn, pdfBtn, delBtn);
+    return tr;
 }
 
-async function generarCotizacionPdf() {
-    if (!validarFechas()) return;
+function irATabCotizador() {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.querySelector('.nav-tab[data-tab="cotizador"]').classList.add('active');
+    document.getElementById('cotizador-section').classList.remove('hidden');
+}
 
-    const generateBtn = document.getElementById('generar-cotizacion-html');
-    const originalButtonText = generateBtn.innerHTML;
-    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generando...';
-    generateBtn.disabled = true;
+async function abrirCotizacionGuardada(id) {
+    await cargarCotizacion(id);
+    irATabCotizador();
+}
 
-    if (!currentCotizacionId) {
-        await guardarCotizacion();
-        if (!currentCotizacionId) {
-            notifyError("No se pudo guardar la cotización antes de generar el PDF.");
-            generateBtn.innerHTML = originalButtonText;
-            generateBtn.disabled = false;
-            return;
-        }
+async function duplicarCotizacionGuardada(id) {
+    try {
+        const res = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const newId = 'COT-' + Date.now();
+        const copia = { ...data, id: newId, fechaGuardado: new Date().toISOString() };
+        const saveRes = await fetch(`${API_URL}?path=guardar-cotizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(copia)
+        });
+        const result = await saveRes.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(`Cotización duplicada con ID: ${newId}`);
+        await cargarCotizacion(newId);
+        irATabCotizador();
+    } catch (e) {
+        notifyError('Error al duplicar: ' + e.message);
     }
+}
 
-    const cotizacionActual = cotizaciones[currentCotizacionId];
+async function verPdfCotizacionGuardada(id, btn) {
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+    try {
+        await cargarCotizacion(id);
+        await mostrarVistaPreviaPdf(id);
+    } finally {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+    }
+}
+
+async function eliminarCotizacionGuardada(id, nombre) {
+    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-cotizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        if (currentCotizacionId === id) currentCotizacionId = null;
+        delete cotizaciones[id];
+        notifySuccess('Cotización eliminada.');
+        cargarCotizacionesGuardadas();
+    } catch (e) {
+        notifyError('Error al eliminar: ' + e.message);
+    }
+}
+
+// Arma los bytes del PDF a partir de una cotización ya guardada (pax/tours/hotels/precios).
+// No descarga nada ni toca el DOM del formulario: es puro "datos adentro, PDF afuera".
+async function construirPdfBytes(cotizacionActual) {
     const formatDate = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
         return `${day}/${month}/${year}`;
     };
-    try {
+    {
         const [
             templateHtml,
             templateCss,
@@ -879,26 +1177,57 @@ async function generarCotizacionPdf() {
             finalPdfDoc.addPage(terminosPage);
         }
 
-        const finalPdfBytes = await finalPdfDoc.save();
-        const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
+        return finalPdfDoc.save();
+    }
+}
 
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Cotizacion_${cotizacionActual.id}_${cotizacionActual.pax.nombre_pax || 'cliente'}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-
+// Genera el PDF de una cotización ya guardada y lo muestra en el modal de vista previa
+// (nunca descarga directo — el usuario decide si descargar desde ahí, con el PDF ya a la vista).
+async function mostrarVistaPreviaPdf(id) {
+    const cotizacionActual = cotizaciones[id];
+    if (!cotizacionActual) {
+        notifyError('No se encontró la cotización.');
+        return;
+    }
+    abrirModalPdfCargando();
+    try {
+        const bytes = await construirPdfBytes(cotizacionActual);
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+        pdfPreviewUrl = URL.createObjectURL(blob);
+        pdfPreviewFilename = `Cotizacion_${cotizacionActual.id}_${cotizacionActual.pax.nombre_pax || 'cliente'}.pdf`;
+        document.getElementById('pdf-preview-frame').src = pdfPreviewUrl;
+        document.getElementById('pdf-preview-loading').classList.add('hidden');
     } catch (error) {
         console.error('Error al generar PDF:', error);
+        cerrarModalPdf();
         notifyError('Hubo un error al generar el PDF. Revisa la consola para más detalles.');
-    } finally {
-        generateBtn.innerHTML = originalButtonText;
-        generateBtn.disabled = false;
     }
+}
+
+function abrirModalPdfCargando() {
+    document.getElementById('pdf-preview-loading').classList.remove('hidden');
+    document.getElementById('pdf-preview-frame').src = 'about:blank';
+    document.getElementById('pdf-preview-modal').classList.remove('hidden');
+}
+
+function cerrarModalPdf() {
+    document.getElementById('pdf-preview-modal').classList.add('hidden');
+    document.getElementById('pdf-preview-frame').src = 'about:blank';
+    if (pdfPreviewUrl) {
+        URL.revokeObjectURL(pdfPreviewUrl);
+        pdfPreviewUrl = null;
+    }
+}
+
+function descargarPdfPreview() {
+    if (!pdfPreviewUrl) return;
+    const link = document.createElement('a');
+    link.href = pdfPreviewUrl;
+    link.download = pdfPreviewFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // ===== INICIALIZACIÓN =====
@@ -912,6 +1241,7 @@ async function init() {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             tab.classList.add('active');
             document.getElementById(`${tab.dataset.tab}-section`).classList.remove('hidden');
+            if (tab.dataset.tab === 'cotizaciones') cargarCotizacionesGuardadas();
         });
     });
 
@@ -933,45 +1263,52 @@ async function init() {
         renderHotels();
     });
 
-    document.getElementById('generar-cotizacion-html').addEventListener('click', generarCotizacionPdf);
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
-    document.getElementById('nueva-cotizacion').addEventListener('click', () => nuevaCotizacion());
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
-    document.getElementById('buscar-cotizacion-input').addEventListener('keyup', e => {
-        if (e.key === 'Enter') openRecordsModal(e.target.value.trim());
+
+    document.getElementById('close-pdf-preview-btn').addEventListener('click', cerrarModalPdf);
+    document.getElementById('pdf-preview-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('pdf-preview-modal')) cerrarModalPdf();
     });
-    document.getElementById('btn-buscar').addEventListener('click', () => {
-        openRecordsModal(document.getElementById('buscar-cotizacion-input').value.trim());
+    document.getElementById('pdf-preview-descargar').addEventListener('click', descargarPdfPreview);
+
+    document.getElementById('cot-nueva').addEventListener('click', () => {
+        nuevaCotizacion();
+        irATabCotizador();
     });
-    document.getElementById('ver-registros').addEventListener('click', () => openRecordsModal(''));
-    document.getElementById('records-modal').addEventListener('click', (e) => {
-        if (e.target === document.getElementById('records-modal')) {
-            document.getElementById('records-modal').classList.add('hidden');
-        }
+    document.getElementById('cot-search').addEventListener('input', (e) => {
+        clearTimeout(cotSearchDebounce);
+        const term = e.target.value.trim();
+        cotSearchDebounce = setTimeout(() => {
+            cotState.term = term;
+            cotState.offset = 0;
+            cargarCotizacionesGuardadas();
+        }, 300);
     });
-    document.getElementById('close-records-modal-btn').addEventListener('click', () => {
-        document.getElementById('records-modal').classList.add('hidden');
+    document.getElementById('cot-prev').addEventListener('click', () => {
+        cotState.offset = Math.max(0, cotState.offset - COT_PAGE_SIZE);
+        cargarCotizacionesGuardadas();
     });
-    document.getElementById('records-search-input').addEventListener('keyup', e => {
-        if (e.key === 'Enter') {
-            recordsState.term = e.target.value.trim();
-            recordsState.offset = 0;
-            cargarRegistros();
-        }
+    document.getElementById('cot-next').addEventListener('click', () => {
+        cotState.offset += COT_PAGE_SIZE;
+        cargarCotizacionesGuardadas();
     });
-    document.getElementById('records-prev').addEventListener('click', () => {
-        recordsState.offset = Math.max(0, recordsState.offset - RECORDS_PAGE_SIZE);
-        cargarRegistros();
+    document.getElementById('paquete-add-row').addEventListener('click', () => agregarFilaPaquete());
+    document.getElementById('paquete-guardar').addEventListener('click', guardarPaquete);
+    document.getElementById('paquete-cancelar-edicion').addEventListener('click', resetPaqueteBuilder);
+    document.getElementById('aplicar-paquete-select').addEventListener('change', (e) => {
+        const id = e.target.value;
+        if (!id) return;
+        const paquete = paquetesData.find(p => String(p.id) === id);
+        if (paquete) aplicarPaquete(paquete);
+        e.target.value = '';
     });
-    document.getElementById('records-next').addEventListener('click', () => {
-        recordsState.offset += RECORDS_PAGE_SIZE;
-        cargarRegistros();
-    });
+    agregarFilaPaquete();
+
     document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow()));
     document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow()));
     document.getElementById('clear-tours').addEventListener('click', () => { document.getElementById('tours-body').innerHTML = ''; calcularResumen(); });
     document.getElementById('clear-hotels').addEventListener('click', () => { document.getElementById('hotels-body').innerHTML = ''; calcularResumen(); });
-    document.getElementById('calcular').addEventListener('click', calcularResumen);
     document.getElementById('precio-adicional').addEventListener('input', calcularResumen);
     document.getElementById('descuento-especial').addEventListener('input', calcularResumen);
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
@@ -979,11 +1316,13 @@ async function init() {
     document.getElementById('tour-new-add').addEventListener('click', async () => {
         const ok = await guardarTour({
             tour: document.getElementById('tour-new-nombre').value.trim(),
+            destino: document.getElementById('tour-new-destino').value.trim(),
+            categoria: document.getElementById('tour-new-categoria').value.trim(),
             distr: document.getElementById('tour-new-distr').value.trim(),
             preg: document.getElementById('tour-new-preg').value,
             ppromo: document.getElementById('tour-new-ppromo').value
         });
-        if (ok) ['tour-new-nombre', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+        if (ok) ['tour-new-nombre', 'tour-new-destino', 'tour-new-categoria', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
     });
     document.getElementById('hotel-new-add').addEventListener('click', async () => {
         const ok = await guardarHotel({
