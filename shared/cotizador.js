@@ -30,6 +30,11 @@ const CURRENCY_SYMBOL = window.APP_CONFIG.currencySymbol;
 // ===== DATOS Y ESTADO =====
 let toursData = [];
 let hotelsData = [];
+let destinosData = [];
+let categoriasData = [];
+let categoriasHotelesData = [];
+let destinoSeleccionadoId = null;
+let categoriaTipoActivo = 'tours';
 let cotizaciones = {};
 let currentCotizacionId = null;
 let toursFilter = '';
@@ -38,6 +43,58 @@ let paquetesData = [];
 let paqueteEditandoId = null;
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
+let pdfPreviewCotizacionId = null;
+let pdfPreviewIdioma = 'es';
+
+// Etiquetas fijas de la plantilla del PDF (shared/pdf-template.html /
+// pdf-terminos-template.html), traducidas a los 3 idiomas de exportación. Los datos
+// variables (tours, hoteles, notas) no se traducen: quedan tal como los escribió el
+// usuario; solo el "chrome" de la plantilla y el título de Términos cambian de idioma.
+const PDF_LABELS = {
+    es: {
+        eCotizacion: 'E-COTIZACIÓN', agente: 'Agente de reservas:', reservaTuPaquete: 'Reserva tu paquete con el',
+        llegada: 'Llegada', salida: 'Salida', fecha: 'Fecha', tourActividad: 'Tour/Actividad', cant: 'Cant.',
+        pReg: 'P.Reg.', pPromo: 'P. Promo', totalLinea: 'Total línea', checkIn: 'Check in', checkOut: 'Check out',
+        alojamiento: 'Alojamiento', nHab: 'N° hab.', nNoches: 'N° noches', pRegNoche: 'P. reg. x noche',
+        pPromoNoche: 'P. promo x noche', nota: 'NOTA:', sinNotas: 'Sin notas adicionales.',
+        cantidadBaseTotal: 'Cantidad base total', descuentoTotal: '(-) Descuento Total',
+        precioAdicional: 'Precio adicional:', totalFinal: 'Total final', terminosTitulo: 'Términos y Condiciones',
+        ruc: 'RUC:', telf: 'Telf:', cel: 'Cel:', whatsapp: 'Whatsapp:',
+        na: 'N/A', actividadNoEspecificada: 'Actividad no especificada'
+    },
+    en: {
+        eCotizacion: 'E-QUOTE', agente: 'Booking agent:', reservaTuPaquete: 'Book your package with',
+        llegada: 'Arrival', salida: 'Departure', fecha: 'Date', tourActividad: 'Tour/Activity', cant: 'Qty.',
+        pReg: 'Reg. Price', pPromo: 'Promo Price', totalLinea: 'Line total', checkIn: 'Check in', checkOut: 'Check out',
+        alojamiento: 'Accommodation', nHab: 'Rooms', nNoches: 'Nights', pRegNoche: 'Reg. price/night',
+        pPromoNoche: 'Promo price/night', nota: 'NOTE:', sinNotas: 'No additional notes.',
+        cantidadBaseTotal: 'Total base amount', descuentoTotal: '(-) Total discount',
+        precioAdicional: 'Additional price:', totalFinal: 'Final total', terminosTitulo: 'Terms and Conditions',
+        ruc: 'Tax ID:', telf: 'Phone:', cel: 'Mobile:', whatsapp: 'WhatsApp:',
+        na: 'N/A', actividadNoEspecificada: 'Activity not specified'
+    },
+    pt: {
+        eCotizacion: 'E-COTAÇÃO', agente: 'Agente de reservas:', reservaTuPaquete: 'Reserve seu pacote com',
+        llegada: 'Chegada', salida: 'Partida', fecha: 'Data', tourActividad: 'Passeio/Atividade', cant: 'Qtd.',
+        pReg: 'Preço Reg.', pPromo: 'Preço Promo', totalLinea: 'Total da linha', checkIn: 'Check in', checkOut: 'Check out',
+        alojamiento: 'Hospedagem', nHab: 'N° quartos', nNoches: 'N° noites', pRegNoche: 'Preço reg. por noite',
+        pPromoNoche: 'Preço promo por noite', nota: 'NOTA:', sinNotas: 'Sem notas adicionais.',
+        cantidadBaseTotal: 'Valor base total', descuentoTotal: '(-) Desconto Total',
+        precioAdicional: 'Preço adicional:', totalFinal: 'Total final', terminosTitulo: 'Termos e Condições',
+        ruc: 'RUC:', telf: 'Tel:', cel: 'Celular:', whatsapp: 'WhatsApp:',
+        na: 'N/D', actividadNoEspecificada: 'Atividade não especificada'
+    }
+};
+
+// Fallback si una cotización no tiene ninguna agencia asociada y tampoco existe una fila
+// marcada como principal (caso límite de integridad de datos) — evita que la generación
+// del PDF se rompa por completo.
+const EMPRESA_FALLBACK = {
+    nombre: 'OUTOORS AGENCIA DE VIAJES', ruc: '20609305755',
+    direccion: 'Jose Carlos Mariategui F-2, Cusco, Perú',
+    telefono: '(084)', telefono2: '(+51) 970-824-536', whatsapp: '(+51) 935-095-895',
+    logo: null, terminos_es: null, terminos_en: null, terminos_pt: null
+};
 
 // ===== UTILIDADES =====
 const fmt = (v) => {
@@ -58,21 +115,32 @@ function safeJsonParse(str) {
     }
 }
 
+// notasLegacyToHtml() e initRichTextEditor() ahora viven en shared/rte.js (compartidas con
+// el editor de Términos y Condiciones de Agencias en usuarios.php).
+
 // ===== CARGA DE DATOS =====
 async function cargarDatosIniciales() {
     try {
-        const [toursRes, hotelesRes, paquetesRes] = await Promise.all([
+        const [toursRes, hotelesRes, paquetesRes, destinosRes, categoriasRes, categoriasHotelesRes] = await Promise.all([
             fetch(`${API_URL}?path=tours`).then(r => r.json()),
             fetch(`${API_URL}?path=hoteles`).then(r => r.json()),
-            fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json())
+            fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json()),
+            fetch(`${API_URL}?path=destinos`).then(r => r.json()),
+            fetch(`${API_URL}?path=categorias`).then(r => r.json()),
+            fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json())
         ]);
         toursData = toursRes;
         hotelsData = hotelesRes;
         paquetesData = paquetesRes;
+        destinosData = destinosRes;
+        categoriasData = categoriasRes;
+        categoriasHotelesData = categoriasHotelesRes;
         cotizaciones = {};
-        updateDatalists();
         renderTours();
         renderHotels();
+        renderDestinos();
+        renderTourNewDestinoCategoria();
+        renderHotelNewDestinoCategoria();
         renderPaquetesList();
         renderAplicarPaqueteSelect();
     } catch (error) {
@@ -81,114 +149,24 @@ async function cargarDatosIniciales() {
     }
 }
 
-// ===== ACTUALIZAR DATALISTS =====
-function updateDatalists() {
-    const listas = {
-        'hotels-list': [...new Set(hotelsData.map(h => h.aloj))],
-        'destinos-list': [...new Set(toursData.map(t => t.destino).filter(Boolean))],
-        'categorias-list': [...new Set(toursData.map(t => t.categoria).filter(Boolean))]
-    };
-    Object.entries(listas).forEach(([id, items]) => {
-        let list = document.getElementById(id);
-        if (!list) {
-            list = document.createElement('datalist');
-            list.id = id;
-            document.body.appendChild(list);
-        }
-        list.innerHTML = '';
-        items.sort().forEach(item => {
-            const opt = document.createElement('option');
-            opt.value = item;
-            list.appendChild(opt);
-        });
-    });
+// ===== SELECTOR EN CASCADA: Destino → Categoría → Ítem =====
+// crearHelpersClasificacion / buildClasificacionSelector ahora viven en
+// shared/cascade-select.js (compartido con el Generador de Itinerarios).
+function nombreEnCatalogo(catalogo, id) {
+    return catalogo.find(x => x.id === id)?.nombre || null;
 }
+function destinoNombre(destinoId) { return nombreEnCatalogo(destinosData, destinoId); }
+function categoriaNombre(categoriaId) { return nombreEnCatalogo(categoriasData, categoriaId); }
+function categoriaHotelNombre(categoriaId) { return nombreEnCatalogo(categoriasHotelesData, categoriaId); }
 
-// ===== SELECTOR EN CASCADA: Destino → Categoría → Actividad =====
-// Reemplaza el antiguo autocompletado plano de "Tour/Actividad" en Data Tours y en
-// el armador de Paquetes, para que elegir una actividad sea manejable aunque el
-// catálogo crezca mucho.
-const SIN_DESTINO = 'Sin clasificar';
-const SIN_CATEGORIA = 'Sin categoría';
+const toursHelpers = crearHelpersClasificacion(() => toursData, () => categoriasData, 'tour');
+const hotelesHelpers = crearHelpersClasificacion(() => hotelsData, () => categoriasHotelesData, 'aloj');
 
-function destinoDe(t) { return t.destino || SIN_DESTINO; }
-function categoriaDe(t) { return t.categoria || SIN_CATEGORIA; }
-
-function getDestinos() {
-    return [...new Set(toursData.map(destinoDe))].sort();
-}
-function getCategorias(destino) {
-    return [...new Set(toursData.filter(t => destinoDe(t) === destino).map(categoriaDe))].sort();
-}
-function getActividades(destino, categoria) {
-    return toursData
-        .filter(t => destinoDe(t) === destino && categoriaDe(t) === categoria)
-        .sort((a, b) => a.tour.localeCompare(b.tour));
-}
-
-// initialTourName: nombre de tour ya elegido (al cargar una cotización o aplicar un paquete).
-// onResolved(tourName): se llama cada vez que la cascada termina en una actividad concreta,
-// o con '' mientras el usuario todavía está eligiendo destino/categoría.
 function buildTourSelector(initialTourName, onResolved) {
-    const wrap = document.createElement('div');
-    wrap.className = 'grid grid-cols-3 gap-1';
-    wrap.innerHTML = `
-        <select class="input rounded px-1 py-1 border sel-destino" style="font-size:0.72rem"><option value="">Destino...</option></select>
-        <select class="input rounded px-1 py-1 border sel-categoria" style="font-size:0.72rem" disabled><option value="">Categoría...</option></select>
-        <select class="input rounded px-1 py-1 border sel-actividad" style="font-size:0.72rem" disabled><option value="">Actividad...</option></select>
-    `;
-    const destinoSel = wrap.querySelector('.sel-destino');
-    const categoriaSel = wrap.querySelector('.sel-categoria');
-    const actividadSel = wrap.querySelector('.sel-actividad');
-
-    function llenarDestinos() {
-        destinoSel.innerHTML = '<option value="">Destino...</option>' +
-            getDestinos().map(d => `<option value="${d}">${d}</option>`).join('');
-    }
-    function llenarCategorias(destino) {
-        categoriaSel.innerHTML = '<option value="">Categoría...</option>' +
-            getCategorias(destino).map(c => `<option value="${c}">${c}</option>`).join('');
-        categoriaSel.disabled = !destino;
-    }
-    function llenarActividades(destino, categoria) {
-        actividadSel.innerHTML = '<option value="">Actividad...</option>' +
-            getActividades(destino, categoria).map(t => `<option value="${t.tour}">${t.tour}</option>`).join('');
-        actividadSel.disabled = !destino || !categoria;
-    }
-
-    llenarDestinos();
-    llenarCategorias('');
-    llenarActividades('', '');
-
-    destinoSel.addEventListener('change', () => {
-        llenarCategorias(destinoSel.value);
-        llenarActividades('', '');
-        onResolved('');
-    });
-    categoriaSel.addEventListener('change', () => {
-        llenarActividades(destinoSel.value, categoriaSel.value);
-        onResolved('');
-    });
-    actividadSel.addEventListener('change', () => onResolved(actividadSel.value));
-
-    if (initialTourName) {
-        const match = toursData.find(t => t.tour === initialTourName);
-        if (match) {
-            const destino = destinoDe(match);
-            const categoria = categoriaDe(match);
-            destinoSel.value = destino;
-            llenarCategorias(destino);
-            categoriaSel.value = categoria;
-            llenarActividades(destino, categoria);
-            actividadSel.value = initialTourName;
-        } else {
-            // El tour ya no está en el catálogo (borrado/renombrado) — se preserva el nombre igual.
-            actividadSel.innerHTML = `<option value="${initialTourName}" selected>${initialTourName} (fuera de catálogo)</option>`;
-            actividadSel.disabled = false;
-        }
-    }
-
-    return wrap;
+    return buildClasificacionSelector(toursHelpers, 'Actividad...', initialTourName, onResolved);
+}
+function buildHotelSelector(initialHotelName, onResolved) {
+    return buildClasificacionSelector(hotelesHelpers, 'Alojamiento...', initialHotelName, onResolved);
 }
 
 // ===== RENDER TABLAS (gestión) — CRUD de tours y hoteles =====
@@ -203,15 +181,14 @@ function renderTours() {
     } else {
         visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
     }
-    updateDatalists();
 }
 
 function buildTourRow(t) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-3 font-medium">${t.tour}</td>
-        <td class="p-3">${t.destino || '<span class="text-slate-400">—</span>'}</td>
-        <td class="p-3">${t.categoria || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3">${destinoNombre(t.destino_id) || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3">${categoriaNombre(t.categoria_id) || '<span class="text-slate-400">—</span>'}</td>
         <td class="p-3">${t.distr || ''}</td>
         <td class="p-3">${fmt(t.preg)}</td>
         <td class="p-3">${fmt(t.ppromo)}</td>
@@ -227,12 +204,44 @@ function buildTourRow(t) {
     return tr;
 }
 
+// Selector encadenado Destino → Categoría (sin nivel de Actividad/Alojamiento), para el
+// alta/edición de un tour o un hotel: aquí es donde se define a qué ítem concreto
+// pertenecen esas dos selects. categoriasDataset: categoriasData (Tours) o
+// categoriasHotelesData (Hoteles) — cada tipo tiene su propio catálogo de categorías.
+function buildDestinoCategoriaSelector(categoriasDataset, destinoId, categoriaId) {
+    const wrap = document.createElement('div');
+    wrap.className = 'grid grid-cols-2 gap-1';
+    wrap.innerHTML = `
+        <select class="input w-full rounded px-2 py-1 border sel-destino-tour">
+            <option value="">Destino...</option>
+            ${destinosData.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('')}
+        </select>
+        <select class="input w-full rounded px-2 py-1 border sel-categoria-tour" disabled>
+            <option value="">Categoría...</option>
+        </select>
+    `;
+    wrap.destinoSelect = wrap.querySelector('.sel-destino-tour');
+    wrap.categoriaSelect = wrap.querySelector('.sel-categoria-tour');
+    const llenarCategorias = (destId) => {
+        wrap.categoriaSelect.innerHTML = '<option value="">Categoría...</option>' +
+            categoriasDataset.filter(c => c.destino_id === Number(destId))
+                .map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        wrap.categoriaSelect.disabled = !destId;
+    };
+    wrap.destinoSelect.addEventListener('change', () => llenarCategorias(wrap.destinoSelect.value));
+    if (destinoId) {
+        wrap.destinoSelect.value = destinoId;
+        llenarCategorias(destinoId);
+        if (categoriaId) wrap.categoriaSelect.value = categoriaId;
+    }
+    return wrap;
+}
+
 function buildTourEditRow(t) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.tour}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.destino || ''}" list="destinos-list"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.categoria || ''}" list="categorias-list"></td>
+        <td class="p-2 destino-categoria-cell" colspan="2"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.ppromo}"></td>
@@ -242,10 +251,14 @@ function buildTourEditRow(t) {
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
         </td>
     `;
-    const [tourI, destinoI, categoriaI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasData, t.destino_id, t.categoria_id);
+    tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
+    const [tourI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
     const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarTour({
-        id: t.id, tour: tourI.value.trim(), destino: destinoI.value.trim(), categoria: categoriaI.value.trim(),
+        id: t.id, tour: tourI.value.trim(),
+        destino_id: destinoCategoriaSelector.destinoSelect.value || null,
+        categoria_id: destinoCategoriaSelector.categoriaSelect.value || null,
         distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
     }));
     cancelBtn.addEventListener('click', () => tr.replaceWith(buildTourRow(t)));
@@ -293,6 +306,259 @@ async function refrescarTours() {
     renderTours();
 }
 
+// ===== RENDER TABLAS (gestión) — CRUD de destinos y categorías =====
+// Categoría vive anidada bajo un Destino: elegir un destino en la tabla superior
+// carga (y permite gestionar) sus categorías en la tabla inferior.
+function renderDestinos() {
+    if (destinoSeleccionadoId && !destinosData.some(d => d.id === destinoSeleccionadoId)) {
+        destinoSeleccionadoId = null;
+    }
+    const visibles = [...destinosData].sort((a, b) => a.nombre.localeCompare(b.nombre));
+    // Autoselecciona el primer destino para que el panel de Categorías nunca se vea vacío
+    // esperando un clic que no es obvio — solo hay que "elegir un destino" si de verdad no hay ninguno.
+    if (destinoSeleccionadoId == null && visibles.length > 0) {
+        destinoSeleccionadoId = visibles[0].id;
+    }
+    const listEl = document.getElementById('destinos-table-body');
+    listEl.innerHTML = '';
+    if (visibles.length === 0) {
+        listEl.innerHTML = '<p class="p-3 text-center text-slate-400 text-sm">Sin destinos registrados.</p>';
+    } else {
+        visibles.forEach(d => listEl.appendChild(buildDestinoRow(d)));
+    }
+    renderCategorias();
+}
+
+// Cuántas categorías (de Tours y de Hoteles) tiene ya este destino — ayuda a ver de un
+// vistazo dónde falta clasificar, sin tener que entrar a revisar uno por uno.
+function resumenCategoriasDestino(destinoId) {
+    const nTours = categoriasData.filter(c => c.destino_id === destinoId).length;
+    const nHoteles = categoriasHotelesData.filter(c => c.destino_id === destinoId).length;
+    if (nTours === 0 && nHoteles === 0) return 'Sin categorías';
+    const partes = [];
+    if (nTours > 0) partes.push(`${nTours} tour${nTours === 1 ? '' : 's'}`);
+    if (nHoteles > 0) partes.push(`${nHoteles} hotel${nHoteles === 1 ? '' : 'es'}`);
+    return partes.join(' · ');
+}
+
+function buildDestinoRow(d) {
+    const div = document.createElement('div');
+    div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === destinoSeleccionadoId ? 'active' : ''}`;
+    div.title = 'Ver categorías de este destino';
+    div.innerHTML = `
+        <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+                <i class="fas fa-chevron-right text-xs text-slate-300"></i>
+                <span class="destino-nombre font-medium truncate">${d.nombre}</span>
+            </div>
+            <div class="text-xs text-slate-400 pl-4">${resumenCategoriasDestino(d.id)}</div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+            <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
+            <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+        </div>
+    `;
+    div.addEventListener('click', () => {
+        destinoSeleccionadoId = d.id;
+        renderDestinos();
+    });
+    const [editBtn, delBtn] = div.querySelectorAll('button');
+    editBtn.addEventListener('click', (e) => { e.stopPropagation(); div.replaceWith(buildDestinoEditRow(d)); });
+    delBtn.addEventListener('click', (e) => { e.stopPropagation(); eliminarDestino(d); });
+    return div;
+}
+
+function buildDestinoEditRow(d) {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
+    div.innerHTML = `
+        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${d.nombre}">
+        <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
+        <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
+    `;
+    const nombreI = div.querySelector('input');
+    const [saveBtn, cancelBtn] = div.querySelectorAll('button');
+    saveBtn.addEventListener('click', () => guardarDestino({ id: d.id, nombre: nombreI.value.trim() }));
+    cancelBtn.addEventListener('click', () => div.replaceWith(buildDestinoRow(d)));
+    return div;
+}
+
+async function guardarDestino(payload) {
+    if (!payload.nombre) { notifyError('El nombre del destino es obligatorio.'); return false; }
+    try {
+        const res = await fetch(`${API_URL}?path=guardar-destino`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(payload.id ? 'Destino actualizado.' : 'Destino agregado.');
+        await refrescarDestinosCategorias();
+        return true;
+    } catch (e) {
+        notifyError('Error al guardar el destino: ' + e.message);
+        return false;
+    }
+}
+
+async function eliminarDestino(d) {
+    if (!await confirmAction(`¿Eliminar el destino "${d.nombre}"?`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-destino`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: d.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Destino eliminado.');
+        if (destinoSeleccionadoId === d.id) destinoSeleccionadoId = null;
+        await refrescarDestinosCategorias();
+    } catch (e) {
+        notifyError('Error al eliminar el destino: ' + e.message);
+    }
+}
+
+// Categorías de Tours y de Hoteles son catálogos separados (evita mezclar "City Tour" con
+// "Hotel Boutique"), pero comparten Destino y la misma UI de gestión — un interruptor cambia
+// cuál de los dos catálogos se está viendo/editando para el destino seleccionado.
+const CATEGORIA_TIPOS = {
+    tours: {
+        label: 'Tours',
+        getDataset: () => categoriasData,
+        apiGuardar: 'guardar-categoria',
+        apiEliminar: 'eliminar-categoria'
+    },
+    hoteles: {
+        label: 'Hoteles',
+        getDataset: () => categoriasHotelesData,
+        apiGuardar: 'guardar-categoria-hotel',
+        apiEliminar: 'eliminar-categoria-hotel'
+    }
+};
+
+function renderCategorias() {
+    const listEl = document.getElementById('categorias-table-body');
+    const sinDestino = document.getElementById('categorias-sin-destino');
+    const tableWrap = document.getElementById('categorias-table-wrap');
+    const destino = destinosData.find(d => d.id === destinoSeleccionadoId);
+    document.getElementById('categorias-destino-actual').textContent = destino ? `· ${destino.nombre}` : '';
+    document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.categoriaTipo === categoriaTipoActivo);
+    });
+    if (!destino) {
+        listEl.innerHTML = '';
+        sinDestino.classList.remove('hidden');
+        tableWrap.classList.add('hidden');
+        return;
+    }
+    sinDestino.classList.add('hidden');
+    tableWrap.classList.remove('hidden');
+    listEl.innerHTML = '';
+    const tipo = categoriaTipoActivo;
+    const visibles = CATEGORIA_TIPOS[tipo].getDataset()
+        .filter(c => c.destino_id === destinoSeleccionadoId)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    if (visibles.length === 0) {
+        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${destino.nombre}" todavía.</p>`;
+    } else {
+        visibles.forEach(c => listEl.appendChild(buildCategoriaRow(tipo, c)));
+    }
+}
+
+function buildCategoriaRow(tipo, c) {
+    const div = document.createElement('div');
+    div.className = 'categoria-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg';
+    div.innerHTML = `
+        <span>${c.nombre}</span>
+        <div class="flex items-center gap-1 shrink-0">
+            <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
+            <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+        </div>
+    `;
+    const [editBtn, delBtn] = div.querySelectorAll('button');
+    editBtn.addEventListener('click', () => div.replaceWith(buildCategoriaEditRow(tipo, c)));
+    delBtn.addEventListener('click', () => eliminarCategoria(tipo, c));
+    return div;
+}
+
+function buildCategoriaEditRow(tipo, c) {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
+    div.innerHTML = `
+        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${c.nombre}">
+        <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
+        <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
+    `;
+    const nombreI = div.querySelector('input');
+    const [saveBtn, cancelBtn] = div.querySelectorAll('button');
+    saveBtn.addEventListener('click', () => guardarCategoria(tipo, { id: c.id, destino_id: c.destino_id, nombre: nombreI.value.trim() }));
+    cancelBtn.addEventListener('click', () => div.replaceWith(buildCategoriaRow(tipo, c)));
+    return div;
+}
+
+async function guardarCategoria(tipo, payload) {
+    if (!payload.nombre) { notifyError('El nombre de la categoría es obligatorio.'); return false; }
+    try {
+        const res = await fetch(`${API_URL}?path=${CATEGORIA_TIPOS[tipo].apiGuardar}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess(payload.id ? 'Categoría actualizada.' : 'Categoría agregada.');
+        await refrescarDestinosCategorias();
+        return true;
+    } catch (e) {
+        notifyError('Error al guardar la categoría: ' + e.message);
+        return false;
+    }
+}
+
+async function eliminarCategoria(tipo, c) {
+    if (!await confirmAction(`¿Eliminar la categoría "${c.nombre}"?`)) return;
+    try {
+        const res = await fetch(`${API_URL}?path=${CATEGORIA_TIPOS[tipo].apiEliminar}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: c.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Categoría eliminada.');
+        await refrescarDestinosCategorias();
+    } catch (e) {
+        notifyError('Error al eliminar la categoría: ' + e.message);
+    }
+}
+
+async function refrescarDestinosCategorias() {
+    const [destinosRes, categoriasRes, categoriasHotelesRes] = await Promise.all([
+        fetch(`${API_URL}?path=destinos`).then(r => r.json()),
+        fetch(`${API_URL}?path=categorias`).then(r => r.json()),
+        fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json())
+    ]);
+    destinosData = destinosRes;
+    categoriasData = categoriasRes;
+    categoriasHotelesData = categoriasHotelesRes;
+    renderDestinos();
+    renderTourNewDestinoCategoria();
+    renderHotelNewDestinoCategoria();
+    // Los nombres de destino/categoría mostrados en "Tours/Hoteles Existentes" dependen de estos catálogos.
+    renderTours();
+    renderHotels();
+}
+
+// Recrea el selector Destino → Categoría de la fila de alta de "Tours Existentes",
+// para que refleje el catálogo vigente (p.ej. tras crear un destino nuevo).
+function renderTourNewDestinoCategoria() {
+    const container = document.getElementById('tour-new-destino-categoria');
+    container.innerHTML = '';
+    container.appendChild(buildDestinoCategoriaSelector(categoriasData, null, null));
+}
+
 function renderHotels() {
     const tbody = document.getElementById('hotels-table-body');
     tbody.innerHTML = '';
@@ -300,17 +566,18 @@ function renderHotels() {
         .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
         .sort((a, b) => a.aloj.localeCompare(b.aloj));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
     } else {
         visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
     }
-    updateDatalists();
 }
 
 function buildHotelRow(h) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-3 font-medium">${h.aloj}</td>
+        <td class="p-3">${destinoNombre(h.destino_id) || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3">${categoriaHotelNombre(h.categoria_id) || '<span class="text-slate-400">—</span>'}</td>
         <td class="p-3">${h.distr || ''}</td>
         <td class="p-3">${fmt(h.preg)}</td>
         <td class="p-3">${fmt(h.ppromo)}</td>
@@ -330,6 +597,7 @@ function buildHotelEditRow(h) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.aloj}"></td>
+        <td class="p-2 destino-categoria-cell" colspan="2"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.ppromo}"></td>
@@ -339,10 +607,15 @@ function buildHotelEditRow(h) {
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
         </td>
     `;
+    const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasHotelesData, h.destino_id, h.categoria_id);
+    tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
     const [alojI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
     const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarHotel({
-        id: h.id, aloj: alojI.value.trim(), distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+        id: h.id, aloj: alojI.value.trim(),
+        destino_id: destinoCategoriaSelector.destinoSelect.value || null,
+        categoria_id: destinoCategoriaSelector.categoriaSelect.value || null,
+        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
     }));
     cancelBtn.addEventListener('click', () => tr.replaceWith(buildHotelRow(h)));
     return tr;
@@ -387,6 +660,14 @@ async function eliminarHotel(h) {
 async function refrescarHoteles() {
     hotelsData = await fetch(`${API_URL}?path=hoteles`).then(r => r.json());
     renderHotels();
+}
+
+// Recrea el selector Destino → Categoría de la fila de alta de "Hoteles Existentes",
+// para que refleje el catálogo vigente (p.ej. tras crear un destino/categoría nuevo).
+function renderHotelNewDestinoCategoria() {
+    const container = document.getElementById('hotel-new-destino-categoria');
+    container.innerHTML = '';
+    container.appendChild(buildDestinoCategoriaSelector(categoriasHotelesData, null, null));
 }
 
 // ===== PAQUETES DE TOURS (combos reutilizables para Data Tours) =====
@@ -539,8 +820,74 @@ function aplicarPaquete(paquete) {
         tr.querySelector('.tour-name').dispatchEvent(new Event('input'));
     });
     calcularResumen();
-    notifySuccess(`Se agregaron ${paquete.tours.length} tour(s) del paquete "${paquete.nombre}".`);
     irATabCotizador();
+}
+
+// ===== Historial de Cotizaciones guardadas (traer TODAS sus actividades a la vista actual) =====
+async function abrirHistorialTours() {
+    document.getElementById('historial-tours-modal').classList.remove('hidden');
+    const container = document.getElementById('historial-tours-list');
+    container.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Cargando...</p>';
+    try {
+        const res = await fetch(`${API_URL}?path=cotizaciones&limit=20`).then(r => r.json());
+        renderHistorialTours(res.results || []);
+    } catch (e) {
+        container.innerHTML = '<p class="text-red-500 text-sm text-center py-6">Error al cargar el historial.</p>';
+    }
+}
+
+function cerrarHistorialTours() {
+    document.getElementById('historial-tours-modal').classList.add('hidden');
+}
+
+function renderHistorialTours(cotizacionesGuardadas) {
+    const container = document.getElementById('historial-tours-list');
+    // Solo interesan las que ya traen actividades, y no la que se está editando ahora mismo.
+    const conActividades = cotizacionesGuardadas.filter(c =>
+        c.id !== currentCotizacionId && Array.isArray(c.data?.tours) && c.data.tours.length > 0
+    );
+    if (!conActividades.length) {
+        container.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Todavía no hay cotizaciones guardadas con actividades.</p>';
+        return;
+    }
+    container.innerHTML = '';
+    conActividades.forEach(c => {
+        const nombre = c.data.pax?.nombre_pax || 'Sin nombre';
+        const tours = c.data.tours.filter(t => t.tour);
+        const preview = tours.map(t => t.tour).join(', ');
+        const div = document.createElement('div');
+        div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
+        div.innerHTML = `
+            <div class="min-w-0">
+                <div class="font-medium truncate">${c.id} — ${nombre}</div>
+                <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${preview}</div>
+            </div>
+            <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
+        `;
+        div.querySelector('button').addEventListener('click', () => reusarHistorialCotizacion(c));
+        container.appendChild(div);
+    });
+}
+
+// Trae TODAS las actividades de esa cotización guardada a la tabla actual, tal cual
+// quedaron (misma fecha/cant/precio/distribuidor) — no reemplaza lo que ya hay en la
+// tabla, se suma a continuación, igual que "Aplicar paquete".
+function reusarHistorialCotizacion(c) {
+    const toursBody = document.getElementById('tours-body');
+    const tours = c.data.tours.filter(t => t.tour);
+    tours.forEach(t => {
+        const tr = createTourRow({
+            tour: t.tour,
+            fecha: t.fecha || '',
+            cant: t.cant,
+            distr: t.distr,
+            preg: t.preg,
+            ppromo: t.ppromo
+        });
+        toursBody.appendChild(tr);
+    });
+    calcularResumen();
+    cerrarHistorialTours();
 }
 
 // ===== FILAS =====
@@ -637,7 +984,7 @@ function createHotelRow(data = {}) {
         <td class="pl-2"><div class="handle">≡</div></td>
         <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.cin || ''}"></td>
         <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.cout || ''}"></td>
-        <td><input class="input w-full rounded px-2 py-1 border hotel-name" type="text" value="${data.aloj || ''}" list="hotels-list"></td>
+        <td class="hotel-selector-cell"></td>
         <td><input class="input w-full rounded px-2 py-1 border text-right nhab" type="number" min="0" value="${initialNhab}"></td>
         <td><input class="input w-full rounded px-2 py-1 border text-right noches" type="number" min="1" value="${initialNoches}"></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
@@ -656,18 +1003,10 @@ function createHotelRow(data = {}) {
         });
     });
 
-    const hotelInput = tr.querySelector('.hotel-name');
-
-    let originalValue = data.aloj || '';
-    hotelInput.addEventListener('mousedown', function() {
-        originalValue = this.value;
-        this.value = '';
-    });
-    hotelInput.addEventListener('blur', function() {
-        if (this.value === '') {
-            this.value = originalValue;
-        }
-    });
+    const hotelInput = document.createElement('input');
+    hotelInput.type = 'hidden';
+    hotelInput.className = 'hotel-name';
+    hotelInput.value = data.aloj || '';
 
     hotelInput.addEventListener('input', function() {
         const hotel = hotelsData.find(h => h.aloj === this.value);
@@ -678,9 +1017,17 @@ function createHotelRow(data = {}) {
             const noches = parseFloat(tr.querySelector('.noches').value) || 0;
             tr.querySelector('.total-line').textContent = fmt(nhab * noches * hotel.ppromo);
             calcularResumen();
-            originalValue = this.value;
         }
     });
+
+    const hotelSelector = buildHotelSelector(data.aloj || '', (alojNombre) => {
+        hotelInput.value = alojNombre;
+        hotelInput.dispatchEvent(new Event('input'));
+    });
+    const hotelCell = tr.querySelector('.hotel-selector-cell');
+    hotelCell.appendChild(hotelSelector);
+    hotelCell.appendChild(hotelInput);
+
     const checkin = tr.querySelector('td:nth-child(2) input');
     const checkout = tr.querySelector('td:nth-child(3) input');
     const nochesInput = tr.querySelector('.noches');
@@ -811,7 +1158,7 @@ async function guardarCotizacion() {
             precioAdicional: document.getElementById('precio-adicional').value,
             descuentoEspecial: document.getElementById('descuento-especial').value,
         },
-        notas: document.getElementById('notas_cotizacion').value,
+        notas: document.getElementById('notas_cotizacion').innerHTML,
         porcentaje_reserva: document.getElementById('porcentaje_reserva').value
     };
     try {
@@ -826,7 +1173,7 @@ async function guardarCotizacion() {
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;
             const generarPdf = await notifySuccessAction(`Cotización guardada con ID: ${id}`, 'Generar PDF');
-            if (generarPdf) mostrarVistaPreviaPdf(id);
+            if (generarPdf) mostrarVistaPreviaPdf(id, 'es');
         } else {
             throw new Error(result.error);
         }
@@ -854,7 +1201,8 @@ async function cargarCotizacion(id) {
         data.hotels.forEach(h => hotelsBody.appendChild(createHotelRow(h)));
         document.getElementById('precio-adicional').value = data.precios.precioAdicional || 0;
         document.getElementById('descuento-especial').value = data.precios.descuentoEspecial || 0;
-        document.getElementById('notas_cotizacion').value = data.notas || '';
+        data.notas = notasLegacyToHtml(data.notas);
+        document.getElementById('notas_cotizacion').innerHTML = data.notas;
         document.getElementById('porcentaje_reserva').value = data.porcentaje_reserva || 30;
         calcularResumen();
         cotizaciones[id] = data;
@@ -871,7 +1219,7 @@ function nuevaCotizacion(showAlert = true) {
     document.getElementById('hotels-body').innerHTML = '';
     document.getElementById('precio-adicional').value = 0;
     document.getElementById('descuento-especial').value = 0;
-    document.getElementById('notas_cotizacion').value = '';
+    document.getElementById('notas_cotizacion').innerHTML = '';
     document.getElementById('porcentaje_reserva').value = 30;
     currentCotizacionId = null;
     document.getElementById('current-cot-id-display').textContent = 'Nueva';
@@ -996,7 +1344,7 @@ async function verPdfCotizacionGuardada(id, btn) {
     btn.disabled = true;
     try {
         await cargarCotizacion(id);
-        await mostrarVistaPreviaPdf(id);
+        await mostrarVistaPreviaPdf(id, 'es');
     } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
@@ -1022,9 +1370,45 @@ async function eliminarCotizacionGuardada(id, nombre) {
     }
 }
 
+// Rasteriza un HTML de una página (.pdf-page) a un PDF de una sola página en memoria.
+// Compartido por la página principal de la cotización y la página de Términos y
+// Condiciones, que se construyen igual pero con plantillas distintas.
+async function renderHtmlPageBytes(html) {
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+    const canvas = await html2canvas(container.querySelector('.pdf-page'), { scale: 1.5, useCORS: true });
+    document.body.removeChild(container);
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.75);
+    const { jsPDF } = window.jspdf;
+    const pagePdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const pageWidth = pagePdf.internal.pageSize.getWidth();
+    const pageHeight = pagePdf.internal.pageSize.getHeight();
+    const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+    pagePdf.addImage(imgData, 'PNG', 0, 0, canvas.width * ratio, canvas.height * ratio);
+    return pagePdf.output('arraybuffer');
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
 // Arma los bytes del PDF a partir de una cotización ya guardada (pax/tours/hotels/precios).
+// `agencia` son los datos de empresa ya resueltos (agencia del creador o la principal, ver
+// mostrarVistaPreviaPdf) e `idioma` es 'es'|'en'|'pt', elegido en el modal de vista previa.
 // No descarga nada ni toca el DOM del formulario: es puro "datos adentro, PDF afuera".
-async function construirPdfBytes(cotizacionActual) {
+async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
+    agencia = agencia || EMPRESA_FALLBACK;
+    const labels = PDF_LABELS[idioma] || PDF_LABELS.es;
+
     const formatDate = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
@@ -1033,22 +1417,28 @@ async function construirPdfBytes(cotizacionActual) {
     {
         const [
             templateHtml,
+            terminosTemplateHtml,
             templateCss,
-            logoPng,
-            plantillaPdfBytes
+            staticLogoBlob
         ] = await Promise.all([
             fetch('../shared/pdf-template.html').then(res => res.text()),
+            fetch('../shared/pdf-terminos-template.html').then(res => res.text()),
             fetch('../shared/pdf-styles.css').then(res => res.text()),
-            fetch('../shared/logo.png').then(res => res.blob()),
-            fetch('../shared/plantilla.pdf').then(res => res.arrayBuffer())
+            fetch('../shared/logo.png').then(res => res.blob())
         ]);
 
-        const logoBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(logoPng);
-        });
+        let logoBase64 = await blobToBase64(staticLogoBlob);
+        if (agencia.logo) {
+            try {
+                const agenciaLogoBlob = await fetch(`../shared/uploads/agencias/${agencia.logo}`).then(res => {
+                    if (!res.ok) throw new Error('Logo de agencia no encontrado');
+                    return res.blob();
+                });
+                logoBase64 = await blobToBase64(agenciaLogoBlob);
+            } catch (e) {
+                console.warn('No se pudo cargar el logo de la agencia, se usa el logo por defecto.', e);
+            }
+        }
 
         const fmtCurrency = (v, currency = CURRENCY_SYMBOL) => {
             const n = Number(v) || 0;
@@ -1076,7 +1466,7 @@ async function construirPdfBytes(cotizacionActual) {
         const tourRowsHtml = cotizacionActual.tours.map(t => `
             <tr>
                <td class="left">${formatDate(t.fecha)}</td>
-                <td class="left" colspan="2">${t.tour || 'Actividad no especificada'}</td>
+                <td class="left" colspan="2">${t.tour || labels.actividadNoEspecificada}</td>
                 <td></td>
                 <td class="left compact-cell">${t.cant || 1}</td> <td class="center compact-cell">${fmtCurrency(t.preg)}</td>
                 <td class="center compact-cell">${fmtCurrency(t.ppromo)}</td>
@@ -1091,14 +1481,14 @@ async function construirPdfBytes(cotizacionActual) {
                 <tr><td colspan="8" style="padding-top: 50px;"></td></tr>
 
                 <tr class="section-spacer">
-                    <th class="left col-hotel-cin hotel-header"><div>Check in</div></th>
-                    <th class="left col-hotel-cout hotel-header"><div>Check out</div></th>
-                    <th class="left col-hotel-desc hotel-header"><div>Alojamiento</div></th>
-                    <th class="center col-qty compact-cell hotel-header"><div>N° hab.</div></th>
-                    <th class="center col-qty compact-cell hotel-header"><div>N° noches</div></th>
-                    <th class="center col-price compact-cell hotel-header"><div>P. reg. x noche</div></th>
-                    <th class="center col-price compact-cell hotel-header"><div>P. promo x noche</div></th>
-                    <th class="right col-line-total compact-cell hotel-header"><div>Total l&iacute;nea</div></th>
+                    <th class="left col-hotel-cin hotel-header"><div>${labels.checkIn}</div></th>
+                    <th class="left col-hotel-cout hotel-header"><div>${labels.checkOut}</div></th>
+                    <th class="left col-hotel-desc hotel-header"><div>${labels.alojamiento}</div></th>
+                    <th class="center col-qty compact-cell hotel-header"><div>${labels.nHab}</div></th>
+                    <th class="center col-qty compact-cell hotel-header"><div>${labels.nNoches}</div></th>
+                    <th class="center col-price compact-cell hotel-header"><div>${labels.pRegNoche}</div></th>
+                    <th class="center col-price compact-cell hotel-header"><div>${labels.pPromoNoche}</div></th>
+                    <th class="right col-line-total compact-cell hotel-header"><div>${labels.totalLinea}</div></th>
                 </tr>
             `;
         }
@@ -1122,76 +1512,114 @@ async function construirPdfBytes(cotizacionActual) {
         const fLlegada = cotizacionActual.pax.f_llegada ? new Date(cotizacionActual.pax.f_llegada + 'T00:00:00') : null;
         const fSalida = cotizacionActual.pax.f_salida ? new Date(cotizacionActual.pax.f_salida + 'T00:00:00') : null;
         const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const localeIdioma = { es: 'es-ES', en: 'en-US', pt: 'pt-BR' }[idioma] || 'es-ES';
+
+        // Solo se listan las líneas de contacto que la agencia realmente tiene cargadas
+        // (no se muestra "Cel: " vacío si esa agencia no configuró un 2do número, etc).
+        const companyInfoParts = [];
+        if (agencia.ruc) companyInfoParts.push(`<span class="company-ruc">${labels.ruc} ${agencia.ruc}</span>`);
+        if (agencia.direccion) companyInfoParts.push(`<span class="company-address">${agencia.direccion}</span>`);
+        if (agencia.telefono) companyInfoParts.push(`<span class="company-address">${labels.telf} ${agencia.telefono}</span>`);
+        if (agencia.telefono2) companyInfoParts.push(`<span class="company-address">${labels.cel} ${agencia.telefono2}</span>`);
+        if (agencia.whatsapp) companyInfoParts.push(`<span class="company-address">${labels.whatsapp} ${agencia.whatsapp}</span>`);
 
         let finalHtml = templateHtml
             .replace('{{cotizacionId}}', cotizacionActual.id)
-            .replace('{{fechaCotizacion}}', fechaCot.toLocaleDateString('es-ES'))
-            .replace('{{agente}}', cotizacionActual.pax.agente || 'N/A')
+            .replace('{{fechaCotizacion}}', fechaCot.toLocaleDateString(localeIdioma))
+            .replace('{{agente}}', cotizacionActual.pax.agente || labels.na)
             .replace('{{nombrePax}}', cotizacionActual.pax.nombre_pax || '')
             .replace('{{contactoPax}}', cotizacionActual.pax.contacto || '')
             .replace('{{porcentajeReserva}}', `${porcentajeReserva}`)
             .replace('{{montoReserva}}', fmtCurrency(montoReserva))
-            .replace('{{fechaLlegada}}', fLlegada ? fLlegada.toLocaleDateString('es-ES', dateOptions) : 'N/A')
+            .replace('{{fechaLlegada}}', fLlegada ? fLlegada.toLocaleDateString(localeIdioma, dateOptions) : labels.na)
             .replace('{{horaLlegada}}', cotizacionActual.pax.h_llegada || '')
-            .replace('{{fechaSalida}}', fSalida ? fSalida.toLocaleDateString('es-ES', dateOptions) : 'N/A')
+            .replace('{{fechaSalida}}', fSalida ? fSalida.toLocaleDateString(localeIdioma, dateOptions) : labels.na)
             .replace('{{horaSalida}}', cotizacionActual.pax.h_salida || '')
-            .replace('{{tableRows}}', tableRows)
-            .replace('{{notas}}', cotizacionActual.notas || 'Sin notas adicionales.')
+            .replace('{{tableRows}}', () => tableRows)
+            .replace('{{notas}}', () => cotizacionActual.notas || labels.sinNotas)
             .replace('{{totalRegular}}', fmtCurrency(pvReg))
             .replace('{{descuentoTotal}}', fmtCurrency(totalDesc))
             .replace('{{precioAdicional}}', fmtCurrency(precioAd))
             .replace('{{totalFinal}}', fmtCurrency(pvFinal))
+            .replace('{{companyNombre}}', agencia.nombre || EMPRESA_FALLBACK.nombre)
+            .replace('{{companyInfoLines}}', () => companyInfoParts.join(''))
+            .replace('{{labelECotizacion}}', labels.eCotizacion)
+            .replace('{{labelAgente}}', labels.agente)
+            .replace('{{labelReservaTuPaquete}}', labels.reservaTuPaquete)
+            .replace('{{labelLlegada}}', labels.llegada)
+            .replace('{{labelSalida}}', labels.salida)
+            .replace('{{labelFecha}}', labels.fecha)
+            .replace('{{labelTourActividad}}', labels.tourActividad)
+            .replace('{{labelCant}}', labels.cant)
+            .replace('{{labelPReg}}', labels.pReg)
+            .replace('{{labelPPromo}}', labels.pPromo)
+            .replace('{{labelTotalLinea}}', labels.totalLinea)
+            .replace('{{labelNota}}', labels.nota)
+            .replace('{{labelCantidadBaseTotal}}', labels.cantidadBaseTotal)
+            .replace('{{labelDescuentoTotal}}', labels.descuentoTotal)
+            .replace('{{labelPrecioAdicional}}', labels.precioAdicional)
+            .replace('{{labelTotalFinal}}', labels.totalFinal)
             .replace('<link rel="stylesheet" href="pdf-styles.css">', `<style>${templateCss}</style>`)
             .replace('src="logo.png"', `src="${logoBase64}"`);
 
-        const container = document.createElement('div');
-        container.innerHTML = finalHtml;
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        document.body.appendChild(container);
-
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-
-        const canvas = await html2canvas(container.querySelector('.pdf-page'), { scale: 1.5, useCORS: true });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.75);
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-        const canvasWidth = canvas.width * ratio;
-        const canvasHeight = canvas.height * ratio;
-
-        pdf.addImage(imgData, 'PNG', 0, 0, canvasWidth, canvasHeight);
-        document.body.removeChild(container);
-
         const { PDFDocument } = PDFLib;
         const finalPdfDoc = await PDFDocument.create();
-        const generatedPdfDoc = await PDFDocument.load(pdf.output('arraybuffer'));
-        const [generatedPage] = await finalPdfDoc.copyPages(generatedPdfDoc, [0]);
-        finalPdfDoc.addPage(generatedPage);
 
-        const plantillaDoc = await PDFDocument.load(plantillaPdfBytes);
-        if (plantillaDoc.getPageCount() > 1) {
-            const [terminosPage] = await finalPdfDoc.copyPages(plantillaDoc, [1]);
-            finalPdfDoc.addPage(terminosPage);
+        const page1Bytes = await renderHtmlPageBytes(finalHtml);
+        const page1Doc = await PDFDocument.load(page1Bytes);
+        const [page1] = await finalPdfDoc.copyPages(page1Doc, [0]);
+        finalPdfDoc.addPage(page1);
+
+        // Página de Términos y Condiciones: dinámica, sale de la agencia resuelta. Si esa
+        // agencia no tiene términos guardados para este idioma, simplemente no se agrega
+        // segunda página (más limpio que un placeholder de "sin términos" en un documento
+        // de cara al cliente).
+        const terminosContenido = agencia[`terminos_${idioma}`];
+        if (terminosContenido && terminosContenido.trim() !== '') {
+            const terminosFinalHtml = terminosTemplateHtml
+                .replace('{{terminosTitulo}}', labels.terminosTitulo)
+                .replace('{{terminosContenido}}', () => terminosContenido)
+                .replace('<link rel="stylesheet" href="pdf-styles.css">', `<style>${templateCss}</style>`);
+            const page2Bytes = await renderHtmlPageBytes(terminosFinalHtml);
+            const page2Doc = await PDFDocument.load(page2Bytes);
+            const [page2] = await finalPdfDoc.copyPages(page2Doc, [0]);
+            finalPdfDoc.addPage(page2);
         }
 
         return finalPdfDoc.save();
     }
 }
 
+// Trae los datos de empresa a usar para el PDF de una cotización: la agencia de quien la
+// creó, o la marcada como principal si no tiene una asignada (típicamente el admin). Se
+// pide siempre fresco al servidor (no se cachea junto con la cotización) para que el
+// logo/términos usados reflejen la ficha de agencia actual.
+async function obtenerAgenciaDeCotizacion(id) {
+    try {
+        const res = await fetch(`${API_URL}?path=cotizacion-agencia&id=${id}`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        console.warn('No se pudo obtener la agencia de la cotización.', e);
+        return null;
+    }
+}
+
 // Genera el PDF de una cotización ya guardada y lo muestra en el modal de vista previa
 // (nunca descarga directo — el usuario decide si descargar desde ahí, con el PDF ya a la vista).
-async function mostrarVistaPreviaPdf(id) {
+async function mostrarVistaPreviaPdf(id, idioma = pdfPreviewIdioma) {
     const cotizacionActual = cotizaciones[id];
     if (!cotizacionActual) {
         notifyError('No se encontró la cotización.');
         return;
     }
+    pdfPreviewCotizacionId = id;
+    pdfPreviewIdioma = idioma;
+    document.querySelectorAll('.pdf-lang-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lang === idioma));
     abrirModalPdfCargando();
     try {
-        const bytes = await construirPdfBytes(cotizacionActual);
+        const agencia = await obtenerAgenciaDeCotizacion(id);
+        const bytes = await construirPdfBytes(cotizacionActual, agencia, idioma);
         const blob = new Blob([bytes], { type: 'application/pdf' });
         if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
         pdfPreviewUrl = URL.createObjectURL(blob);
@@ -1214,6 +1642,7 @@ function abrirModalPdfCargando() {
 function cerrarModalPdf() {
     document.getElementById('pdf-preview-modal').classList.add('hidden');
     document.getElementById('pdf-preview-frame').src = 'about:blank';
+    pdfPreviewCotizacionId = null;
     if (pdfPreviewUrl) {
         URL.revokeObjectURL(pdfPreviewUrl);
         pdfPreviewUrl = null;
@@ -1266,11 +1695,24 @@ async function init() {
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
 
+    document.getElementById('historial-tours-btn').addEventListener('click', abrirHistorialTours);
+    document.getElementById('close-historial-tours-btn').addEventListener('click', cerrarHistorialTours);
+    document.getElementById('historial-tours-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'historial-tours-modal') cerrarHistorialTours();
+    });
+
     document.getElementById('close-pdf-preview-btn').addEventListener('click', cerrarModalPdf);
     document.getElementById('pdf-preview-modal').addEventListener('click', (e) => {
         if (e.target === document.getElementById('pdf-preview-modal')) cerrarModalPdf();
     });
     document.getElementById('pdf-preview-descargar').addEventListener('click', descargarPdfPreview);
+
+    document.querySelectorAll('.pdf-lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!pdfPreviewCotizacionId || btn.classList.contains('active')) return;
+            mostrarVistaPreviaPdf(pdfPreviewCotizacionId, btn.dataset.lang);
+        });
+    });
 
     document.getElementById('cot-nueva').addEventListener('click', () => {
         nuevaCotizacion();
@@ -1311,27 +1753,57 @@ async function init() {
     document.getElementById('clear-hotels').addEventListener('click', () => { document.getElementById('hotels-body').innerHTML = ''; calcularResumen(); });
     document.getElementById('precio-adicional').addEventListener('input', calcularResumen);
     document.getElementById('descuento-especial').addEventListener('input', calcularResumen);
+    initRichTextEditor(document.getElementById('notas_cotizacion'));
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);
     document.getElementById('tour-new-add').addEventListener('click', async () => {
+        const destinoCategoriaContainer = document.getElementById('tour-new-destino-categoria');
+        const destinoSel = destinoCategoriaContainer.querySelector('.sel-destino-tour');
+        const categoriaSel = destinoCategoriaContainer.querySelector('.sel-categoria-tour');
         const ok = await guardarTour({
             tour: document.getElementById('tour-new-nombre').value.trim(),
-            destino: document.getElementById('tour-new-destino').value.trim(),
-            categoria: document.getElementById('tour-new-categoria').value.trim(),
+            destino_id: destinoSel.value || null,
+            categoria_id: categoriaSel.value || null,
             distr: document.getElementById('tour-new-distr').value.trim(),
             preg: document.getElementById('tour-new-preg').value,
             ppromo: document.getElementById('tour-new-ppromo').value
         });
-        if (ok) ['tour-new-nombre', 'tour-new-destino', 'tour-new-categoria', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+        if (ok) {
+            ['tour-new-nombre', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+            renderTourNewDestinoCategoria();
+        }
+    });
+    document.getElementById('destino-new-add').addEventListener('click', async () => {
+        const ok = await guardarDestino({ nombre: document.getElementById('destino-new-nombre').value.trim() });
+        if (ok) document.getElementById('destino-new-nombre').value = '';
+    });
+    document.getElementById('categoria-new-add').addEventListener('click', async () => {
+        if (!destinoSeleccionadoId) { notifyError('Selecciona un destino primero.'); return; }
+        const ok = await guardarCategoria(categoriaTipoActivo, { destino_id: destinoSeleccionadoId, nombre: document.getElementById('categoria-new-nombre').value.trim() });
+        if (ok) document.getElementById('categoria-new-nombre').value = '';
+    });
+    document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            categoriaTipoActivo = btn.dataset.categoriaTipo;
+            renderCategorias();
+        });
     });
     document.getElementById('hotel-new-add').addEventListener('click', async () => {
+        const destinoCategoriaContainer = document.getElementById('hotel-new-destino-categoria');
+        const destinoSel = destinoCategoriaContainer.querySelector('.sel-destino-tour');
+        const categoriaSel = destinoCategoriaContainer.querySelector('.sel-categoria-tour');
         const ok = await guardarHotel({
             aloj: document.getElementById('hotel-new-nombre').value.trim(),
+            destino_id: destinoSel.value || null,
+            categoria_id: categoriaSel.value || null,
             distr: document.getElementById('hotel-new-distr').value.trim(),
             preg: document.getElementById('hotel-new-preg').value,
             ppromo: document.getElementById('hotel-new-ppromo').value
         });
-        if (ok) ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+        if (ok) {
+            ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+            renderHotelNewDestinoCategoria();
+        }
     });
     setupDragDrop();
 }

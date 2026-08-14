@@ -1,0 +1,67 @@
+/* shared/hero.css
+   Cabecera de página (imagen + overlay) y tabs de filtro pegados a su base,
+   compartidos por cotizador.php e itinerario/index.php para que no se
+   desincronicen entre páginas. */
+
+.page-hero {
+    position: relative;
+    width: 100%;
+    padding: 40px 0 76px;
+    background-color: #0f172a;
+    background-image: linear-gradient(120deg, rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.55)), var(--hero-bg-image);
+    background-size: cover;
+    background-position: center;
+}
+.page-hero-content { position: relative; z-index: 1; max-width: 640px; }
+.page-hero h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: white;
+    margin: 0 0 6px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.page-hero-content p {
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+}
+@media (min-width: 768px) {
+    .page-hero { padding: 56px 0 88px; }
+    .page-hero h1 { font-size: 2.1rem; }
+    .page-hero-content p { font-size: 1rem; }
+}
+
+/* Tabs de filtro: fuera del flujo, ancladas a la base del hero. Al ir con
+   position:absolute no empujan al contenedor p-4/md:p-6 de abajo: ese
+   contenedor queda pegado directo al hero, y la base de los tabs coincide
+   exactamente con ese mismo borde (quedan "clavadas" ahí, no flotando). */
+.filter-tabs-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+}
+.filter-tabs { display: flex; align-items: flex-end; gap: 6px; flex-wrap: wrap; }
+.filter-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: #64748b;
+    background: #e2e8f0;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.filter-tab:hover { background: #cbd5e1; color: #334155; }
+.filter-tab.active {
+    background: #f5fbff;
+    color: var(--accent-2, #bb3135);
+    box-shadow: 0 -4px 10px rgba(2, 6, 23, 0.06);
+}

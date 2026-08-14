@@ -138,6 +138,28 @@
 .notes-section strong {
     font-weight: bold;
 }
+/* html2canvas no rasteriza de forma confiable el ::marker nativo de <li>,
+   así que la viñeta se dibuja a mano con ::before para que sí aparezca en el PDF.
+   Se comparte con .terminos-content (página de Términos y Condiciones). */
+.notes-content ul, .terminos-content ul {
+    margin: 4px 0;
+    padding-left: 0;
+    list-style: none;
+}
+.notes-content li, .terminos-content li {
+    position: relative;
+    padding-left: 16px;
+    margin: 2px 0;
+}
+.notes-content li::before, .terminos-content li::before {
+    content: "\2022";
+    position: absolute;
+    left: 2px;
+}
+.terminos-content {
+    font-size: 11pt;
+    line-height: 1.6;
+}
 .totals-wrapper {
     width: 350px;
 }

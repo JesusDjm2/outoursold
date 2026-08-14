@@ -1,0 +1,67 @@
+/* shared/cascade-select.css
+   Selector en cascada Destino > Categoría > Ítem en un solo desplegable, compartido por
+   el Cotizador (Tours/Hoteles/Paquetes de Tours) y el Generador de Itinerarios.
+   Usa var(--accent-1)/var(--accent-2)/var(--muted-border) con fallback propio, para no
+   depender de que la página que lo incluye las tenga definidas. */
+.cascade-select { display: block; width: 100%; position: relative; }
+.cascade-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: white;
+    font-size: 0.78rem;
+    color: #1e293b;
+    text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cascade-select-trigger:hover { border-color: #94a3b8; }
+.cascade-select-trigger.is-open {
+    border-color: var(--accent-1, #e80c13);
+    box-shadow: 0 0 0 3px rgba(232, 12, 19, 0.15);
+}
+.cascade-select-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cascade-select-label.is-placeholder { color: #94a3b8; }
+.cascade-select-caret { font-size: 0.65rem; color: #94a3b8; flex-shrink: 0; transition: transform 0.15s; }
+.cascade-select-trigger.is-open .cascade-select-caret { transform: rotate(180deg); }
+
+.cascade-select-panel {
+    position: fixed;
+    z-index: 200;
+    background: white;
+    border: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06));
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(2, 6, 23, 0.18);
+    overflow-y: auto;
+    padding: 6px;
+    font-size: 0.82rem;
+}
+.cascade-node-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #334155;
+}
+.cascade-node-row:hover { background: #f1f5f9; }
+.cascade-caret { width: 10px; font-size: 0.65rem; color: #94a3b8; transition: transform 0.15s; }
+.cascade-node.is-open > .cascade-node-row { font-weight: 600; color: #1e293b; }
+.cascade-node.is-open > .cascade-node-row .cascade-caret { transform: rotate(90deg); color: var(--accent-2, #bb3135); }
+.cascade-children {
+    margin: 2px 0 4px 17px;
+    padding-left: 10px;
+    border-left: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06));
+}
+.cascade-leaf > .cascade-node-row { padding-left: 8px; }
+.cascade-leaf.is-selected > .cascade-node-row {
+    background: rgba(187, 49, 53, 0.1);
+    color: var(--accent-2, #bb3135);
+    font-weight: 600;
+}
+.cascade-empty { padding: 10px 8px; color: #94a3b8; text-align: center; font-size: 0.78rem; }

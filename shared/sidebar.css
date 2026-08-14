@@ -1,0 +1,107 @@
+/* shared/sidebar.css
+   Estilos del menú lateral, compartidos por cotizador.php, itinerario/index.php
+   y usuarios.php para que nunca queden desincronizados entre páginas. */
+:root { --sidebar-w: 240px; --sidebar-w-collapsed: 76px; }
+
+.app-sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: white;
+    border-right: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06));
+    display: flex;
+    flex-direction: column;
+    padding: 20px 14px;
+    z-index: 40;
+    transition: width 0.25s ease, transform 0.25s ease;
+    overflow: hidden;
+}
+.sidebar-brand { text-align: center; margin-bottom: 24px; flex-shrink: 0; }
+.sidebar-logo { width: 100%; max-width: 120px; height: auto; margin: 0 auto; object-fit: contain; transition: max-width 0.25s ease; }
+.sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; }
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: #475569;
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.sidebar-link i { width: 18px; text-align: center; flex-shrink: 0; }
+.sidebar-link:hover { background: #f1f5f9; color: #1e293b; }
+.sidebar-link.active {
+    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+    color: white;
+}
+
+/* Contraer/expandir menú: fila propia al final del nav, en el flujo normal
+   (no flotante) para que se vea y se comporte igual en todas las páginas. */
+.sidebar-collapse-toggle {
+    margin-top: auto;
+    padding-top: 12px;
+    border: none;
+    border-top: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06));
+    border-radius: 0;
+    background: none;
+    width: 100%;
+    justify-content: center;
+    font: inherit;
+    color: #94a3b8;
+    cursor: pointer;
+}
+.sidebar-collapse-toggle:hover { background: #f1f5f9; color: #1e293b; }
+.sidebar-collapse-toggle i { transition: transform 0.2s ease; }
+
+.sidebar-footer { border-top: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06)); padding-top: 14px; margin-top: 14px; flex-shrink: 0; }
+.sidebar-user { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; }
+.sidebar-user i { font-size: 1.6rem; color: #94a3b8; flex-shrink: 0; }
+.sidebar-user-info { white-space: nowrap; overflow: hidden; }
+.sidebar-user-name { font-weight: 600; font-size: 0.85rem; color: #1e293b; }
+.sidebar-user-role { font-size: 0.75rem; color: #94a3b8; text-transform: capitalize; }
+.sidebar-logout { color: #dc2626; }
+.sidebar-logout:hover { background: #fef2f2; }
+.app-content { margin-left: var(--sidebar-w); transition: margin-left 0.25s ease; }
+
+.sidebar-toggle-btn {
+    display: none;
+    position: fixed;
+    top: 14px; left: 14px;
+    z-index: 50;
+    background: white;
+    border: 1px solid var(--muted-border, rgba(15, 23, 42, 0.06));
+    border-radius: 8px;
+    width: 40px; height: 40px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 39;
+}
+.sidebar-backdrop.open { display: block; }
+
+@media (min-width: 901px) {
+    body.sidebar-collapsed .sidebar-link { justify-content: center; }
+    body.sidebar-collapsed .sidebar-link span,
+    body.sidebar-collapsed .sidebar-user-info,
+    body.sidebar-collapsed .sidebar-logout span { display: none; }
+    body.sidebar-collapsed .sidebar-logo { max-width: 48px; }
+    body.sidebar-collapsed .sidebar-user { justify-content: center; padding-right: 0; }
+    body.sidebar-collapsed .sidebar-collapse-toggle i { transform: rotate(180deg); }
+    body.sidebar-collapsed .app-sidebar { width: var(--sidebar-w-collapsed); }
+    body.sidebar-collapsed .app-content { margin-left: var(--sidebar-w-collapsed); }
+}
+
+@media (max-width: 900px) {
+    .app-sidebar { transform: translateX(-100%); box-shadow: 0 0 20px rgba(0, 0, 0, 0.15); width: var(--sidebar-w); }
+    .app-sidebar.open { transform: translateX(0); }
+    .app-content { margin-left: 0 !important; padding-top: 46px; }
+    .sidebar-toggle-btn { display: block; }
+    .app-sidebar.open ~ .sidebar-toggle-btn { display: none; }
+    .sidebar-collapse-toggle { display: none; }
+}

@@ -37,7 +37,16 @@ if ($mime !== 'application/pdf') {
     exit;
 }
 
-$uploadDir = __DIR__ . '/uploads/';
+$idiomasValidos = ['es', 'en', 'pt'];
+$idioma = $_POST['idioma'] ?? 'es';
+if (!in_array($idioma, $idiomasValidos, true)) {
+    $idioma = 'es';
+}
+
+$uploadDir = __DIR__ . '/uploads/' . $idioma . '/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0775, true);
+}
 $targetPath = $uploadDir . $fileName;
 
 // Opcional: Prevenir sobrescritura generando un nombre único

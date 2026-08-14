@@ -20,18 +20,30 @@ $navActive = 'itinerario';
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="itinerario.css">
+    <link rel="stylesheet" href="../shared/sidebar.css">
+    <link rel="stylesheet" href="../shared/hero.css">
+    <link rel="stylesheet" href="../shared/cascade-select.css">
 </head>
-<body class="p-4 md:p-6">
+<body>
     <?php require __DIR__ . '/../shared/sidebar.php'; ?>
 
     <div class="app-content">
-    <div class="max-w-7xl mx-auto">
-        <header class="mb-6 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-800 mb-2">Generador de Itinerarios</h1>
-                <p class="text-slate-600">Gestión y creación de programas de viaje en PDF.</p>
+        <header class="page-hero" style="--hero-bg-image:url('../shared/fondo-sistema-outours.jpg')">
+            <div class="max-w-7xl mx-auto px-4 md:px-6">
+                <div class="page-hero-content">
+                    <h1>Generador de Itinerarios</h1>
+                    <p>Plataforma B2B de cotizaciones e itinerarios turísticos</p>
+                </div>
             </div>
         </header>
+        <div class="p-4 md:p-6">
+        <div class="max-w-7xl mx-auto">
+
+        <div class="flex gap-1 mb-4 bg-slate-100 rounded-lg p-1 w-fit" id="idioma-tabs">
+            <button type="button" class="categoria-tipo-tab idioma-tab active" data-idioma="es">Español</button>
+            <button type="button" class="categoria-tipo-tab idioma-tab" data-idioma="en">English</button>
+            <button type="button" class="categoria-tipo-tab idioma-tab" data-idioma="pt">Português</button>
+        </div>
 
         <main class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-6">
@@ -42,6 +54,20 @@ $navActive = 'itinerario';
                             <div>
                                 <label for="itinerary-module-title" class="font-medium text-slate-700">Título del Módulo</label>
                                 <input type="text" id="itinerary-module-title" placeholder="Ej: Tour Valle Sagrado" class="w-full border rounded p-2 mt-1" required>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label for="itinerary-module-destino" class="font-medium text-slate-700">Destino <span class="text-slate-400 font-normal">(opcional)</span></label>
+                                    <select id="itinerary-module-destino" class="w-full border rounded p-2 mt-1">
+                                        <option value="">Sin clasificar</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="itinerary-module-categoria" class="font-medium text-slate-700">Categoría</label>
+                                    <select id="itinerary-module-categoria" class="w-full border rounded p-2 mt-1" disabled>
+                                        <option value="">—</option>
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label for="itinerary-module-pdf" class="font-medium text-slate-700">Archivo PDF</label>
@@ -54,8 +80,45 @@ $navActive = 'itinerario';
 
                 <section>
                     <div class="card p-6">
-                        <h2 class="text-xl font-semibold text-slate-800 mb-4">Módulos Existentes</h2>
-                        <div id="itinerary-list" class="space-y-2 max-h-60 overflow-y-auto pr-2"></div>
+                        <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                            <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Módulos Existentes</h2>
+                            <div class="relative">
+                                <input id="itinerario-modulos-search" class="rounded-lg pl-8 pr-3 py-1.5 border text-sm w-64" type="text" placeholder="Buscar módulo...">
+                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            </div>
+                        </div>
+                        <div class="itinerary-table-container max-h-96 overflow-y-auto">
+                            <table class="w-full">
+                                <thead class="bg-slate-50">
+                                    <tr>
+                                        <th class="text-left p-2">Título</th>
+                                        <th class="text-left p-2">Destino</th>
+                                        <th class="text-left p-2">Categoría</th>
+                                        <th class="text-left p-2">Creado por</th>
+                                        <th class="text-right p-2">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itinerario-modulos-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <div class="card p-6 mb-6">
+                        <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Paquete de Itinerario</h2>
+                        <p class="text-sm text-slate-500 mb-4">Guarda una secuencia de módulos predefinida (por ejemplo, los días de un paquete típico) para insertarla completa en el armador de un clic.</p>
+                        <input id="itinerario-paquete-nombre" class="w-full rounded px-3 py-2 border mb-3" type="text" placeholder="Nombre del paquete (ej. Cusco 4 días)">
+                        <div id="itinerario-paquete-builder-rows" class="space-y-2 mb-3"></div>
+                        <div class="flex flex-wrap gap-2">
+                            <button id="itinerario-paquete-add-row" class="btn btn-secondary"><i class="fas fa-plus mr-1"></i>Agregar Módulo</button>
+                            <button id="itinerario-paquete-guardar" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Guardar Paquete</button>
+                            <button id="itinerario-paquete-cancelar-edicion" class="btn btn-secondary hidden"><i class="fas fa-times mr-1"></i>Cancelar edición</button>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h2 class="text-xl font-semibold text-slate-800 mb-4">Paquetes de Itinerario Guardados</h2>
+                        <div id="itinerario-paquetes-list" class="space-y-2"></div>
                     </div>
                 </section>
 
@@ -117,6 +180,10 @@ $navActive = 'itinerario';
                             </div>
                         </div>
 
+                        <select id="itinerario-aplicar-paquete-select" class="w-full border rounded p-2 mb-3">
+                            <option value="">Aplicar paquete de itinerario...</option>
+                        </select>
+
                         <div class="itinerary-table-container">
                             <table class="w-full">
                                 <thead class="bg-slate-50">
@@ -139,7 +206,8 @@ $navActive = 'itinerario';
                 </section>
             </div>
         </main>
-    </div>
+        </div>
+        </div>
     </div>
 
     <div id="loading-modal" class="modal">
@@ -153,6 +221,7 @@ $navActive = 'itinerario';
     </div>
 
     <script src="../shared/notify.js"></script>
+    <script src="../shared/cascade-select.js"></script>
     <script src="itinerario.js"></script>
 </body>
 </html>
