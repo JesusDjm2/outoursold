@@ -111,13 +111,8 @@ tr.draggable:active { cursor: grabbing; }
     border-color: var(--accent-1);
     box-shadow: 0 0 0 3px rgba(232, 12, 19, 0.15);
 }
-.field-label {
-    flex-shrink: 0;
-    white-space: nowrap;
-    font-size: 0.72rem;
-    color: #94a3b8;
-}
-.field input {
+.field input,
+.field select {
     width: 100%;
     min-width: 0;
     background: transparent;
@@ -127,8 +122,90 @@ tr.draggable:active { cursor: grabbing; }
     font-size: inherit;
     color: #1e293b;
 }
+.field input::placeholder { color: #94a3b8; }
+
+/* N° PAX: al ser number con valor por defecto (1), siempre tiene contenido — el
+   placeholder nunca llegaría a mostrarse, así que necesita un prefijo fijo en vez de
+   uno que se oculte al escribir (como los demás campos de este formulario). */
+.field-prefix-label {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+/* Campos de fecha/hora: no admiten placeholder nativo (Chrome ignora el atributo y
+   siempre pinta su propio "dd/mm/aaaa" / "--:--"), así que ese hint nativo se oculta
+   y se reemplaza con un overlay de texto que se comporta como un placeholder real
+   (visible solo mientras el campo está vacío, tapado apenas tiene un valor). */
+.field-overlay { position: relative; }
+.field-overlay input[type="date"]::-webkit-datetime-edit,
+.field-overlay input[type="time"]::-webkit-datetime-edit {
+    color: transparent;
+}
+.field-overlay input[type="date"]:focus::-webkit-datetime-edit,
+.field-overlay input[type="time"]:focus::-webkit-datetime-edit,
+.field-overlay.has-value input[type="date"]::-webkit-datetime-edit,
+.field-overlay.has-value input[type="time"]::-webkit-datetime-edit {
+    color: #1e293b;
+}
+.field-placeholder-overlay {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    font-size: inherit;
+    pointer-events: none;
+}
+.field-overlay.has-value .field-placeholder-overlay { display: none; }
 th { background-color: #f8fafc; white-space: nowrap; }
 .hidden { display: none; }
+
+/* Precios confidenciales (Actividades del Tour / Data Hotel): ocultos por defecto, un
+   botón por tabla ("Precios confid.") revela y habilita edición de las 2 columnas para
+   todas las filas a la vez — el cambio queda solo en la cotización actual, nunca toca
+   el catálogo maestro. */
+table:not(.mostrar-confidencial) .col-confidencial { display: none; }
+.confid-toggle-activo {
+    background: rgba(232, 12, 19, 0.1) !important;
+    border-color: var(--accent-1, #e80c13) !important;
+    color: var(--accent-2, #bb3135) !important;
+}
+.pais-dropdown-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    max-height: 220px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    padding: 4px;
+    margin: 0;
+    list-style: none;
+}
+.pais-dropdown-list li {
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: #1e293b;
+}
+.pais-dropdown-list li:hover,
+.pais-dropdown-list li.activa {
+    background: rgba(232, 12, 19, 0.1);
+}
+.pais-dropdown-list li.sin-resultados {
+    color: #94a3b8;
+    cursor: default;
+}
+.pais-dropdown-list li.sin-resultados:hover {
+    background: transparent;
+}
 input[readonly] {
     background-color: #f1f5f9;
     cursor: not-allowed;
@@ -180,3 +257,32 @@ input[readonly] {
 
 /* El selector en cascada Destino > Categoría > Ítem (.cascade-*) se movió a
    shared/cascade-select.css, compartido con el Generador de Itinerarios. */
+
+/* Gráfico de "Cotizaciones generadas" (Usuarios > Agencias > Comparativo): SVG dibujado
+   a mano en JS (ver renderCotizacionesChart en usuarios.php), una sola serie en el color
+   de acento de la marca. */
+.cotchart-grid { stroke: #e2e8f0; stroke-width: 1; }
+.cotchart-axis-label { fill: #94a3b8; font-size: 10px; }
+.cotchart-area { fill: rgba(187, 49, 53, 0.1); }
+.cotchart-line { stroke: var(--accent-2); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cotchart-enddot { fill: var(--accent-2); stroke: #fff; stroke-width: 2; }
+.cotchart-endlabel { fill: #334155; font-size: 11px; font-weight: 600; }
+.cotchart-crosshair { stroke: #cbd5e1; stroke-width: 1; }
+.cotchart-tooltip {
+    position: absolute;
+    transform: translateX(-50%);
+    background: #0f172a;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Punto de estado "en línea" (Usuarios, detalle de agencia) */
+.estado-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.estado-dot.en-linea { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+.estado-dot.desconectado { background: #cbd5e1; }

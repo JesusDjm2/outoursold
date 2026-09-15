@@ -5,6 +5,7 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/agencia-helpers.php';
+require_once __DIR__ . '/error-helpers.php';
 
 require_login();
 
@@ -14,18 +15,8 @@ $uploadDir = __DIR__ . '/uploads/agencias/';
 $path = $_GET['path'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Resuelve el id de la agencia "propia" del usuario logueado a partir de la sesión, nunca
-// de un id que venga del cliente: si es admin, la agencia marcada como principal (su
-// propia empresa); si no, la que tiene asignada en su ficha de usuario (o ninguna).
-function resolverAgenciaPropiaId($db) {
-    if (is_admin()) {
-        $stmt = $db->query("SELECT id FROM agencias WHERE es_principal = 1 LIMIT 1");
-        return $stmt->fetchColumn() ?: null;
-    }
-    $stmt = $db->prepare("SELECT agencia_id FROM usuarios WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    return $stmt->fetchColumn() ?: null;
-}
+// resolverAgenciaPropiaId() vive ahora en agencia-helpers.php (también la usa el Hero
+// de cada vista para saber de quién es la imagen de fondo a mostrar).
 
 try {
     switch ($path) {
@@ -35,7 +26,8 @@ try {
                 echo json_encode(['agencia' => null]);
                 break;
             }
-            $stmt = $db->prepare("SELECT id, nombre, ruc, direccion, telefono, telefono2, whatsapp, logo,
+            $stmt = $db->prepare("SELECT id, nombre, ruc, direccion, telefono, telefono2, whatsapp,
+                                          color_principal, color_secundario, logo, hero_imagen,
                                           terminos_es, terminos_en, terminos_pt
                                    FROM agencias WHERE id = ?");
             $stmt->execute([$id]);
@@ -73,6 +65,8 @@ try {
                 trim($_POST['telefono'] ?? ''),
                 trim($_POST['telefono2'] ?? ''),
                 trim($_POST['whatsapp'] ?? ''),
+                trim($_POST['color_principal'] ?? '') ?: null,
+                trim($_POST['color_secundario'] ?? '') ?: null,
                 sanitizarHtmlTerminos($_POST['terminos_es'] ?? ''),
                 sanitizarHtmlTerminos($_POST['terminos_en'] ?? ''),
                 sanitizarHtmlTerminos($_POST['terminos_pt'] ?? '')
@@ -84,13 +78,95 @@ try {
                 if ($anterior && file_exists($uploadDir . $anterior)) {
                     @unlink($uploadDir . $anterior);
                 }
-                $stmt = $db->prepare("UPDATE agencias SET nombre = ?, ruc = ?, direccion = ?, telefono = ?, telefono2 = ?, whatsapp = ?, terminos_es = ?, terminos_en = ?, terminos_pt = ?, logo = ? WHERE id = ?");
+                $stmt = $db->prepare("UPDATE agencias SET nombre = ?, ruc = ?, direccion = ?, telefono = ?, telefono2 = ?, whatsapp = ?, color_principal = ?, color_secundario = ?, terminos_es = ?, terminos_en = ?, terminos_pt = ?, logo = ? WHERE id = ?");
                 $stmt->execute([...$comunes, $logo, $id]);
             } else {
-                $stmt = $db->prepare("UPDATE agencias SET nombre = ?, ruc = ?, direccion = ?, telefono = ?, telefono2 = ?, whatsapp = ?, terminos_es = ?, terminos_en = ?, terminos_pt = ? WHERE id = ?");
+                $stmt = $db->prepare("UPDATE agencias SET nombre = ?, ruc = ?, direccion = ?, telefono = ?, telefono2 = ?, whatsapp = ?, color_principal = ?, color_secundario = ?, terminos_es = ?, terminos_en = ?, terminos_pt = ? WHERE id = ?");
                 $stmt->execute([...$comunes, $id]);
             }
             echo json_encode(['success' => true]);
+            break;
+
+        // Imagen de fondo del Hero de MI agencia (independiente del botón "Guardar
+        // cambios" del resto de la ficha: se sube y se aplica al instante). Cada agencia
+        // tiene la suya; mientras no suba una, todas sus vistas usan el fondo por defecto
+        // del sistema (ver resolverHeroImagenUrl() en agencia-helpers.php).
+        case 'subir-hero':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $id = resolverAgenciaPropiaId($db);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No tienes una agencia/empresa asignada. Contacta a tu administrador.']);
+                break;
+            }
+            $file = $_FILES['imagen'] ?? null;
+            if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No se recibió ninguna imagen.']);
+                break;
+            }
+            if ($file['size'] > 10 * 1024 * 1024) {
+                http_response_code(400);
+                echo json_encode(['error' => 'La imagen no debe superar 10MB.']);
+                break;
+            }
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+            $creadores = ['image/jpeg' => 'imagecreatefromjpeg', 'image/png' => 'imagecreatefrompng'];
+            if (function_exists('imagecreatefromwebp')) {
+                $creadores['image/webp'] = 'imagecreatefromwebp';
+            }
+            if (!isset($creadores[$mime])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'La imagen debe ser JPG, PNG o WEBP.']);
+                break;
+            }
+
+            $origen = $creadores[$mime]($file['tmp_name']);
+            if (!$origen) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No se pudo leer la imagen.']);
+                break;
+            }
+
+            // Recomprime siempre a JPG y limita el ancho: es un fondo decorativo, no hace
+            // falta conservar una foto de varios MB.
+            $anchoOriginal = imagesx($origen);
+            $altoOriginal = imagesy($origen);
+            $anchoFinal = min($anchoOriginal, 1920);
+            $altoFinal = (int) round($altoOriginal * ($anchoFinal / $anchoOriginal));
+
+            $final = imagecreatetruecolor($anchoFinal, $altoFinal);
+            imagefill($final, 0, 0, imagecolorallocate($final, 255, 255, 255));
+            imagealphablending($final, true);
+            imagecopyresampled($final, $origen, 0, 0, 0, 0, $anchoFinal, $altoFinal, $anchoOriginal, $altoOriginal);
+            imagedestroy($origen);
+
+            $nuevoNombre = 'hero_' . bin2hex(random_bytes(8)) . '.jpg';
+            $rutaFinal = $uploadDir . $nuevoNombre;
+            $guardado = imagejpeg($final, $rutaFinal, 85);
+            imagedestroy($final);
+            if (!$guardado) {
+                http_response_code(500);
+                echo json_encode(['error' => 'No se pudo guardar la imagen.']);
+                break;
+            }
+
+            $stmt = $db->prepare("SELECT hero_imagen FROM agencias WHERE id = ?");
+            $stmt->execute([$id]);
+            $anterior = $stmt->fetchColumn();
+            $db->prepare("UPDATE agencias SET hero_imagen = ? WHERE id = ?")->execute([$nuevoNombre, $id]);
+            if ($anterior && file_exists($uploadDir . $anterior)) {
+                @unlink($uploadDir . $anterior);
+            }
+
+            echo json_encode(['success' => true, 'filename' => $nuevoNombre, 'v' => filemtime($rutaFinal)]);
             break;
 
         default:
@@ -98,6 +174,5 @@ try {
             echo json_encode(['error' => 'Ruta no encontrada']);
     }
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    responderErrorAmigable($e);
 }

@@ -7,19 +7,39 @@ require_once '../config.php';
 // Devuelve la fila del usuario si las credenciales son correctas y la cuenta está activa.
 // Si el usuario existe pero está pausado, devuelve ['paused' => true] para que login.php
 // pueda mostrar un mensaje distinto a "credenciales incorrectas".
-function authenticate($usuario, $pass) {
+// $identificador acepta tanto el nombre de usuario como el email (pensado para cuentas de
+// rol 'agencia', que inician sesión con su email en vez de un usuario interno).
+// Cada intento (exitoso o no) queda registrado en bitacora_accesos.
+function authenticate($identificador, $pass) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, usuario, password_hash, rol, activo FROM usuarios WHERE usuario = ?");
-    $stmt->execute([$usuario]);
+    $stmt = $db->prepare("SELECT id, usuario, password_hash, rol, activo FROM usuarios WHERE usuario = ? OR email = ?");
+    $stmt->execute([$identificador, $identificador]);
     $row = $stmt->fetch();
 
     if (!$row || !password_verify($pass, $row['password_hash'])) {
+        registrarAcceso($row['id'] ?? null, $identificador, false, 'credenciales_invalidas');
         return false;
     }
     if (!$row['activo']) {
+        registrarAcceso($row['id'], $identificador, false, 'pausado');
         return ['paused' => true];
     }
+    registrarAcceso($row['id'], $identificador, true, null);
+    $db->prepare("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?")->execute([$row['id']]);
     return $row;
+}
+
+function registrarAcceso($usuarioId, $identificador, $exito, $motivo) {
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO bitacora_accesos (usuario_id, identificador, ip, user_agent, exito, motivo) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $usuarioId,
+        mb_substr($identificador, 0, 150),
+        $_SERVER['REMOTE_ADDR'] ?? null,
+        mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
+        $exito ? 1 : 0,
+        $motivo
+    ]);
 }
 
 function is_logged_in() {
@@ -37,6 +57,9 @@ function is_logged_in() {
         session_destroy();
         return false;
     }
+    // Heartbeat: cada request autenticado refresca ultimo_acceso, así "conectado ahora"
+    // (ver usuarios-api.php) refleja actividad reciente, no solo el momento del login.
+    $db->prepare("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?")->execute([$_SESSION['user_id']]);
     return true;
 }
 
@@ -71,6 +94,7 @@ function try_remember_login() {
     $_SESSION['usuario'] = $row['usuario'];
     $_SESSION['rol'] = $row['rol'];
     set_remember_cookie($row['id']);
+    $db->prepare("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?")->execute([$row['id']]);
     return true;
 }
 
@@ -111,5 +135,28 @@ function require_login() {
         header('Location: login.php');
         exit;
     }
+}
+
+// Catálogo (destinos, categorías, tours, hoteles, módulos de itinerario, páginas fijas,
+// paquetes) es propio de cada usuario, igual que cotizaciones/itinerarios generados: un
+// admin puede tocar cualquier fila, un no-admin solo las suyas. Compartida por
+// shared/api.php e itinerario/api.php. Devuelve true si puede proceder; si no, ya
+// respondió el error HTTP y el caller debe hacer `break`.
+function verificarDueno($db, $tabla, $id) {
+    if (is_admin()) return true;
+    $stmt = $db->prepare("SELECT creado_por FROM $tabla WHERE id = ?");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        http_response_code(404);
+        echo json_encode(['error' => 'No encontrado.']);
+        return false;
+    }
+    if (intval($row['creado_por']) !== intval($_SESSION['user_id'])) {
+        http_response_code(403);
+        echo json_encode(['error' => 'No tienes permiso sobre este registro.']);
+        return false;
+    }
+    return true;
 }
 ?>

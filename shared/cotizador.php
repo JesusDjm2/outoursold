@@ -3,8 +3,11 @@
 // Plantilla única del cotizador. El caller (pen/index.php o usd/index.php) debe definir
 // antes de incluir este archivo: $pageTitle, $currencySymbol, $navActive.
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/agencia-helpers.php';
 $navRoot = '../';
 $navShared = '../shared/';
+$db = getDB();
+$heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -12,6 +15,7 @@ $navShared = '../shared/';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
+    <link rel="icon" type="image/png" href="../shared/favicon-outoors.png?v=<?= filemtime(__DIR__ . '/favicon-outoors.png') ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -26,7 +30,9 @@ $navShared = '../shared/';
 <body>
     <?php require __DIR__ . '/sidebar.php'; ?>
     <div class="app-content">
-        <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($navShared) ?>fondo-sistema-outours.jpg')">
+        <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
+            <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
+            <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             <div class="max-w-7xl mx-auto px-4 md:px-6">
                 <div class="page-hero-content">
                     <h1><?= htmlspecialchars($pageTitle) ?></h1>
@@ -56,30 +62,43 @@ $navShared = '../shared/';
             </button>
         </div>
         <div id="cotizador-section" class="tab-content">
-            <main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <main class="grid grid-cols-1 lg:grid-cols-4 gap-4">
                 <section class="lg:col-span-1 card p-3">
                     <div class="flex items-center justify-between mb-2">
                         <h2 class="text-base font-medium">1. Datos Pax</h2>
                         <span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
                     </div>
                     <form id="form-pax" class="grid grid-cols-1 gap-2 small">
-                        <div class="field"><span class="field-label">Agente</span><input type="text" name="agente" title="Agente que atiende esta cotización"></div>
-                        <div class="field"><span class="field-label">Nombre PAX</span><input type="text" name="nombre_pax" title="Nombre completo del pasajero"></div>
-                        <div class="field"><span class="field-label">Edad</span><input type="number" name="edad" title="Edad del pasajero"></div>
-                        <div class="field"><span class="field-label">Contacto</span><input type="text" name="contacto" title="Teléfono o correo de contacto"></div>
-                        <div class="field"><span class="field-label">Canal</span><input type="text" name="canal" placeholder="WhatsApp / Web" title="Canal por el que llegó el cliente"></div>
-                        <div class="field"><span class="field-label">F. Cot.</span><input type="date" name="fecha_cot" title="Fecha de la cotización"></div>
-                        <div class="field"><span class="field-label">N° PAX</span><input type="number" name="n_pax" value="1" min="1" title="Número de pasajeros"></div>
-                        <div class="field"><span class="field-label">País</span><input type="text" name="pais" placeholder="Perú" title="País de procedencia del pasajero"></div>
-                        <div class="field"><span class="field-label">Cod. País</span><input type="text" name="cod_pais" value="+51" title="Código telefónico del país"></div>
-                        <div class="field"><span class="field-label">Dpto/Est.</span><input type="text" name="dpto" placeholder="Cusco" title="Departamento o estado de destino"></div>
-                        <div class="field"><span class="field-label">F. llegada</span><input type="date" name="f_llegada" title="Fecha de llegada"></div>
-                        <div class="field"><span class="field-label">H. llegada</span><input type="time" name="h_llegada" title="Hora de llegada"></div>
-                        <div class="field"><span class="field-label">F. salida</span><input type="date" name="f_salida" title="Fecha de salida"></div>
-                        <div class="field"><span class="field-label">H. salida</span><input type="time" name="h_salida" title="Hora de salida"></div>
+                        <div class="field">
+                            <select name="idioma" title="Idioma de la cotización / PDF">
+                                <option value="es" selected>Español</option>
+                                <option value="en">English</option>
+                                <option value="pt">Português</option>
+                            </select>
+                        </div>
+                        <div class="field"><input type="text" name="agente" placeholder="Agente" title="Agente que atiende esta cotización"></div>
+                        <div class="field"><input type="text" name="nombre_pax" placeholder="Nombre PAX" title="Nombre completo del pasajero"></div>
+                        <div class="field"><input type="number" name="edad" placeholder="Edad" title="Edad del pasajero"></div>
+                        <div class="field"><input type="text" name="contacto" placeholder="Contacto (tel./correo)" title="Teléfono o correo de contacto"></div>
+                        <div class="field"><input type="text" name="canal" placeholder="Canal (WhatsApp, Web...)" title="Canal por el que llegó el cliente"></div>
+                        <div class="field field-overlay"><input type="date" name="fecha_cot" title="Fecha de la cotización"><span class="field-placeholder-overlay">F. Cot.</span></div>
+                        <div class="field field-prefix">
+                            <span class="field-prefix-label">N° PAX</span>
+                            <input type="number" name="n_pax" value="1" min="1" title="Número de pasajeros">
+                        </div>
+                        <div class="field pais-combobox" style="position:relative">
+                            <input type="text" name="pais" id="input-pais" placeholder="Buscar país..." title="País de procedencia del pasajero" autocomplete="off">
+                            <ul id="pais-dropdown-list" class="pais-dropdown-list hidden"></ul>
+                        </div>
+                        <div class="field"><input type="text" name="cod_pais" value="+51" placeholder="Cód. País" title="Código telefónico del país"></div>
+                        <div class="field"><input type="text" name="dpto" placeholder="Dpto/Est." title="Departamento o estado de destino"></div>
+                        <div class="field field-overlay"><input type="date" name="f_llegada" title="Fecha de llegada"><span class="field-placeholder-overlay">F. Llegada</span></div>
+                        <div class="field field-overlay"><input type="time" name="h_llegada" title="Hora de llegada"><span class="field-placeholder-overlay">H. Llegada</span></div>
+                        <div class="field field-overlay"><input type="date" name="f_salida" title="Fecha de salida"><span class="field-placeholder-overlay">F. Salida</span></div>
+                        <div class="field field-overlay"><input type="time" name="h_salida" title="Hora de salida"><span class="field-placeholder-overlay">H. Salida</span></div>
                     </form>
                 </section>
-                <section class="lg:col-span-2 space-y-4">
+                <section class="lg:col-span-3 space-y-4">
                     <div class="card p-3">
                         <div class="flex items-center justify-between mb-2">
                             <h2 class="text-base font-medium">2. Actividades del Tour</h2>
@@ -87,24 +106,28 @@ $navShared = '../shared/';
                                 <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1">
                                     <option value="">Aplicar paquete...</option>
                                 </select>
-                                <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
-                                <button id="clear-tours" class="px-3 py-1 rounded-md small border">Limpiar</button>
                                 <button id="historial-tours-btn" type="button" class="px-3 py-1 rounded-md small border" title="Ver historial de actividades usadas en cotizaciones guardadas">
                                     <i class="fas fa-clock-rotate-left mr-1"></i>Historial
                                 </button>
+                                <button id="toggle-conf-tours" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                    <i class="fas fa-eye mr-1"></i>Precios confid.
+                                </button>
+                                <button id="clear-tours" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full small">
+                            <table id="tours-table" class="w-full small">
                                 <thead>
                                     <tr>
                                         <th class="w-8 pl-2">&nbsp;</th>
                                         <th class="w-40">Fecha</th>
-                                        <th class="w-[50%]">Tour / Actividad</th>
+                                        <th class="w-[32%]">Tour / Actividad</th>
                                         <th class="w-24">Cant.</th>
                                         <th class="w-24">Distr.</th>
                                         <th class="w-24" hidden>P.Reg</th>
                                         <th class="w-24" hidden>P.Promo</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
                                         <th class="w-28">Total Línea</th>
                                         <th class="w-12 pr-2">Acc.</th>
                                     </tr>
@@ -112,17 +135,22 @@ $navShared = '../shared/';
                                 <tbody id="tours-body" class="small"></tbody>
                             </table>
                         </div>
+                        <div class="mt-2">
+                            <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                        </div>
                     </div>
                     <div class="card p-3">
                          <div class="flex items-center justify-between mb-2">
                             <h2 class="text-base font-medium">3. Data Hotel</h2>
                             <div class="flex items-center gap-2">
-                                <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-2)">+ Fila</button>
+                                <button id="toggle-conf-hoteles" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                    <i class="fas fa-eye mr-1"></i>Precios confid.
+                                </button>
                                 <button id="clear-hotels" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full small">
+                            <table id="hotels-table" class="w-full small">
                                 <thead>
                                     <tr>
                                         <th class="w-8 pl-2">&nbsp;</th>
@@ -133,12 +161,17 @@ $navShared = '../shared/';
                                         <th class="w-24">Noches</th>
                                         <th class="w-24" hidden>P.Reg</th>
                                         <th class="w-24" hidden>P.Promo</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
                                         <th class="w-28">Total Línea</th>
                                         <th class="w-12 pr-2">Acc.</th>
                                     </tr>
                                 </thead>
                                 <tbody id="hotels-body" class="small"></tbody>
                             </table>
+                        </div>
+                        <div class="mt-2">
+                            <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-2)">+ Fila</button>
                         </div>
                     </div>
                     <div class="card p-0 overflow-hidden">
@@ -191,21 +224,22 @@ $navShared = '../shared/';
         </div>
         <div id="gestion-section" class="tab-content hidden">
             <div class="flex gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit">
-                <button class="subnav-tab active" data-subtab="tours">
+                <button class="subnav-tab active" data-subtab="clasificacion">
+                    <i class="fas fa-tags mr-1"></i> Destinos y Categorías
+                </button>
+                <button class="subnav-tab" data-subtab="paquetes">
+                    <i class="fas fa-box-open mr-1"></i> Paquetes
+                </button>
+                <button class="subnav-tab" data-subtab="tours">
                     <i class="fas fa-map-marked-alt mr-1"></i> Tours
                 </button>
                 <button class="subnav-tab" data-subtab="hoteles">
                     <i class="fas fa-hotel mr-1"></i> Hoteles
                 </button>
-                <button class="subnav-tab" data-subtab="paquetes">
-                    <i class="fas fa-box-open mr-1"></i> Paquetes
-                </button>
-                <button class="subnav-tab" data-subtab="clasificacion">
-                    <i class="fas fa-tags mr-1"></i> Destinos y Categorías
-                </button>
             </div>
+            <div id="gestion-resumen" class="text-xs text-slate-500 mb-3"></div>
 
-            <div id="gestion-tours" class="subtab-content">
+            <div id="gestion-tours" class="subtab-content hidden">
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
                         <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Tours Existentes</h2>
@@ -217,11 +251,15 @@ $navShared = '../shared/';
                             <a href="../shared/plantilla_tours.csv" download class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar plantilla de ejemplo (CSV)">
                                 <i class="fas fa-download text-xl"></i>
                             </a>
-                            <label for="tour-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría — las 2 últimas opcionales. Puede llevar fila de encabezado o no, se detecta solo)">
+                            <label for="tour-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, y fila de encabezado o no: se detecta todo solo)">
                                 <i class="fas fa-file-csv text-xl"></i>
                             </label>
                             <input type="file" id="tour-csv-input" accept=".csv" class="hidden">
                         </div>
+                    </div>
+                    <div id="tours-sin-destinos-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
+                        <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus tours.</span>
+                        <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
                     </div>
                     <div class="bg-slate-50 border rounded-lg p-3 mb-4">
                         <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo tour</h3>
@@ -232,6 +270,11 @@ $navShared = '../shared/';
                             <input id="tour-new-preg" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Reg.">
                             <input id="tour-new-ppromo" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Promo">
                             <button id="tour-new-add" class="btn btn-primary col-span-2" title="Agregar tour"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="grid grid-cols-12 gap-2 small mt-2">
+                            <span class="col-span-12 text-[11px] text-slate-400"><i class="fas fa-lock mr-1"></i>Precios confidenciales (uso interno, nunca se muestran en la cotización salvo que se revelen a propósito)</span>
+                            <input id="tour-new-pconf" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio Confidencial">
+                            <input id="tour-new-pctotal" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio C. Total">
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -244,6 +287,8 @@ $navShared = '../shared/';
                                     <th class="text-left p-3">Distr.</th>
                                     <th class="text-left p-3">P. Reg.</th>
                                     <th class="text-left p-3">P. Promocional</th>
+                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio Conf.</th>
+                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio C. Total</th>
                                     <th class="text-left p-3">Creado por</th>
                                     <th class="text-right p-3">Acciones</th>
                                 </tr>
@@ -252,6 +297,9 @@ $navShared = '../shared/';
                         </table>
                     </div>
                 </div>
+                <button id="tours-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
+                    <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="tours-guardar-count">0</span>)
+                </button>
             </div>
 
             <div id="gestion-hoteles" class="subtab-content hidden">
@@ -266,11 +314,15 @@ $navShared = '../shared/';
                             <a href="../shared/plantilla_hoteles.csv" download class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar plantilla de ejemplo (CSV)">
                                 <i class="fas fa-download text-xl"></i>
                             </a>
-                            <label for="hotel-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría — las 2 últimas opcionales. Puede llevar fila de encabezado o no, se detecta solo)">
+                            <label for="hotel-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, y fila de encabezado o no: se detecta todo solo)">
                                 <i class="fas fa-file-csv text-xl"></i>
                             </label>
                             <input type="file" id="hotel-csv-input" accept=".csv" class="hidden">
                         </div>
+                    </div>
+                    <div id="hoteles-sin-destinos-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
+                        <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus alojamientos.</span>
+                        <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
                     </div>
                     <div class="bg-slate-50 border rounded-lg p-3 mb-4">
                         <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo alojamiento</h3>
@@ -281,6 +333,11 @@ $navShared = '../shared/';
                             <input id="hotel-new-preg" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Reg.">
                             <input id="hotel-new-ppromo" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Promo">
                             <button id="hotel-new-add" class="btn btn-primary col-span-2" title="Agregar alojamiento"><i class="fas fa-plus"></i></button>
+                        </div>
+                        <div class="grid grid-cols-12 gap-2 small mt-2">
+                            <span class="col-span-12 text-[11px] text-slate-400"><i class="fas fa-lock mr-1"></i>Precios confidenciales (uso interno, nunca se muestran en la cotización salvo que se revelen a propósito)</span>
+                            <input id="hotel-new-pconf" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio Confidencial">
+                            <input id="hotel-new-pctotal" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio C. Total">
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -293,6 +350,8 @@ $navShared = '../shared/';
                                     <th class="text-left p-3">Distr.</th>
                                     <th class="text-left p-3">P. Regular</th>
                                     <th class="text-left p-3">P. Promo</th>
+                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio Conf.</th>
+                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio C. Total</th>
                                     <th class="text-left p-3">Creado por</th>
                                     <th class="text-right p-3">Acciones</th>
                                 </tr>
@@ -301,9 +360,16 @@ $navShared = '../shared/';
                         </table>
                     </div>
                 </div>
+                <button id="hoteles-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
+                    <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="hoteles-guardar-count">0</span>)
+                </button>
             </div>
 
             <div id="gestion-paquetes" class="subtab-content hidden">
+                <div id="paquetes-sin-tours-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
+                    <span><i class="fas fa-circle-info mr-1"></i>Aún no hay tours en el catálogo. Agrega uno primero para poder armar paquetes con ellos.</span>
+                    <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear tour →</button>
+                </div>
                 <div class="card p-6 mb-6">
                     <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Paquete de Tours</h2>
                     <p class="text-sm text-slate-500 mb-4">Guarda una combinación de tours para insertarla completa en "Data Tours" de un clic.</p>
@@ -321,7 +387,7 @@ $navShared = '../shared/';
                 </div>
             </div>
 
-            <div id="gestion-clasificacion" class="subtab-content hidden">
+            <div id="gestion-clasificacion" class="subtab-content">
                 <div class="card p-6">
                     <h2 class="text-xl font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
                     <p class="text-sm text-slate-500 mb-4">Elige un destino a la izquierda para ver y gestionar sus categorías de Tours y de Hoteles.</p>
@@ -403,21 +469,25 @@ $navShared = '../shared/';
                 <h2 class="text-lg font-semibold">Historial de Cotizaciones</h2>
                 <button id="close-historial-tours-btn" class="text-xl text-slate-500">&times;</button>
             </div>
+            <div class="relative mb-3">
+                <input id="historial-tours-search" class="input rounded px-2 py-2 border pl-8 text-sm w-full" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
+                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+            </div>
             <div id="historial-tours-list" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+            <div class="flex justify-between items-center mt-3 pt-3 border-t text-sm text-slate-600">
+                <span id="historial-tours-page-info"></span>
+                <div class="flex gap-2">
+                    <button id="historial-tours-prev" class="btn border">Anterior</button>
+                    <button id="historial-tours-next" class="btn border">Siguiente</button>
+                </div>
+            </div>
         </div>
     </div>
     <div id="pdf-preview-modal" class="modal-overlay hidden">
         <div class="modal-content" style="max-width:900px; height:85vh; display:flex; flex-direction:column; overflow:hidden;">
             <div class="flex justify-between items-center mb-3">
                 <h2 class="text-lg font-semibold">Vista previa de la cotización</h2>
-                <div class="flex items-center gap-3">
-                    <div class="flex gap-1 bg-slate-100 rounded-lg p-1" id="pdf-lang-selector">
-                        <button type="button" class="categoria-tipo-tab pdf-lang-btn active" data-lang="es">ES</button>
-                        <button type="button" class="categoria-tipo-tab pdf-lang-btn" data-lang="en">EN</button>
-                        <button type="button" class="categoria-tipo-tab pdf-lang-btn" data-lang="pt">PT</button>
-                    </div>
-                    <button id="close-pdf-preview-btn" class="text-xl text-slate-500">&times;</button>
-                </div>
+                <button id="close-pdf-preview-btn" class="text-xl text-slate-500">&times;</button>
             </div>
             <div class="relative flex-1" style="min-height:0;">
                 <div id="pdf-preview-loading" class="absolute inset-0 flex items-center justify-center text-slate-400 hidden">
@@ -426,6 +496,7 @@ $navShared = '../shared/';
                 <iframe id="pdf-preview-frame" class="w-full h-full border rounded" style="min-height:0;"></iframe>
             </div>
             <div class="flex justify-end gap-2 mt-3 pt-3 border-t">
+                <button id="pdf-preview-nueva-pestana" class="btn border"><i class="fas fa-up-right-from-square mr-2"></i>Ver en nueva pestaña</button>
                 <button id="pdf-preview-descargar" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Descargar PDF</button>
             </div>
         </div>
@@ -436,6 +507,8 @@ $navShared = '../shared/';
         };
     </script>
     <script src="../shared/notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
+    <script>window.ME_API_URL = '../shared/mi-empresa-api.php'; window.HERO_ASSET_BASE = '../shared/';</script>
+    <script src="../shared/hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>
     <script src="../shared/rte.js?v=<?= filemtime(__DIR__ . '/rte.js') ?>"></script>
     <script src="../shared/cascade-select.js?v=<?= filemtime(__DIR__ . '/cascade-select.js') ?>"></script>
     <script src="../shared/cotizador.js?v=<?= filemtime(__DIR__ . '/cotizador.js') ?>"></script>

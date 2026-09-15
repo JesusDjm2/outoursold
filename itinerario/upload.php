@@ -43,7 +43,14 @@ if (!in_array($idioma, $idiomasValidos, true)) {
     $idioma = 'es';
 }
 
-$uploadDir = __DIR__ . '/uploads/' . $idioma . '/';
+// 'carpeta' es opcional y de lista blanca: separa el catálogo (uploads/$idioma/) del
+// historial de PDFs ya generados (uploads/$idioma/generados/), que crece por su cuenta
+// y no debe mezclarse con los módulos/páginas fijas que sí se gestionan a mano.
+$carpetasValidas = ['generados'];
+$carpeta = $_POST['carpeta'] ?? '';
+$subcarpeta = in_array($carpeta, $carpetasValidas, true) ? $carpeta . '/' : '';
+
+$uploadDir = __DIR__ . '/uploads/' . $idioma . '/' . $subcarpeta;
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);
 }

@@ -1,4 +1,5 @@
-Tour,Distr,P.Reg,P.Promo,Destino,Categoria
-City Tour Cusco 1er turno,ABC Travel,50.00,45.00,Cusco,City Tour
-Machu Picchu Full Day,ABC Travel,180.00,160.00,Cusco,Machu Picchu
-Tour de ejemplo sin clasificar,ABC Travel,30.00,25.00,,
+Tour;Distr;P.Reg;P.Promo;Destino;Categoria;Precio Confidencial;Precio C. Total
+City Tour Cusco 1er turno;ABC Travel;50.00;45.00;Cusco;City Tour;40.00;30.00
+Machu Picchu Full Day;ABC Travel;180.00;160.00;Cusco;Machu Picchu;150.00;120.00
+Tour de ejemplo sin clasificar;ABC Travel;30.00;25.00;;;;
+Tour de ejemplo formato antiguo (sin Destino/Categoria/Precios conf.);ABC Travel;20.00;15.00

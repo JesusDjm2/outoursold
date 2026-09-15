@@ -33,6 +33,35 @@
     .page-hero-content p { font-size: 1rem; }
 }
 
+/* Botón sutil (solo admin) para reemplazar la imagen de fondo del Hero, arriba a la
+   derecha. Circular y translúcido para no competir con el título ni la imagen. */
+.hero-edit-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 3;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(15, 23, 42, 0.32);
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: pointer;
+    backdrop-filter: blur(3px);
+    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
+}
+.hero-edit-btn:hover {
+    background: rgba(15, 23, 42, 0.6);
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+    transform: scale(1.06);
+}
+.hero-edit-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+
 /* Tabs de filtro: fuera del flujo, ancladas a la base del hero. Al ir con
    position:absolute no empujan al contenedor p-4/md:p-6 de abajo: ese
    contenedor queda pegado directo al hero, y la base de los tabs coincide

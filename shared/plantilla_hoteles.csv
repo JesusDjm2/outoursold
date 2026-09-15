@@ -1,4 +1,5 @@
-Alojamiento,Distr,P.Reg,P.Promo,Destino,Categoria
-Hotel Boutique Cusco (Doble),XYZ Travel,120.00,100.00,Cusco,Hotel Boutique
-Hostal Central Lima (Simple),XYZ Travel,60.00,50.00,Lima,Hostal
-Alojamiento de ejemplo sin clasificar,XYZ Travel,80.00,70.00,,
+Alojamiento;Distr;P.Reg;P.Promo;Destino;Categoria;Precio Confidencial;Precio C. Total
+Hotel Boutique Cusco (Doble);XYZ Travel;120.00;100.00;Cusco;Hotel Boutique;95.00;75.00
+Hostal Central Lima (Simple);XYZ Travel;60.00;50.00;Lima;Hostal;45.00;35.00
+Alojamiento de ejemplo sin clasificar;XYZ Travel;80.00;70.00;;;;
+Alojamiento de ejemplo formato antiguo (sin Destino/Categoria/Precios conf.);XYZ Travel;55.00;45.00

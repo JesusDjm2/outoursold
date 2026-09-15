@@ -37,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Cotizador Turístico</title>
+    <link rel="icon" type="image/png" href="favicon-outoors.png?v=<?= filemtime(__DIR__ . '/favicon-outoors.png') ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -70,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" class="space-y-5">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Usuario</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Usuario o Email</label>
                 <div class="relative">
                     <input type="text" name="user" required
                            class="w-full border border-slate-300 rounded-lg px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-cyan-500">

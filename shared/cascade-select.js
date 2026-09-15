@@ -13,6 +13,11 @@ const SIN_CATEGORIA_VAL = '__sin_categoria__';
 const SIN_DESTINO_LABEL = 'Sin clasificar';
 const SIN_CATEGORIA_LABEL = 'Sin categoría';
 
+// Sin tildes ni mayúsculas, para que "avion" encuentre "Avión" igual que "avión".
+function cascadeNormalizarTexto(s) {
+    return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 // `keys` puede ser un string simple (p.ej. 'tour') cuando el texto a mostrar y el valor a
 // resolver son el mismo campo — equivale a {labelKey: 'tour', valueKey: 'tour'}. O un
 // objeto {labelKey, valueKey} cuando son campos distintos (p.ej. título a mostrar, filename
@@ -162,6 +167,42 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
         });
     }
 
+    // Resultados de la búsqueda: lista plana de ítems (sin importar destino/categoría),
+    // cada uno con su ruta "Destino · Categoría" debajo del nombre para no perder el
+    // contexto que sí se ve al navegar el árbol.
+    function rutaDe(item) {
+        const destinoVal = helpers.destinoValDe(item);
+        const categoriaVal = helpers.categoriaValDe(item);
+        const destinoLabel = helpers.getDestinoOpciones().find(o => o.value === destinoVal)?.label || SIN_DESTINO_LABEL;
+        const categoriaLabel = helpers.getCategoriaOpciones(destinoVal).find(o => o.value === categoriaVal)?.label || SIN_CATEGORIA_LABEL;
+        return `${destinoLabel} · ${categoriaLabel}`;
+    }
+
+    function llenarResultadosBusqueda(container, termino) {
+        const q = cascadeNormalizarTexto(termino);
+        const resultados = helpers.getItems()
+            .filter(item => cascadeNormalizarTexto(item[labelKey]).includes(q))
+            .sort((a, b) => a[labelKey].localeCompare(b[labelKey]));
+        container.innerHTML = resultados.length
+            ? ''
+            : `<div class="cascade-empty">Sin coincidencias para "${termino}".</div>`;
+        resultados.forEach(item => {
+            const leaf = document.createElement('div');
+            leaf.className = 'cascade-leaf cascade-search-result';
+            if (item[valueKey] === currentValue) leaf.classList.add('is-selected');
+            leaf.innerHTML = `
+                <div class="cascade-node-row cascade-search-result-row">
+                    <div class="cascade-search-result-text">
+                        <span>${item[labelKey]}</span>
+                        <small class="cascade-search-result-ruta">${rutaDe(item)}</small>
+                    </div>
+                </div>
+            `;
+            leaf.addEventListener('click', () => { elegir(item); cerrarCascadeSelectAbierto(); });
+            container.appendChild(leaf);
+        });
+    }
+
     function construirPanel() {
         const panel = document.createElement('div');
         panel.className = 'cascade-select-panel';
@@ -170,11 +211,42 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
             panel.innerHTML = `<div class="cascade-empty">No hay destinos en el catálogo.</div>`;
             return panel;
         }
+
+        const searchWrap = document.createElement('div');
+        searchWrap.className = 'cascade-search-wrap';
+        searchWrap.innerHTML = `
+            <i class="fas fa-search cascade-search-icon"></i>
+            <input type="text" class="cascade-search-input" placeholder="Buscar ${itemPlaceholder.toLowerCase()}...">
+        `;
+        panel.appendChild(searchWrap);
+        const searchInput = searchWrap.querySelector('.cascade-search-input');
+
+        const arbol = document.createElement('div');
+        arbol.className = 'cascade-tree';
         destinos.forEach(d => {
-            panel.appendChild(crearNodo(d.label, {
+            arbol.appendChild(crearNodo(d.label, {
                 onOpen: (children) => llenarCategorias(children, d.value)
             }));
         });
+        panel.appendChild(arbol);
+
+        const resultados = document.createElement('div');
+        resultados.className = 'cascade-search-results hidden';
+        panel.appendChild(resultados);
+
+        searchInput.addEventListener('input', () => {
+            const termino = searchInput.value.trim();
+            if (termino) {
+                arbol.classList.add('hidden');
+                resultados.classList.remove('hidden');
+                llenarResultadosBusqueda(resultados, termino);
+            } else {
+                resultados.classList.add('hidden');
+                arbol.classList.remove('hidden');
+            }
+        });
+        setTimeout(() => searchInput.focus(), 0);
+
         return panel;
     }
 
@@ -211,7 +283,16 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
         if (cascadeSelectAbierto === cerrarPanel) cascadeSelectAbierto = null;
     }
     function onKeydown(e) {
-        if (e.key === 'Escape') cerrarPanel();
+        if (e.key !== 'Escape') return;
+        // Con texto en el buscador, el primer Escape solo lo limpia (vuelve al árbol);
+        // recién el segundo cierra el panel.
+        const searchInput = panelEl?.querySelector('.cascade-search-input');
+        if (searchInput && searchInput.value) {
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+            return;
+        }
+        cerrarPanel();
     }
     // Si el scroll ocurre dentro del propio panel (o al abrir una rama del árbol
     // que lo hace crecer) no hay que cerrarlo — solo cuando se mueve algo detrás,

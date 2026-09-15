@@ -44,7 +44,6 @@ let paqueteEditandoId = null;
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
 let pdfPreviewCotizacionId = null;
-let pdfPreviewIdioma = 'es';
 
 // Etiquetas fijas de la plantilla del PDF (shared/pdf-template.html /
 // pdf-terminos-template.html), traducidas a los 3 idiomas de exportación. Los datos
@@ -152,13 +151,6 @@ async function cargarDatosIniciales() {
 // ===== SELECTOR EN CASCADA: Destino → Categoría → Ítem =====
 // crearHelpersClasificacion / buildClasificacionSelector ahora viven en
 // shared/cascade-select.js (compartido con el Generador de Itinerarios).
-function nombreEnCatalogo(catalogo, id) {
-    return catalogo.find(x => x.id === id)?.nombre || null;
-}
-function destinoNombre(destinoId) { return nombreEnCatalogo(destinosData, destinoId); }
-function categoriaNombre(categoriaId) { return nombreEnCatalogo(categoriasData, categoriaId); }
-function categoriaHotelNombre(categoriaId) { return nombreEnCatalogo(categoriasHotelesData, categoriaId); }
-
 const toursHelpers = crearHelpersClasificacion(() => toursData, () => categoriasData, 'tour');
 const hotelesHelpers = crearHelpersClasificacion(() => hotelsData, () => categoriasHotelesData, 'aloj');
 
@@ -169,36 +161,127 @@ function buildHotelSelector(initialHotelName, onResolved) {
     return buildClasificacionSelector(hotelesHelpers, 'Alojamiento...', initialHotelName, onResolved);
 }
 
+// Cambia de subpestaña dentro de Gestión de Datos (Destinos y Categorías / Paquetes /
+// Tours / Hoteles) — misma lógica que el click en un .subnav-tab, reutilizada por los
+// avisos de "falta X" y por los enlaces cruzados Destino/Categoría de las tablas.
+function irASubtabGestion(subtab) {
+    document.querySelectorAll('.subnav-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
+    document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+    document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
+}
+
+// Llena un <select> de Destino (mismo catálogo para tours y hoteles).
+function llenarSelectDestino(select, selectedId) {
+    select.innerHTML = '<option value="">Sin clasificar</option>' +
+        destinosData.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
+}
+// Llena un <select> de Categoría según el destino elegido — categoriasDataset es
+// categoriasData (tours) o categoriasHotelesData (hoteles), cada uno su propio catálogo.
+function llenarSelectCategoria(select, categoriasDataset, destinoId, selectedId) {
+    if (!destinoId) {
+        select.innerHTML = '<option value="">—</option>';
+        select.disabled = true;
+        return;
+    }
+    const opciones = categoriasDataset.filter(c => c.destino_id === Number(destinoId));
+    select.innerHTML = '<option value="">Sin categoría</option>' +
+        opciones.map(c => `<option value="${c.id}" ${selectedId != null && c.id === Number(selectedId) ? 'selected' : ''}>${c.nombre}</option>`).join('');
+    select.disabled = false;
+}
+
+// "3 destinos · 12 categorías · 45 tours · 8 paquetes" arriba de las subpestañas de
+// Gestión de Datos, para tener panorama general sin entrar a cada una.
+function renderGestionResumen() {
+    const el = document.getElementById('gestion-resumen');
+    if (!el) return;
+    const nCategorias = categoriasData.length + categoriasHotelesData.length;
+    const pl = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
+    el.textContent = [
+        pl(destinosData.length, 'destino', 'destinos'),
+        pl(nCategorias, 'categoría', 'categorías'),
+        pl(toursData.length, 'tour', 'tours'),
+        pl(hotelsData.length, 'hotel', 'hoteles'),
+        pl(paquetesData.length, 'paquete', 'paquetes')
+    ].join(' · ');
+}
+
+// Aviso accionable cuando falta la data de la que depende la pestaña actual (ej. Tours sin
+// ningún Destino creado todavía) — evita selects vacíos sin explicación.
+function actualizarAvisoDependencia(hintId, faltante, subtabDestino) {
+    const hint = document.getElementById(hintId);
+    if (!hint) return;
+    hint.classList.toggle('hidden', !faltante);
+    if (faltante && !hint.dataset.wired) {
+        hint.dataset.wired = '1';
+        hint.querySelector('button')?.addEventListener('click', () => irASubtabGestion(subtabDestino));
+    }
+}
+
 // ===== RENDER TABLAS (gestión) — CRUD de tours y hoteles =====
+// Clasificación de varios registros a la vez: el select de Destino/Categoría de cada fila
+// queda siempre editable (no hace falta entrar en "Editar"); cambiar uno no guarda al toque,
+// solo lo marca como pendiente acá. Un botón flotante (fijo en la pantalla, visible aunque
+// haya cientos de filas y estés scrolleado) guarda todos los pendientes en un solo viaje al
+// servidor — que a su vez solo toca esos IDs puntuales (UPDATE por id, no recorre la tabla).
+let cambiosPendientesTours = new Map();
+let cambiosPendientesHoteles = new Map();
+
+function actualizarBotonGuardarTours() {
+    const btn = document.getElementById('tours-guardar-flotante');
+    const n = cambiosPendientesTours.size;
+    btn.classList.toggle('hidden', n === 0);
+    document.getElementById('tours-guardar-count').textContent = n;
+}
+
 function renderTours() {
     const tbody = document.getElementById('tours-table-body');
     tbody.innerHTML = '';
+    cambiosPendientesTours.clear();
+    actualizarBotonGuardarTours();
     const visibles = toursData
         .filter(t => t.tour.toLowerCase().includes(toursFilter))
         .sort((a, b) => a.tour.localeCompare(b.tour));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
     } else {
         visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
     }
+    actualizarAvisoDependencia('tours-sin-destinos-hint', destinosData.length === 0, 'clasificacion');
+    renderGestionResumen();
 }
 
 function buildTourRow(t) {
     const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50';
     tr.innerHTML = `
         <td class="p-3 font-medium">${t.tour}</td>
-        <td class="p-3">${destinoNombre(t.destino_id) || '<span class="text-slate-400">—</span>'}</td>
-        <td class="p-3">${categoriaNombre(t.categoria_id) || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-destino"></select></td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-categoria" disabled></select></td>
         <td class="p-3">${t.distr || ''}</td>
         <td class="p-3">${fmt(t.preg)}</td>
         <td class="p-3">${fmt(t.ppromo)}</td>
+        <td class="p-3">${fmt(t.pconf)}</td>
+        <td class="p-3">${fmt(t.pctotal)}</td>
         <td class="p-3 text-slate-500">${t.creado_por_nombre || '—'}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
         </td>
     `;
-    const [editBtn, delBtn] = tr.querySelectorAll('button');
+    const destinoSel = tr.querySelector('.tour-row-destino');
+    const categoriaSel = tr.querySelector('.tour-row-categoria');
+    llenarSelectDestino(destinoSel, t.destino_id);
+    llenarSelectCategoria(categoriaSel, categoriasData, t.destino_id, t.categoria_id);
+    const marcarPendiente = () => {
+        cambiosPendientesTours.set(t.id, { destino_id: destinoSel.value || null, categoria_id: categoriaSel.value || null });
+        actualizarBotonGuardarTours();
+    };
+    destinoSel.addEventListener('change', () => {
+        llenarSelectCategoria(categoriaSel, categoriasData, destinoSel.value, null);
+        marcarPendiente();
+    });
+    categoriaSel.addEventListener('change', marcarPendiente);
+    const [editBtn, delBtn] = tr.querySelectorAll('td:last-child button');
     editBtn.addEventListener('click', () => tr.replaceWith(buildTourEditRow(t)));
     delBtn.addEventListener('click', () => eliminarTour(t));
     return tr;
@@ -245,6 +328,8 @@ function buildTourEditRow(t) {
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.ppromo}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.pconf || 0}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.pctotal || 0}"></td>
         <td class="p-2 text-slate-500">${t.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
@@ -253,13 +338,14 @@ function buildTourEditRow(t) {
     `;
     const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasData, t.destino_id, t.categoria_id);
     tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
-    const [tourI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const [tourI, distrI, pregI, ppromoI, pconfI, pctotalI] = tr.querySelectorAll('input');
     const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarTour({
         id: t.id, tour: tourI.value.trim(),
         destino_id: destinoCategoriaSelector.destinoSelect.value || null,
         categoria_id: destinoCategoriaSelector.categoriaSelect.value || null,
-        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value,
+        pconf: pconfI.value, pctotal: pctotalI.value
     }));
     cancelBtn.addEventListener('click', () => tr.replaceWith(buildTourRow(t)));
     return tr;
@@ -327,6 +413,7 @@ function renderDestinos() {
         visibles.forEach(d => listEl.appendChild(buildDestinoRow(d)));
     }
     renderCategorias();
+    renderGestionResumen();
 }
 
 // Cuántas categorías (de Tours y de Hoteles) tiene ya este destino — ayuda a ver de un
@@ -351,7 +438,7 @@ function buildDestinoRow(d) {
                 <i class="fas fa-chevron-right text-xs text-slate-300"></i>
                 <span class="destino-nombre font-medium truncate">${d.nombre}</span>
             </div>
-            <div class="text-xs text-slate-400 pl-4">${resumenCategoriasDestino(d.id)}</div>
+            <div class="text-xs text-slate-400 pl-4">${resumenCategoriasDestino(d.id)} · ${d.creado_por_nombre || '—'}</div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
             <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
@@ -403,7 +490,16 @@ async function guardarDestino(payload) {
 }
 
 async function eliminarDestino(d) {
-    if (!await confirmAction(`¿Eliminar el destino "${d.nombre}"?`)) return;
+    const nTours = toursData.filter(t => t.destino_id === d.id).length;
+    const nHoteles = hotelsData.filter(h => h.destino_id === d.id).length;
+    let mensaje = `¿Eliminar el destino "${d.nombre}"?`;
+    if (nTours || nHoteles) {
+        const partes = [];
+        if (nTours) partes.push(`${nTours} tour${nTours === 1 ? '' : 's'}`);
+        if (nHoteles) partes.push(`${nHoteles} hotel${nHoteles === 1 ? '' : 'es'}`);
+        mensaje += ` Quedarían ${partes.join(' y ')} sin destino asignado.`;
+    }
+    if (!await confirmAction(mensaje)) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-destino`, {
             method: 'POST',
@@ -471,7 +567,7 @@ function buildCategoriaRow(tipo, c) {
     const div = document.createElement('div');
     div.className = 'categoria-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg';
     div.innerHTML = `
-        <span>${c.nombre}</span>
+        <span class="min-w-0 truncate">${c.nombre} <span class="text-xs text-slate-400">· ${c.creado_por_nombre || '—'}</span></span>
         <div class="flex items-center gap-1 shrink-0">
             <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
             <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
@@ -518,7 +614,14 @@ async function guardarCategoria(tipo, payload) {
 }
 
 async function eliminarCategoria(tipo, c) {
-    if (!await confirmAction(`¿Eliminar la categoría "${c.nombre}"?`)) return;
+    const dataset = tipo === 'hoteles' ? hotelsData : toursData;
+    const n = dataset.filter(x => x.categoria_id === c.id).length;
+    let mensaje = `¿Eliminar la categoría "${c.nombre}"?`;
+    if (n) {
+        const sustantivo = tipo === 'hoteles' ? `hotel${n === 1 ? '' : 'es'}` : `tour${n === 1 ? '' : 's'}`;
+        mensaje += ` Quedarían ${n} ${sustantivo} sin categoría asignada.`;
+    }
+    if (!await confirmAction(mensaje)) return;
     try {
         const res = await fetch(`${API_URL}?path=${CATEGORIA_TIPOS[tipo].apiEliminar}`, {
             method: 'POST',
@@ -559,35 +662,62 @@ function renderTourNewDestinoCategoria() {
     container.appendChild(buildDestinoCategoriaSelector(categoriasData, null, null));
 }
 
+function actualizarBotonGuardarHoteles() {
+    const btn = document.getElementById('hoteles-guardar-flotante');
+    const n = cambiosPendientesHoteles.size;
+    btn.classList.toggle('hidden', n === 0);
+    document.getElementById('hoteles-guardar-count').textContent = n;
+}
+
 function renderHotels() {
     const tbody = document.getElementById('hotels-table-body');
     tbody.innerHTML = '';
+    cambiosPendientesHoteles.clear();
+    actualizarBotonGuardarHoteles();
     const visibles = hotelsData
         .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
         .sort((a, b) => a.aloj.localeCompare(b.aloj));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
     } else {
         visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
     }
+    actualizarAvisoDependencia('hoteles-sin-destinos-hint', destinosData.length === 0, 'clasificacion');
+    renderGestionResumen();
 }
 
 function buildHotelRow(h) {
     const tr = document.createElement('tr');
+    tr.className = 'hover:bg-slate-50';
     tr.innerHTML = `
         <td class="p-3 font-medium">${h.aloj}</td>
-        <td class="p-3">${destinoNombre(h.destino_id) || '<span class="text-slate-400">—</span>'}</td>
-        <td class="p-3">${categoriaHotelNombre(h.categoria_id) || '<span class="text-slate-400">—</span>'}</td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-destino"></select></td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-categoria" disabled></select></td>
         <td class="p-3">${h.distr || ''}</td>
         <td class="p-3">${fmt(h.preg)}</td>
         <td class="p-3">${fmt(h.ppromo)}</td>
+        <td class="p-3">${fmt(h.pconf)}</td>
+        <td class="p-3">${fmt(h.pctotal)}</td>
         <td class="p-3 text-slate-500">${h.creado_por_nombre || '—'}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
         </td>
     `;
-    const [editBtn, delBtn] = tr.querySelectorAll('button');
+    const destinoSel = tr.querySelector('.hotel-row-destino');
+    const categoriaSel = tr.querySelector('.hotel-row-categoria');
+    llenarSelectDestino(destinoSel, h.destino_id);
+    llenarSelectCategoria(categoriaSel, categoriasHotelesData, h.destino_id, h.categoria_id);
+    const marcarPendiente = () => {
+        cambiosPendientesHoteles.set(h.id, { destino_id: destinoSel.value || null, categoria_id: categoriaSel.value || null });
+        actualizarBotonGuardarHoteles();
+    };
+    destinoSel.addEventListener('change', () => {
+        llenarSelectCategoria(categoriaSel, categoriasHotelesData, destinoSel.value, null);
+        marcarPendiente();
+    });
+    categoriaSel.addEventListener('change', marcarPendiente);
+    const [editBtn, delBtn] = tr.querySelectorAll('td:last-child button');
     editBtn.addEventListener('click', () => tr.replaceWith(buildHotelEditRow(h)));
     delBtn.addEventListener('click', () => eliminarHotel(h));
     return tr;
@@ -601,6 +731,8 @@ function buildHotelEditRow(h) {
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.distr || ''}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.preg}"></td>
         <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.ppromo}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.pconf || 0}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.pctotal || 0}"></td>
         <td class="p-2 text-slate-500">${h.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
@@ -609,13 +741,14 @@ function buildHotelEditRow(h) {
     `;
     const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasHotelesData, h.destino_id, h.categoria_id);
     tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
-    const [alojI, distrI, pregI, ppromoI] = tr.querySelectorAll('input');
+    const [alojI, distrI, pregI, ppromoI, pconfI, pctotalI] = tr.querySelectorAll('input');
     const [saveBtn, cancelBtn] = tr.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarHotel({
         id: h.id, aloj: alojI.value.trim(),
         destino_id: destinoCategoriaSelector.destinoSelect.value || null,
         categoria_id: destinoCategoriaSelector.categoriaSelect.value || null,
-        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value
+        distr: distrI.value.trim(), preg: pregI.value, ppromo: ppromoI.value,
+        pconf: pconfI.value, pctotal: pctotalI.value
     }));
     cancelBtn.addEventListener('click', () => tr.replaceWith(buildHotelRow(h)));
     return tr;
@@ -777,28 +910,37 @@ function renderPaquetesList() {
     container.innerHTML = '';
     if (paquetesData.length === 0) {
         container.innerHTML = '<p class="text-slate-400 text-sm">Sin paquetes guardados.</p>';
-        return;
+    } else {
+        paquetesData.forEach(p => {
+            const preview = p.tours.map(t => `${t.tour} x${t.cant}`).join(', ');
+            // Un paquete puede quedar referenciando tours que ya se borraron del catálogo
+            // (o se les cambió el nombre) — avisarlo acá evita aplicar filas rotas a una cotización.
+            const faltantes = p.tours.filter(t => !toursData.some(td => td.tour === t.tour));
+            const avisoHtml = faltantes.length
+                ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} tour${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${faltantes.map(t => t.tour).join(', ')}</div>`
+                : '';
+            const div = document.createElement('div');
+            div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3 flex-wrap';
+            div.innerHTML = `
+                <div class="min-w-0">
+                    <div class="font-medium">${p.nombre}</div>
+                    <div class="text-xs text-slate-500 truncate">${preview}</div>
+                    ${avisoHtml}
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
+                    <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
+                    <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+            div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
+            div.querySelector('.paquete-editar-btn').addEventListener('click', () => editarPaquete(p));
+            div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
+            container.appendChild(div);
+        });
     }
-    paquetesData.forEach(p => {
-        const preview = p.tours.map(t => `${t.tour} x${t.cant}`).join(', ');
-        const div = document.createElement('div');
-        div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3 flex-wrap';
-        div.innerHTML = `
-            <div class="min-w-0">
-                <div class="font-medium">${p.nombre}</div>
-                <div class="text-xs text-slate-500 truncate">${preview}</div>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
-                <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
-                <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
-            </div>
-        `;
-        div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
-        div.querySelector('.paquete-editar-btn').addEventListener('click', () => editarPaquete(p));
-        div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
-        container.appendChild(div);
-    });
+    actualizarAvisoDependencia('paquetes-sin-tours-hint', toursData.length === 0, 'tours');
+    renderGestionResumen();
 }
 
 function renderAplicarPaqueteSelect() {
@@ -812,27 +954,75 @@ function renderAplicarPaqueteSelect() {
     });
 }
 
-function aplicarPaquete(paquete) {
+// Inserta filas de tour en la tabla, reutilizando primero las filas ya presentes que
+// están vacías (sin tour elegido, típicamente la fila 1 en blanco de una cotización
+// nueva) en vez de siempre agregar al final dejándolas vacías de por medio. Solo cuando
+// se acaban las filas vacías se agregan filas nuevas al final — igual que antes.
+function agregarFilasTours(filasDatos, dispatchInput) {
     const toursBody = document.getElementById('tours-body');
-    paquete.tours.forEach(item => {
-        const tr = createTourRow({ tour: item.tour, cant: item.cant });
-        toursBody.appendChild(tr);
-        tr.querySelector('.tour-name').dispatchEvent(new Event('input'));
+    const filasVacias = Array.from(toursBody.querySelectorAll('tr')).filter(tr => !tr.querySelector('.tour-name').value);
+    filasDatos.forEach((datos, i) => {
+        const tr = createTourRow(datos);
+        if (dispatchInput) tr.querySelector('.tour-name').dispatchEvent(new Event('input'));
+        if (i < filasVacias.length) {
+            filasVacias[i].replaceWith(tr);
+        } else {
+            toursBody.appendChild(tr);
+        }
     });
     calcularResumen();
+}
+
+// Igual que agregarFilasTours pero para la tabla de hoteles.
+function agregarFilasHoteles(filasDatos, dispatchInput) {
+    const hotelsBody = document.getElementById('hotels-body');
+    const filasVacias = Array.from(hotelsBody.querySelectorAll('tr')).filter(tr => !tr.querySelector('.hotel-name').value);
+    filasDatos.forEach((datos, i) => {
+        const tr = createHotelRow(datos);
+        if (dispatchInput) tr.querySelector('.hotel-name').dispatchEvent(new Event('input'));
+        if (i < filasVacias.length) {
+            filasVacias[i].replaceWith(tr);
+        } else {
+            hotelsBody.appendChild(tr);
+        }
+    });
+    calcularResumen();
+}
+
+function aplicarPaquete(paquete) {
+    // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
+    // mano) y sigue a N° PAX hasta que el usuario la edite — antes se fijaba con la
+    // cantidad guardada en el paquete y quedaba sorda a los cambios de N° PAX.
+    const filas = paquete.tours.map(item => ({ tour: item.tour }));
+    agregarFilasTours(filas, true);
     irATabCotizador();
 }
 
 // ===== Historial de Cotizaciones guardadas (traer TODAS sus actividades a la vista actual) =====
+const HIST_PAGE_SIZE = 15;
+const histState = { term: '', offset: 0, total: 0 };
+let histSearchDebounce = null;
+
 async function abrirHistorialTours() {
     document.getElementById('historial-tours-modal').classList.remove('hidden');
+    histState.term = '';
+    histState.offset = 0;
+    document.getElementById('historial-tours-search').value = '';
+    await cargarHistorialTours();
+}
+
+async function cargarHistorialTours() {
     const container = document.getElementById('historial-tours-list');
     container.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Cargando...</p>';
     try {
-        const res = await fetch(`${API_URL}?path=cotizaciones&limit=20`).then(r => r.json());
-        renderHistorialTours(res.results || []);
+        const params = new URLSearchParams({ q: histState.term, limit: HIST_PAGE_SIZE, offset: histState.offset });
+        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`).then(r => r.json());
+        renderHistorialTours(res.results || [], res.total || 0);
     } catch (e) {
         container.innerHTML = '<p class="text-red-500 text-sm text-center py-6">Error al cargar el historial.</p>';
+        document.getElementById('historial-tours-page-info').textContent = '';
+        document.getElementById('historial-tours-prev').disabled = true;
+        document.getElementById('historial-tours-next').disabled = true;
     }
 }
 
@@ -840,54 +1030,86 @@ function cerrarHistorialTours() {
     document.getElementById('historial-tours-modal').classList.add('hidden');
 }
 
-function renderHistorialTours(cotizacionesGuardadas) {
+function renderHistorialTours(cotizacionesGuardadas, total) {
     const container = document.getElementById('historial-tours-list');
     // Solo interesan las que ya traen actividades, y no la que se está editando ahora mismo.
     const conActividades = cotizacionesGuardadas.filter(c =>
-        c.id !== currentCotizacionId && Array.isArray(c.data?.tours) && c.data.tours.length > 0
+        c.id !== currentCotizacionId && Array.isArray(c.data?.tours) && c.data.tours.filter(t => t.tour).length > 0
     );
-    if (!conActividades.length) {
-        container.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Todavía no hay cotizaciones guardadas con actividades.</p>';
-        return;
-    }
     container.innerHTML = '';
-    conActividades.forEach(c => {
-        const nombre = c.data.pax?.nombre_pax || 'Sin nombre';
-        const tours = c.data.tours.filter(t => t.tour);
-        const preview = tours.map(t => t.tour).join(', ');
-        const div = document.createElement('div');
-        div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
-        div.innerHTML = `
-            <div class="min-w-0">
-                <div class="font-medium truncate">${c.id} — ${nombre}</div>
-                <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${preview}</div>
-            </div>
-            <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
-        `;
-        div.querySelector('button').addEventListener('click', () => reusarHistorialCotizacion(c));
-        container.appendChild(div);
-    });
+    if (!conActividades.length) {
+        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-6">${histState.term ? 'Sin resultados.' : 'Todavía no hay cotizaciones guardadas con actividades.'}</p>`;
+    } else {
+        conActividades.forEach(c => {
+            const nombre = c.data.pax?.nombre_pax || 'Sin nombre';
+            const tours = c.data.tours.filter(t => t.tour);
+            const preview = tours.map(t => t.tour).join(', ');
+            const div = document.createElement('div');
+            div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
+            div.innerHTML = `
+                <div class="min-w-0">
+                    <div class="font-medium truncate">${c.id} — ${nombre}</div>
+                    <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${preview}</div>
+                </div>
+                <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
+            `;
+            div.querySelector('button').addEventListener('click', () => reusarHistorialCotizacion(c));
+            container.appendChild(div);
+        });
+    }
+    const shown = histState.offset + cotizacionesGuardadas.length;
+    document.getElementById('historial-tours-page-info').textContent = total === 0 ? '' : `${histState.offset + 1}-${shown} de ${total}`;
+    document.getElementById('historial-tours-prev').disabled = histState.offset === 0;
+    document.getElementById('historial-tours-next').disabled = shown >= total;
 }
 
-// Trae TODAS las actividades de esa cotización guardada a la tabla actual, tal cual
-// quedaron (misma fecha/cant/precio/distribuidor) — no reemplaza lo que ya hay en la
-// tabla, se suma a continuación, igual que "Aplicar paquete".
+// Trae TODAS las actividades y hoteles de esa cotización guardada a la vista actual,
+// tal cual quedaron (misma fecha/cant/precio/distribuidor). Reutiliza primero las filas
+// vacías que ya haya en las tablas (ver agregarFilasTours/agregarFilasHoteles) y recién
+// luego agrega al final.
 function reusarHistorialCotizacion(c) {
-    const toursBody = document.getElementById('tours-body');
-    const tours = c.data.tours.filter(t => t.tour);
-    tours.forEach(t => {
-        const tr = createTourRow({
-            tour: t.tour,
-            fecha: t.fecha || '',
-            cant: t.cant,
-            distr: t.distr,
-            preg: t.preg,
-            ppromo: t.ppromo
-        });
-        toursBody.appendChild(tr);
-    });
-    calcularResumen();
+    // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
+    // mano o un paquete aplicado) y sigue a N° PAX hasta que el usuario la edite — antes
+    // se fijaba con la cantidad de la cotización histórica y quedaba sorda a N° PAX.
+    const filasTours = c.data.tours.filter(t => t.tour).map(t => ({
+        tour: t.tour,
+        fecha: t.fecha || '',
+        distr: t.distr,
+        preg: t.preg,
+        ppromo: t.ppromo,
+        pconf: t.pconf,
+        pctotal: t.pctotal
+    }));
+    agregarFilasTours(filasTours, false);
+
+    const filasHoteles = (c.data.hotels || []).filter(h => h.aloj).map(h => ({
+        aloj: h.aloj,
+        cin: h.cin || '',
+        cout: h.cout || '',
+        nhab: h.nhab,
+        noches: h.noches,
+        preg: h.preg,
+        ppromo: h.ppromo,
+        pconf: h.pconf,
+        pctotal: h.pctotal
+    }));
+    agregarFilasHoteles(filasHoteles, false);
+
     cerrarHistorialTours();
+}
+
+// Sugiere la fecha de una nueva fila de actividad: el día siguiente a la fecha más
+// tardía ya puesta en alguna fila existente (típico armado de itinerario día por día).
+// Si ninguna fila tiene fecha todavía, no sugiere nada (queda vacía, como antes).
+function sugerirSiguienteFechaTour() {
+    const fechas = Array.from(document.querySelectorAll('#tours-body tr td:nth-child(2) input'))
+        .map(input => input.value)
+        .filter(Boolean);
+    if (fechas.length === 0) return '';
+    const ultima = fechas.reduce((max, f) => f > max ? f : max);
+    const siguiente = new Date(ultima + 'T00:00:00');
+    siguiente.setDate(siguiente.getDate() + 1);
+    return siguiente.toISOString().split('T')[0];
 }
 
 // ===== FILAS =====
@@ -915,6 +1137,8 @@ function createTourRow(data = {}) {
         <td><input class="input w-full rounded px-2 py-1 border distr" type="text" value="${data.distr || ''}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
+        <td class="col-confidencial"><input class="input w-full rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
+        <td class="col-confidencial"><input class="input w-full rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
         <td class="text-right total-line">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
@@ -938,6 +1162,8 @@ function createTourRow(data = {}) {
             tr.querySelector('.preg').value = tour.preg;
             tr.querySelector('.ppromo').value = tour.ppromo;
             tr.querySelector('.distr').value = tour.distr;
+            tr.querySelector('.pconf').value = tour.pconf || 0;
+            tr.querySelector('.pctotal').value = tour.pctotal || 0;
             const cant = parseFloat(tr.querySelector('.cant').value) || 0;
             tr.querySelector('.total-line').textContent = fmt(cant * tour.ppromo);
             calcularResumen();
@@ -970,6 +1196,19 @@ function sincronizarCantidadTours() {
     calcularResumen();
 }
 
+// Los campos de fecha/hora de Datos Pax no tienen label ni placeholder nativo (los
+// navegadores ignoran el atributo placeholder en type="date"/"time") — en su lugar
+// muestran un overlay de texto (ver .field-placeholder-overlay en cotizador.css) que se
+// oculta con esta clase apenas el campo tiene un valor. Como se asigna con .value = ...
+// al cargar una cotización guardada (no dispara 'input'), hay que refrescarlo a mano
+// cada vez que el formulario se llena por código en vez de por tipeo del usuario.
+function actualizarEstadoCampoFecha(input) {
+    input.closest('.field-overlay')?.classList.toggle('has-value', input.value !== '');
+}
+function actualizarEstadosCamposFecha() {
+    document.querySelectorAll('.field-overlay input').forEach(actualizarEstadoCampoFecha);
+}
+
 function createHotelRow(data = {}) {
     const tr = document.createElement('tr');
     tr.className = 'draggable';
@@ -989,6 +1228,8 @@ function createHotelRow(data = {}) {
         <td><input class="input w-full rounded px-2 py-1 border text-right noches" type="number" min="1" value="${initialNoches}"></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
+        <td class="col-confidencial"><input class="input w-full rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
+        <td class="col-confidencial"><input class="input w-full rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
         <td class="text-right total-line">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
@@ -1013,6 +1254,8 @@ function createHotelRow(data = {}) {
         if (hotel) {
             tr.querySelector('.preg').value = hotel.preg;
             tr.querySelector('.ppromo').value = hotel.ppromo;
+            tr.querySelector('.pconf').value = hotel.pconf || 0;
+            tr.querySelector('.pctotal').value = hotel.pctotal || 0;
             const nhab = parseFloat(tr.querySelector('.nhab').value) || 0;
             const noches = parseFloat(tr.querySelector('.noches').value) || 0;
             tr.querySelector('.total-line').textContent = fmt(nhab * noches * hotel.ppromo);
@@ -1137,7 +1380,9 @@ async function guardarCotizacion() {
         cant: tr.querySelector('.cant').value,
         distr: tr.querySelector('.distr').value,
         preg: tr.querySelector('.preg').value,
-        ppromo: tr.querySelector('.ppromo').value
+        ppromo: tr.querySelector('.ppromo').value,
+        pconf: tr.querySelector('.pconf').value,
+        pctotal: tr.querySelector('.pctotal').value
     }));
     const hotels = Array.from(document.getElementById('hotels-body').querySelectorAll('tr')).map(tr => ({
         cin: tr.querySelector('td:nth-child(2) input').value,
@@ -1146,7 +1391,9 @@ async function guardarCotizacion() {
         nhab: tr.querySelector('.nhab').value,
         noches: tr.querySelector('.noches').value,
         preg: tr.querySelector('.preg').value,
-        ppromo: tr.querySelector('.ppromo').value
+        ppromo: tr.querySelector('.ppromo').value,
+        pconf: tr.querySelector('.pconf').value,
+        pctotal: tr.querySelector('.pctotal').value
     }));
     const data = {
         id,
@@ -1173,7 +1420,7 @@ async function guardarCotizacion() {
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;
             const generarPdf = await notifySuccessAction(`Cotización guardada con ID: ${id}`, 'Generar PDF');
-            if (generarPdf) mostrarVistaPreviaPdf(id, 'es');
+            if (generarPdf) mostrarVistaPreviaPdf(id);
         } else {
             throw new Error(result.error);
         }
@@ -1193,6 +1440,7 @@ async function cargarCotizacion(id) {
             const input = form.querySelector(`[name="${key}"]`);
             if (input) input.value = data.pax[key];
         });
+        actualizarEstadosCamposFecha();
         const toursBody = document.getElementById('tours-body');
         toursBody.innerHTML = '';
         data.tours.forEach(t => toursBody.appendChild(createTourRow(t)));
@@ -1224,6 +1472,7 @@ function nuevaCotizacion(showAlert = true) {
     currentCotizacionId = null;
     document.getElementById('current-cot-id-display').textContent = 'Nueva';
     document.querySelector('input[name="fecha_cot"]').value = new Date().toISOString().split('T')[0];
+    actualizarEstadosCamposFecha();
     document.getElementById('tours-body').appendChild(createTourRow());
     document.getElementById('hotels-body').appendChild(createHotelRow());
     calcularResumen();
@@ -1344,7 +1593,7 @@ async function verPdfCotizacionGuardada(id, btn) {
     btn.disabled = true;
     try {
         await cargarCotizacion(id);
-        await mostrarVistaPreviaPdf(id, 'es');
+        await mostrarVistaPreviaPdf(id);
     } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
@@ -1421,9 +1670,12 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
             templateCss,
             staticLogoBlob
         ] = await Promise.all([
-            fetch('../shared/pdf-template.html').then(res => res.text()),
-            fetch('../shared/pdf-terminos-template.html').then(res => res.text()),
-            fetch('../shared/pdf-styles.css').then(res => res.text()),
+            // Cache-busting con Date.now(): son pocos archivos chicos, solo se piden al
+            // generar un PDF (no en cada carga de página), así que no vale la pena
+            // arriesgarse a que el navegador sirva una versión vieja cacheada.
+            fetch(`../shared/pdf-template.html?v=${Date.now()}`).then(res => res.text()),
+            fetch(`../shared/pdf-terminos-template.html?v=${Date.now()}`).then(res => res.text()),
+            fetch(`../shared/pdf-styles.css?v=${Date.now()}`).then(res => res.text()),
             fetch('../shared/logo.png').then(res => res.blob())
         ]);
 
@@ -1514,6 +1766,17 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
         const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const localeIdioma = { es: 'es-ES', en: 'en-US', pt: 'pt-BR' }[idioma] || 'es-ES';
 
+        // Acento de marca por agencia: si no configuró colores, no se agrega override y el
+        // CSS usa sus valores originales (var(--accent-primary, #ff0000) etc.), así que el
+        // PDF se ve exactamente igual que antes de existir estos campos.
+        let colorOverridesCss = '';
+        if (agencia.color_principal || agencia.color_secundario) {
+            const vars = [];
+            if (agencia.color_principal) vars.push(`--accent-primary:${agencia.color_principal};`);
+            if (agencia.color_secundario) vars.push(`--accent-secondary:${agencia.color_secundario};`);
+            colorOverridesCss = `.pdf-page{${vars.join('')}}`;
+        }
+
         // Solo se listan las líneas de contacto que la agencia realmente tiene cargadas
         // (no se muestra "Cel: " vacío si esa agencia no configuró un 2do número, etc).
         const companyInfoParts = [];
@@ -1559,7 +1822,7 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
             .replace('{{labelDescuentoTotal}}', labels.descuentoTotal)
             .replace('{{labelPrecioAdicional}}', labels.precioAdicional)
             .replace('{{labelTotalFinal}}', labels.totalFinal)
-            .replace('<link rel="stylesheet" href="pdf-styles.css">', `<style>${templateCss}</style>`)
+            .replace('<link rel="stylesheet" href="pdf-styles.css">', `<style>${templateCss}${colorOverridesCss}</style>`)
             .replace('src="logo.png"', `src="${logoBase64}"`);
 
         const { PDFDocument } = PDFLib;
@@ -1606,16 +1869,17 @@ async function obtenerAgenciaDeCotizacion(id) {
 }
 
 // Genera el PDF de una cotización ya guardada y lo muestra en el modal de vista previa
-// (nunca descarga directo — el usuario decide si descargar desde ahí, con el PDF ya a la vista).
-async function mostrarVistaPreviaPdf(id, idioma = pdfPreviewIdioma) {
+// (nunca descarga directo — el usuario decide si descargar o abrirlo en una pestaña nueva
+// desde ahí, con el PDF ya a la vista). El idioma ya no se elige acá: se usa el que quedó
+// guardado con la cotización (elegido al inicio, en Datos Pax).
+async function mostrarVistaPreviaPdf(id) {
     const cotizacionActual = cotizaciones[id];
     if (!cotizacionActual) {
         notifyError('No se encontró la cotización.');
         return;
     }
+    const idioma = cotizacionActual.pax.idioma || 'es';
     pdfPreviewCotizacionId = id;
-    pdfPreviewIdioma = idioma;
-    document.querySelectorAll('.pdf-lang-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.lang === idioma));
     abrirModalPdfCargando();
     try {
         const agencia = await obtenerAgenciaDeCotizacion(id);
@@ -1659,6 +1923,11 @@ function descargarPdfPreview() {
     document.body.removeChild(link);
 }
 
+function abrirPdfPreviewNuevaPestana() {
+    if (!pdfPreviewUrl) return;
+    window.open(pdfPreviewUrl, '_blank');
+}
+
 // ===== INICIALIZACIÓN =====
 async function init() {
     await cargarDatosIniciales();
@@ -1675,12 +1944,7 @@ async function init() {
     });
 
     document.querySelectorAll('.subnav-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.subnav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
-            tab.classList.add('active');
-            document.getElementById(`gestion-${tab.dataset.subtab}`).classList.remove('hidden');
-        });
+        tab.addEventListener('click', () => irASubtabGestion(tab.dataset.subtab));
     });
 
     document.getElementById('tours-search').addEventListener('input', (e) => {
@@ -1691,14 +1955,71 @@ async function init() {
         hotelsFilter = e.target.value.trim().toLowerCase();
         renderHotels();
     });
+    // Guarda de una sola vez todas las clasificaciones Destino/Categoría pendientes (marcadas
+    // al tocar los selects de cada fila) — un solo request, el servidor solo actualiza esos IDs.
+    document.getElementById('tours-guardar-flotante').addEventListener('click', async () => {
+        if (cambiosPendientesTours.size === 0) return;
+        const cambios = Array.from(cambiosPendientesTours, ([id, v]) => ({ id, ...v }));
+        try {
+            const res = await fetch(`${API_URL}?path=guardar-clasificaciones-tours`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cambios })
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Error desconocido');
+            notifySuccess(`${result.actualizados} tour(es) actualizado(s).`);
+            await refrescarTours();
+        } catch (e) {
+            notifyError('Error al guardar la clasificación: ' + e.message);
+        }
+    });
+    document.getElementById('hoteles-guardar-flotante').addEventListener('click', async () => {
+        if (cambiosPendientesHoteles.size === 0) return;
+        const cambios = Array.from(cambiosPendientesHoteles, ([id, v]) => ({ id, ...v }));
+        try {
+            const res = await fetch(`${API_URL}?path=guardar-clasificaciones-hoteles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cambios })
+            });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'Error desconocido');
+            notifySuccess(`${result.actualizados} alojamiento(s) actualizado(s).`);
+            await refrescarHoteles();
+        } catch (e) {
+            notifyError('Error al guardar la clasificación: ' + e.message);
+        }
+    });
 
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
+    document.querySelectorAll('.field-overlay input').forEach(input => {
+        input.addEventListener('input', () => actualizarEstadoCampoFecha(input));
+    });
+    actualizarEstadosCamposFecha();
 
     document.getElementById('historial-tours-btn').addEventListener('click', abrirHistorialTours);
     document.getElementById('close-historial-tours-btn').addEventListener('click', cerrarHistorialTours);
     document.getElementById('historial-tours-modal').addEventListener('click', (e) => {
         if (e.target.id === 'historial-tours-modal') cerrarHistorialTours();
+    });
+    document.getElementById('historial-tours-search').addEventListener('input', (e) => {
+        clearTimeout(histSearchDebounce);
+        const term = e.target.value.trim();
+        histSearchDebounce = setTimeout(() => {
+            histState.term = term;
+            histState.offset = 0;
+            cargarHistorialTours();
+        }, 300);
+    });
+    document.getElementById('historial-tours-prev').addEventListener('click', () => {
+        histState.offset = Math.max(0, histState.offset - HIST_PAGE_SIZE);
+        cargarHistorialTours();
+    });
+    document.getElementById('historial-tours-next').addEventListener('click', () => {
+        histState.offset += HIST_PAGE_SIZE;
+        cargarHistorialTours();
     });
 
     document.getElementById('close-pdf-preview-btn').addEventListener('click', cerrarModalPdf);
@@ -1706,13 +2027,7 @@ async function init() {
         if (e.target === document.getElementById('pdf-preview-modal')) cerrarModalPdf();
     });
     document.getElementById('pdf-preview-descargar').addEventListener('click', descargarPdfPreview);
-
-    document.querySelectorAll('.pdf-lang-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (!pdfPreviewCotizacionId || btn.classList.contains('active')) return;
-            mostrarVistaPreviaPdf(pdfPreviewCotizacionId, btn.dataset.lang);
-        });
-    });
+    document.getElementById('pdf-preview-nueva-pestana').addEventListener('click', abrirPdfPreviewNuevaPestana);
 
     document.getElementById('cot-nueva').addEventListener('click', () => {
         nuevaCotizacion();
@@ -1747,10 +2062,23 @@ async function init() {
     });
     agregarFilaPaquete();
 
-    document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow()));
+    document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() })));
     document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow()));
     document.getElementById('clear-tours').addEventListener('click', () => { document.getElementById('tours-body').innerHTML = ''; calcularResumen(); });
     document.getElementById('clear-hotels').addEventListener('click', () => { document.getElementById('hotels-body').innerHTML = ''; calcularResumen(); });
+    // Revela/edita Precio Confidencial y Precio C. Total para TODAS las filas de la tabla
+    // a la vez (columnas .col-confidencial, ver cotizador.css). Siempre arranca oculto al
+    // cargar la página — es información sensible, no debe quedar expuesta por defecto.
+    ['tours', 'hoteles'].forEach(tipo => {
+        document.getElementById(`toggle-conf-${tipo}`).addEventListener('click', function() {
+            const tabla = document.getElementById(tipo === 'tours' ? 'tours-table' : 'hotels-table');
+            const visible = tabla.classList.toggle('mostrar-confidencial');
+            this.classList.toggle('confid-toggle-activo', visible);
+            this.innerHTML = visible
+                ? '<i class="fas fa-eye-slash mr-1"></i>Ocultar confid.'
+                : '<i class="fas fa-eye mr-1"></i>Precios confid.';
+        });
+    });
     document.getElementById('precio-adicional').addEventListener('input', calcularResumen);
     document.getElementById('descuento-especial').addEventListener('input', calcularResumen);
     initRichTextEditor(document.getElementById('notas_cotizacion'));
@@ -1766,10 +2094,12 @@ async function init() {
             categoria_id: categoriaSel.value || null,
             distr: document.getElementById('tour-new-distr').value.trim(),
             preg: document.getElementById('tour-new-preg').value,
-            ppromo: document.getElementById('tour-new-ppromo').value
+            ppromo: document.getElementById('tour-new-ppromo').value,
+            pconf: document.getElementById('tour-new-pconf').value,
+            pctotal: document.getElementById('tour-new-pctotal').value
         });
         if (ok) {
-            ['tour-new-nombre', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+            ['tour-new-nombre', 'tour-new-distr', 'tour-new-preg', 'tour-new-ppromo', 'tour-new-pconf', 'tour-new-pctotal'].forEach(id => document.getElementById(id).value = '');
             renderTourNewDestinoCategoria();
         }
     });
@@ -1798,14 +2128,132 @@ async function init() {
             categoria_id: categoriaSel.value || null,
             distr: document.getElementById('hotel-new-distr').value.trim(),
             preg: document.getElementById('hotel-new-preg').value,
-            ppromo: document.getElementById('hotel-new-ppromo').value
+            ppromo: document.getElementById('hotel-new-ppromo').value,
+            pconf: document.getElementById('hotel-new-pconf').value,
+            pctotal: document.getElementById('hotel-new-pctotal').value
         });
         if (ok) {
-            ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo'].forEach(id => document.getElementById(id).value = '');
+            ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo', 'hotel-new-pconf', 'hotel-new-pctotal'].forEach(id => document.getElementById(id).value = '');
             renderHotelNewDestinoCategoria();
         }
     });
     setupDragDrop();
+    initPaisAutocomplete();
+
+    // Deep link desde fuera del cotizador (ej. el detalle de una agencia en Usuarios):
+    // ?cotizacion=ID abre esa cotización directamente en la pestaña Cotizador.
+    const cotizacionUrlId = new URLSearchParams(window.location.search).get('cotizacion');
+    if (cotizacionUrlId) {
+        await abrirCotizacionGuardada(cotizacionUrlId);
+        history.replaceState(null, '', window.location.pathname);
+    }
+}
+
+// ===== Buscador de País (Datos Pax) =====
+// El input name="pais" sigue siendo un <input type="text"> normal (lo que ya leen/escriben
+// FormData(form-pax) y la carga de cotizaciones guardadas) — esto solo le agrega un dropdown
+// de búsqueda encima para elegir rápido en vez de tipear el país completo a mano.
+const PAISES = [
+    'Afganistán', 'Albania', 'Alemania', 'Andorra', 'Angola', 'Antigua y Barbuda',
+    'Arabia Saudita', 'Argelia', 'Argentina', 'Armenia', 'Australia', 'Austria',
+    'Azerbaiyán', 'Bahamas', 'Baréin', 'Bangladés', 'Barbados', 'Bélgica', 'Belice',
+    'Benín', 'Bielorrusia', 'Birmania (Myanmar)', 'Bolivia', 'Bosnia y Herzegovina',
+    'Botsuana', 'Brasil', 'Brunéi', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Bután',
+    'Cabo Verde', 'Camboya', 'Camerún', 'Canadá', 'Catar', 'Chad', 'Chile', 'China',
+    'Chipre', 'Ciudad del Vaticano', 'Colombia', 'Comoras', 'Corea del Norte',
+    'Corea del Sur', 'Costa de Marfil', 'Costa Rica', 'Croacia', 'Cuba', 'Dinamarca',
+    'Dominica', 'Ecuador', 'Egipto', 'El Salvador', 'Emiratos Árabes Unidos', 'Eritrea',
+    'Eslovaquia', 'Eslovenia', 'España', 'Estados Unidos', 'Estonia', 'Etiopía',
+    'Filipinas', 'Finlandia', 'Fiyi', 'Francia', 'Gabón', 'Gambia', 'Georgia', 'Ghana',
+    'Granada', 'Grecia', 'Guatemala', 'Guyana', 'Guinea', 'Guinea-Bisáu',
+    'Guinea Ecuatorial', 'Haití', 'Honduras', 'Hungría', 'India', 'Indonesia', 'Irak',
+    'Irán', 'Irlanda', 'Islandia', 'Islas Marshall', 'Islas Salomón', 'Israel', 'Italia',
+    'Jamaica', 'Japón', 'Jordania', 'Kazajistán', 'Kenia', 'Kirguistán', 'Kiribati',
+    'Kuwait', 'Laos', 'Lesoto', 'Letonia', 'Líbano', 'Liberia', 'Libia', 'Liechtenstein',
+    'Lituania', 'Luxemburgo', 'Macedonia del Norte', 'Madagascar', 'Malasia', 'Malaui',
+    'Maldivas', 'Malí', 'Malta', 'Marruecos', 'Mauricio', 'Mauritania', 'México',
+    'Micronesia', 'Moldavia', 'Mónaco', 'Mongolia', 'Montenegro', 'Mozambique',
+    'Namibia', 'Nauru', 'Nepal', 'Nicaragua', 'Níger', 'Nigeria', 'Noruega',
+    'Nueva Zelanda', 'Omán', 'Países Bajos', 'Pakistán', 'Palaos', 'Panamá',
+    'Papúa Nueva Guinea', 'Paraguay', 'Perú', 'Polonia', 'Portugal', 'Reino Unido',
+    'República Centroafricana', 'República Checa', 'República del Congo',
+    'República Democrática del Congo', 'República Dominicana', 'Ruanda', 'Rumania',
+    'Rusia', 'Samoa', 'San Cristóbal y Nieves', 'San Marino',
+    'San Vicente y las Granadinas', 'Santa Lucía', 'Santo Tomé y Príncipe', 'Senegal',
+    'Serbia', 'Seychelles', 'Sierra Leona', 'Singapur', 'Siria', 'Somalia', 'Sri Lanka',
+    'Suazilandia (Esuatini)', 'Sudáfrica', 'Sudán', 'Sudán del Sur', 'Suecia', 'Suiza',
+    'Surinam', 'Tailandia', 'Tanzania', 'Tayikistán', 'Timor Oriental', 'Togo', 'Tonga',
+    'Trinidad y Tobago', 'Túnez', 'Turkmenistán', 'Turquía', 'Tuvalu', 'Ucrania',
+    'Uganda', 'Uruguay', 'Uzbekistán', 'Vanuatu', 'Venezuela', 'Vietnam', 'Yemen',
+    'Yibuti', 'Zambia', 'Zimbabue',
+];
+
+function initPaisAutocomplete() {
+    const input = document.getElementById('input-pais');
+    const lista = document.getElementById('pais-dropdown-list');
+    let indiceActivo = -1;
+
+    // Sin tildes ni mayúsculas, para que "peru" encuentre "Perú" igual que "perú".
+    const normalizar = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+    function renderOpciones(filtro) {
+        const termino = normalizar(filtro.trim());
+        const coincidencias = termino
+            ? PAISES.filter(p => normalizar(p).includes(termino))
+            : PAISES;
+        indiceActivo = -1;
+        if (coincidencias.length === 0) {
+            lista.innerHTML = '<li class="sin-resultados">Sin coincidencias</li>';
+        } else {
+            lista.innerHTML = coincidencias.map(p => `<li data-pais="${p}">${p}</li>`).join('');
+        }
+        lista.classList.remove('hidden');
+    }
+
+    function cerrarLista() {
+        lista.classList.add('hidden');
+        indiceActivo = -1;
+    }
+
+    function elegir(pais) {
+        input.value = pais;
+        cerrarLista();
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    input.addEventListener('focus', () => renderOpciones(input.value));
+    input.addEventListener('input', () => renderOpciones(input.value));
+
+    lista.addEventListener('mousedown', (e) => {
+        // mousedown (no click) para que dispare antes que el 'blur' del input.
+        const li = e.target.closest('li[data-pais]');
+        if (li) elegir(li.dataset.pais);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const opciones = Array.from(lista.querySelectorAll('li[data-pais]'));
+        if (lista.classList.contains('hidden') || opciones.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            indiceActivo = Math.min(indiceActivo + 1, opciones.length - 1);
+            opciones.forEach((li, i) => li.classList.toggle('activa', i === indiceActivo));
+            opciones[indiceActivo]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            indiceActivo = Math.max(indiceActivo - 1, 0);
+            opciones.forEach((li, i) => li.classList.toggle('activa', i === indiceActivo));
+            opciones[indiceActivo]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+            if (indiceActivo >= 0) {
+                e.preventDefault();
+                elegir(opciones[indiceActivo].dataset.pais);
+            }
+        } else if (e.key === 'Escape') {
+            cerrarLista();
+        }
+    });
+
+    input.addEventListener('blur', () => setTimeout(cerrarLista, 100));
 }
 
 // ===== CSV =====
