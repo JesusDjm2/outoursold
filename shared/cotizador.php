@@ -243,15 +243,27 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
                         <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Tours Existentes</h2>
-                        <div class="flex items-center gap-1">
-                            <div class="relative">
-                                <input id="tours-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-80" type="text" placeholder="Buscar tour...">
+                        <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
+                            <div class="relative flex-1 min-w-[160px] sm:flex-none">
+                                <input id="tours-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar tour...">
                                 <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                             </div>
-                            <a href="../shared/plantilla_tours.csv" download class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar plantilla de ejemplo (CSV)">
-                                <i class="fas fa-download text-xl"></i>
-                            </a>
-                            <label for="tour-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, y fila de encabezado o no: se detecta todo solo)">
+                            <div class="relative">
+                                <button type="button" id="tours-download-toggle" class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar CSV">
+                                    <i class="fas fa-download text-xl"></i>
+                                </button>
+                                <div id="tours-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
+                                    <button type="button" id="tours-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
+                                        <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
+                                        <span>Mi catálogo actual<br><span class="text-xs text-slate-400">Lo que ya tienes cargado, para editarlo</span></span>
+                                    </button>
+                                    <a href="../shared/plantilla_tours.csv" download class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2 border-t">
+                                        <i class="fas fa-file-alt text-slate-400 mt-0.5"></i>
+                                        <span>Plantilla de ejemplo<br><span class="text-xs text-slate-400">Para armar tu catálogo desde cero</span></span>
+                                    </a>
+                                </div>
+                            </div>
+                            <label for="tour-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)">
                                 <i class="fas fa-file-csv text-xl"></i>
                             </label>
                             <input type="file" id="tour-csv-input" accept=".csv" class="hidden">
@@ -306,15 +318,27 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
                         <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Hoteles Existentes</h2>
-                        <div class="flex items-center gap-1">
-                            <div class="relative">
-                                <input id="hoteles-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-80" type="text" placeholder="Buscar alojamiento...">
+                        <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
+                            <div class="relative flex-1 min-w-[160px] sm:flex-none">
+                                <input id="hoteles-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar alojamiento...">
                                 <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                             </div>
-                            <a href="../shared/plantilla_hoteles.csv" download class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar plantilla de ejemplo (CSV)">
-                                <i class="fas fa-download text-xl"></i>
-                            </a>
-                            <label for="hotel-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, y fila de encabezado o no: se detecta todo solo)">
+                            <div class="relative">
+                                <button type="button" id="hoteles-download-toggle" class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar CSV">
+                                    <i class="fas fa-download text-xl"></i>
+                                </button>
+                                <div id="hoteles-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
+                                    <button type="button" id="hoteles-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
+                                        <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
+                                        <span>Mi catálogo actual<br><span class="text-xs text-slate-400">Lo que ya tienes cargado, para editarlo</span></span>
+                                    </button>
+                                    <a href="../shared/plantilla_hoteles.csv" download class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2 border-t">
+                                        <i class="fas fa-file-alt text-slate-400 mt-0.5"></i>
+                                        <span>Plantilla de ejemplo<br><span class="text-xs text-slate-400">Para armar tu catálogo desde cero</span></span>
+                                    </a>
+                                </div>
+                            </div>
+                            <label for="hotel-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)">
                                 <i class="fas fa-file-csv text-xl"></i>
                             </label>
                             <input type="file" id="hotel-csv-input" accept=".csv" class="hidden">

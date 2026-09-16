@@ -674,6 +674,11 @@ try {
                 echo json_encode(['error' => 'Archivo requerido']);
                 break;
             }
+            // preview=1: corre exactamente la misma lógica (valida, resuelve Destino/Categoría,
+            // decide crear vs actualizar) pero termina en rollback en vez de commit — así el
+            // frontend puede mostrar "se crearán X, se actualizarán Y" ANTES de aplicar nada,
+            // y el usuario confirma con números reales, no una advertencia genérica.
+            $esPreview = !empty($_POST['preview']);
             $file = $_FILES['file']['tmp_name'];
             $lineas = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             // Excel en español (configuración regional de Perú/Latam) exporta e importa CSV
@@ -695,80 +700,141 @@ try {
             }
             $esTours = $path === 'upload-tours';
             $table = $esTours ? $tablaTours : $tablaHoteles;
+            $nombreCampo = $esTours ? 'tour' : 'aloj';
             $tablaCategoriaCsv = $esTours ? 'categorias' : 'categorias_hoteles';
-            // Se acepta opcionalmente Destino y Categoría como columnas 5 y 6 (por nombre; si no
-            // existen en el catálogo se crean, igual que al escribirlas a mano en Gestión de Datos),
-            // y Precio Confidencial / Precio C. Total como columnas 7 y 8 (0 si no vienen).
-            // La categoría de tours y la de hoteles son catálogos separados, aunque comparten Destino.
-            $fields = ($esTours
-                ? ['tour', 'distr', 'preg', 'ppromo']
-                : ['aloj', 'distr', 'preg', 'ppromo']);
-            $fields = array_merge($fields, ['destino_id', 'categoria_id', 'pconf', 'pctotal', 'creado_por']);
 
+            // ===== 1. Validar cada fila (todavía no toca la base de datos) =====
+            $filasValidas = [];
+            $errores = [];
+            foreach ($csv as $i => $row) {
+                $numFila = $i + 1;
+                if (count($row) < 4) {
+                    $errores[] = ['fila' => $numFila, 'motivo' => 'Faltan columnas (se requieren al menos Nombre, Distr, P.Reg y P.Promo).'];
+                    continue;
+                }
+                $nombreCsv = trim($row[0] ?? '');
+                if ($nombreCsv === '') {
+                    $errores[] = ['fila' => $numFila, 'motivo' => 'El nombre está vacío.'];
+                    continue;
+                }
+                $pregTxt = normalizarNumeroCsv($row[2] ?? '');
+                $ppromoTxt = normalizarNumeroCsv($row[3] ?? '');
+                if ($pregTxt === '' || !is_numeric($pregTxt) || $ppromoTxt === '' || !is_numeric($ppromoTxt)) {
+                    $errores[] = ['fila' => $numFila, 'motivo' => 'P.Reg o P.Promo no es un número válido.'];
+                    continue;
+                }
+                $filasValidas[] = [
+                    'nombre' => $nombreCsv,
+                    'distr' => trim($row[1] ?? ''),
+                    'preg' => floatval($pregTxt),
+                    'ppromo' => floatval($ppromoTxt),
+                    'destinoNombre' => isset($row[4]) && trim($row[4]) !== '' ? trim($row[4]) : null,
+                    'categoriaNombre' => isset($row[5]) && trim($row[5]) !== '' ? trim($row[5]) : null,
+                    'pconf' => isset($row[6]) && trim($row[6]) !== '' ? floatval(normalizarNumeroCsv($row[6])) : 0,
+                    'pctotal' => isset($row[7]) && trim($row[7]) !== '' ? floatval(normalizarNumeroCsv($row[7])) : 0,
+                ];
+            }
+
+            // Si más de la mitad de las filas tienen error, mejor no aplicar nada — casi
+            // seguro es el archivo equivocado o un problema de formato, no vale la pena
+            // dejar un catálogo a medio armar.
+            $totalFilas = count($csv);
+            if ($totalFilas > 0 && count($errores) >= 2 && (count($errores) / $totalFilas) > 0.5) {
+                http_response_code(422);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Demasiadas filas con error (' . count($errores) . ' de ' . $totalFilas . '). Revisa el archivo antes de volver a intentarlo.',
+                    'errores' => $errores,
+                ]);
+                break;
+            }
+
+            // ===== 2. Resolver Destino/Categoría — tolerante a mayúsculas/espacios, para no
+            // crear duplicados por "Cusco" vs "cusco " =====
             $destinoIdPorNombre = [];
             $categoriaIdPorNombre = [];
-            // Busca solo entre TUS PROPIOS destinos (nunca los de otro usuario) — subir un CSV
-            // arma o reemplaza tu catálogo, no reutiliza el ajeno aunque el nombre coincida.
-            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE nombre = ? AND creado_por = ?");
+            // Busca solo entre TUS PROPIOS destinos (nunca los de otro usuario).
+            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ?");
             $crearDestinoStmt = $db->prepare("INSERT INTO destinos (nombre, creado_por) VALUES (?, ?)");
-            $buscarCategoriaStmt = $db->prepare("SELECT id FROM $tablaCategoriaCsv WHERE destino_id = ? AND nombre = ?");
+            $buscarCategoriaStmt = $db->prepare("SELECT id FROM $tablaCategoriaCsv WHERE destino_id = ? AND LOWER(TRIM(nombre)) = LOWER(TRIM(?))");
             $crearCategoriaStmt = $db->prepare("INSERT INTO $tablaCategoriaCsv (destino_id, nombre, creado_por) VALUES (?, ?, ?)");
             $resolverDestinoId = function ($nombre) use ($db, $buscarDestinoStmt, $crearDestinoStmt, &$destinoIdPorNombre) {
-                if (isset($destinoIdPorNombre[$nombre])) return $destinoIdPorNombre[$nombre];
+                $clave = mb_strtolower(trim($nombre));
+                if (isset($destinoIdPorNombre[$clave])) return $destinoIdPorNombre[$clave];
                 $buscarDestinoStmt->execute([$nombre, $_SESSION['user_id']]);
                 $id = $buscarDestinoStmt->fetchColumn();
                 if ($id === false) {
-                    $crearDestinoStmt->execute([$nombre, $_SESSION['user_id']]);
+                    $crearDestinoStmt->execute([trim($nombre), $_SESSION['user_id']]);
                     $id = $db->lastInsertId();
                 }
-                return $destinoIdPorNombre[$nombre] = $id;
+                return $destinoIdPorNombre[$clave] = $id;
             };
             $resolverCategoriaId = function ($destinoId, $nombre) use ($db, $buscarCategoriaStmt, $crearCategoriaStmt, &$categoriaIdPorNombre) {
-                $clave = $destinoId . '|' . $nombre;
+                $clave = $destinoId . '|' . mb_strtolower(trim($nombre));
                 if (isset($categoriaIdPorNombre[$clave])) return $categoriaIdPorNombre[$clave];
                 $buscarCategoriaStmt->execute([$destinoId, $nombre]);
                 $id = $buscarCategoriaStmt->fetchColumn();
                 if ($id === false) {
-                    $crearCategoriaStmt->execute([$destinoId, $nombre, $_SESSION['user_id']]);
+                    $crearCategoriaStmt->execute([$destinoId, trim($nombre), $_SESSION['user_id']]);
                     $id = $db->lastInsertId();
                 }
                 return $categoriaIdPorNombre[$clave] = $id;
             };
 
+            // ===== 3. Crear o actualizar por nombre (tolerante a mayúsculas/espacios) — nunca
+            // se borra nada que no venga en el archivo, a diferencia del reemplazo total de
+            // antes =====
+            $buscarExistenteStmt = $db->prepare("SELECT id FROM $table WHERE creado_por = ? AND LOWER(TRIM($nombreCampo)) = LOWER(TRIM(?))");
+            $actualizarStmt = $db->prepare("UPDATE $table SET $nombreCampo = ?, distr = ?, preg = ?, ppromo = ?, pconf = ?, pctotal = ?, destino_id = ?, categoria_id = ? WHERE id = ?");
+            $insertarStmt = $db->prepare("INSERT INTO $table ($nombreCampo, distr, preg, ppromo, pconf, pctotal, destino_id, categoria_id, creado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
             $db->beginTransaction();
             try {
-                // Solo reemplaza TU catálogo — nunca el de otro usuario, aunque antes borraba
-                // la tabla entera.
-                $db->prepare("DELETE FROM $table WHERE creado_por = ?")->execute([$_SESSION['user_id']]);
-                $placeholders = implode(',', array_fill(0, count($fields), '?'));
-                $stmt = $db->prepare("INSERT INTO $table (" . implode(',', $fields) . ") VALUES ($placeholders)");
-                foreach ($csv as $row) {
-                    if (count($row) >= 4) {
-                        $nombreDestinoCsv = isset($row[4]) && trim($row[4]) !== '' ? trim($row[4]) : null;
-                        $nombreCategoriaCsv = isset($row[5]) && trim($row[5]) !== '' ? trim($row[5]) : null;
-                        $destinoIdCsv = $nombreDestinoCsv ? $resolverDestinoId($nombreDestinoCsv) : null;
-                        $categoriaIdCsv = ($destinoIdCsv && $nombreCategoriaCsv) ? $resolverCategoriaId($destinoIdCsv, $nombreCategoriaCsv) : null;
-                        $pconfCsv = isset($row[6]) && trim($row[6]) !== '' ? floatval(normalizarNumeroCsv($row[6])) : 0;
-                        $pctotalCsv = isset($row[7]) && trim($row[7]) !== '' ? floatval(normalizarNumeroCsv($row[7])) : 0;
-                        $valores = [
-                            $row[0],
-                            $row[1],
-                            floatval(normalizarNumeroCsv($row[2])),
-                            floatval(normalizarNumeroCsv($row[3])),
-                            $destinoIdCsv,
-                            $categoriaIdCsv,
-                            $pconfCsv,
-                            $pctotalCsv,
-                            $_SESSION['user_id']
-                        ];
-                        $stmt->execute($valores);
+                $creados = 0;
+                $actualizados = 0;
+                // Dos filas con el mismo nombre en el MISMO archivo actualizan el mismo
+                // registro en vez de crear uno duplicado por cada una.
+                $idsDeEsteLote = [];
+                foreach ($filasValidas as $f) {
+                    $destinoId = $f['destinoNombre'] ? $resolverDestinoId($f['destinoNombre']) : null;
+                    $categoriaId = ($destinoId && $f['categoriaNombre']) ? $resolverCategoriaId($destinoId, $f['categoriaNombre']) : null;
+
+                    $claveNombre = mb_strtolower(trim($f['nombre']));
+                    $id = $idsDeEsteLote[$claveNombre] ?? null;
+                    if (!$id) {
+                        $buscarExistenteStmt->execute([$_SESSION['user_id'], $f['nombre']]);
+                        $encontrado = $buscarExistenteStmt->fetchColumn();
+                        $id = $encontrado !== false ? $encontrado : null;
                     }
+
+                    if ($id) {
+                        $actualizarStmt->execute([$f['nombre'], $f['distr'], $f['preg'], $f['ppromo'], $f['pconf'], $f['pctotal'], $destinoId, $categoriaId, $id]);
+                        $actualizados++;
+                    } else {
+                        $insertarStmt->execute([$f['nombre'], $f['distr'], $f['preg'], $f['ppromo'], $f['pconf'], $f['pctotal'], $destinoId, $categoriaId, $_SESSION['user_id']]);
+                        $id = $db->lastInsertId();
+                        $creados++;
+                    }
+                    $idsDeEsteLote[$claveNombre] = $id;
                 }
-                $db->commit();
-                echo json_encode(['success' => true, 'count' => count($csv)]);
+
+                if ($esPreview) {
+                    $db->rollBack();
+                } else {
+                    $db->commit();
+                }
+
+                echo json_encode([
+                    'success' => true,
+                    'preview' => $esPreview,
+                    'creados' => $creados,
+                    'actualizados' => $actualizados,
+                    'errores' => $errores,
+                    'totalFilas' => $totalFilas,
+                ]);
             } catch (Exception $e) {
-                $db->rollback();
-                throw $e;
+                $db->rollBack();
+                responderErrorAmigable($e);
             }
             break;
 

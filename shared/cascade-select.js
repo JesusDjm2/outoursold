@@ -155,11 +155,24 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
         });
     }
 
+    // Los ítems sin categoría ya no viven detrás de una carpeta "Sin categoría" aparte —
+    // aparecen de frente como hijos del destino, al mismo nivel que las carpetas de
+    // categoría reales (mismo criterio para Actividades, Hoteles e Itinerarios, al
+    // compartir este selector).
     function llenarCategorias(children, destinoVal) {
-        const opciones = helpers.getCategoriaOpciones(destinoVal);
-        children.innerHTML = opciones.length
-            ? ''
-            : `<div class="cascade-empty">Sin categorías.</div>`;
+        const opciones = helpers.getCategoriaOpciones(destinoVal).filter(o => o.value !== SIN_CATEGORIA_VAL);
+        const itemsSinCategoria = helpers.getItemsFiltrados(destinoVal, SIN_CATEGORIA_VAL);
+        children.innerHTML = (opciones.length === 0 && itemsSinCategoria.length === 0)
+            ? `<div class="cascade-empty">Sin categorías.</div>`
+            : '';
+        itemsSinCategoria.forEach(item => {
+            const leaf = crearNodo(item[labelKey], {
+                leaf: true,
+                onSelect: () => { elegir(item); cerrarCascadeSelectAbierto(); }
+            });
+            if (item[valueKey] === currentValue) leaf.classList.add('is-selected');
+            children.appendChild(leaf);
+        });
         opciones.forEach(o => {
             children.appendChild(crearNodo(o.label, {
                 onOpen: (itemChildren) => llenarItems(itemChildren, destinoVal, o.value)

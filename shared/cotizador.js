@@ -2084,6 +2084,10 @@ async function init() {
     initRichTextEditor(document.getElementById('notas_cotizacion'));
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);
+    document.getElementById('tours-export-btn').addEventListener('click', exportarToursCsv);
+    document.getElementById('hoteles-export-btn').addEventListener('click', exportarHotelesCsv);
+    initDropdownDescarga('tours-download-toggle', 'tours-download-menu');
+    initDropdownDescarga('hoteles-download-toggle', 'hoteles-download-menu');
     document.getElementById('tour-new-add').addEventListener('click', async () => {
         const destinoCategoriaContainer = document.getElementById('tour-new-destino-categoria');
         const destinoSel = destinoCategoriaContainer.querySelector('.sel-destino-tour');
@@ -2256,83 +2260,172 @@ function initPaisAutocomplete() {
     input.addEventListener('blur', () => setTimeout(cerrarLista, 100));
 }
 
+// ===== Exportar catálogo (CSV) =====
+// Genera un CSV con TU catálogo actual de tours/hoteles, mismo formato que acepta la
+// carga masiva (ver upload-tours/upload-hoteles en shared/api.php), para poder editarlo
+// en Excel y volver a subirlo — en vez de partir de la plantilla de ejemplo en blanco.
+function csvEscaparCampo(valor) {
+    const texto = String(valor ?? '');
+    return /[;"\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+}
+function descargarTextoComoArchivo(texto, filename) {
+    // BOM al inicio: sin esto, Excel interpreta tildes/ñ como caracteres corruptos al
+    // abrir un CSV UTF-8 (Windows asume ANSI/Latin1 salvo que el BOM le diga lo contrario).
+    const blob = new Blob(['﻿' + texto], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+function exportarCatalogoCsv(items, encabezado, filasDe, filenamePrefix) {
+    if (items.length === 0) {
+        notifyWarning('Todavía no tienes registros para exportar.');
+        return;
+    }
+    const filas = items.map(filasDe);
+    const csv = [encabezado, ...filas].map(fila => fila.map(csvEscaparCampo).join(';')).join('\r\n');
+    descargarTextoComoArchivo(csv, `${filenamePrefix}_${new Date().toISOString().split('T')[0]}.csv`);
+}
+function exportarToursCsv() {
+    exportarCatalogoCsv(
+        toursData,
+        ['Tour', 'Distr', 'P.Reg', 'P.Promo', 'Destino', 'Categoria', 'Precio Confidencial', 'Precio C. Total'],
+        t => [
+            t.tour, t.distr || '', t.preg, t.ppromo,
+            destinosData.find(d => d.id === t.destino_id)?.nombre || '',
+            categoriasData.find(c => c.id === t.categoria_id)?.nombre || '',
+            t.pconf || 0, t.pctotal || 0
+        ],
+        'mi_catalogo_tours'
+    );
+}
+function exportarHotelesCsv() {
+    exportarCatalogoCsv(
+        hotelsData,
+        ['Alojamiento', 'Distr', 'P.Reg', 'P.Promo', 'Destino', 'Categoria', 'Precio Confidencial', 'Precio C. Total'],
+        h => [
+            h.aloj, h.distr || '', h.preg, h.ppromo,
+            destinosData.find(d => d.id === h.destino_id)?.nombre || '',
+            categoriasHotelesData.find(c => c.id === h.categoria_id)?.nombre || '',
+            h.pconf || 0, h.pctotal || 0
+        ],
+        'mi_catalogo_hoteles'
+    );
+}
+
+// Menú desplegable "Descargar" (Mi catálogo actual / Plantilla de ejemplo) — reemplaza
+// los 2 íconos sueltos de antes, para ganar espacio horizontal en pantallas angostas.
+function initDropdownDescarga(toggleId, menuId) {
+    const toggle = document.getElementById(toggleId);
+    const menu = document.getElementById(menuId);
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const yaAbierto = !menu.classList.contains('hidden');
+        document.querySelectorAll('.csv-download-menu').forEach(m => m.classList.add('hidden'));
+        menu.classList.toggle('hidden', yaAbierto);
+    });
+    menu.addEventListener('click', () => menu.classList.add('hidden'));
+}
+document.addEventListener('click', () => {
+    document.querySelectorAll('.csv-download-menu').forEach(m => m.classList.add('hidden'));
+});
+
 // ===== CSV =====
-function processCSV(file, callback) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const rows = text.trim().split(/\r\n|\n/).filter(row => row.trim().length > 0);
-        const data = rows.map(row => {
-            const result = [];
-            let inQuotes = false;
-            let field = '';
-            for (let i = 0; i < row.length; i++) {
-                const char = row[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(field.trim());
-                    field = '';
-                } else {
-                    field += char;
-                }
-            }
-            result.push(field.trim());
-            return result;
-        });
-        callback(data);
+// Arma el bloque HTML de "creados / actualizados / errores" que se muestra tanto en la
+// confirmación previa (con números reales, no una advertencia genérica) como en el
+// resumen final tras aplicar.
+function construirResumenHtmlCsv(data) {
+    let html = `<div class="text-left text-sm">
+        <p>✅ <b>${data.creados}</b> nuevo(s)</p>
+        <p>🔄 <b>${data.actualizados}</b> actualizado(s) (coincidieron por nombre)</p>`;
+    if (data.errores.length) {
+        html += `<p class="mt-2" style="color:#b45309">⚠️ ${data.errores.length} fila(s) con error — se omitirán:</p>
+            <ul class="text-xs text-left" style="max-height:8rem;overflow-y:auto">`;
+        data.errores.slice(0, 12).forEach(e => { html += `<li>Fila ${e.fila}: ${e.motivo}</li>`; });
+        if (data.errores.length > 12) html += `<li>... y ${data.errores.length - 12} más.</li>`;
+        html += `</ul>`;
+    }
+    html += `</div>`;
+    return html;
+}
+
+// Sube un CSV de tours/hoteles en 2 pasos: primero un preview (valida y calcula
+// creados/actualizados/errores SIN tocar la base de datos), muestra esos números reales
+// en una confirmación, y solo si el usuario confirma se vuelve a enviar para aplicarlo.
+// Coincide por nombre (tolerante a mayúsculas/espacios): lo que ya existe se actualiza,
+// lo nuevo se crea, y lo que no viene en el archivo se queda intacto (ya no se borra todo).
+async function subirCsvConPreview(tipo, file) {
+    const endpoint = tipo === 'tours' ? 'upload-tours' : 'upload-hoteles';
+    const nombrePlural = tipo === 'tours' ? 'tours' : 'hoteles';
+
+    const enviar = async (preview) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (preview) formData.append('preview', '1');
+        const res = await fetch(`${API_URL}?path=${endpoint}`, { method: 'POST', body: formData });
+        return res.json();
     };
-    reader.readAsText(file);
+
+    const previo = await enviar(true);
+    if (!previo.success) {
+        let html = `<p>${previo.error}</p>`;
+        if (previo.errores?.length) {
+            html += `<ul class="text-xs text-left mt-2" style="max-height:10rem;overflow-y:auto">` +
+                previo.errores.slice(0, 15).map(e => `<li>Fila ${e.fila}: ${e.motivo}</li>`).join('') +
+                (previo.errores.length > 15 ? `<li>... y ${previo.errores.length - 15} más.</li>` : '') + `</ul>`;
+        }
+        await Swal.fire({ icon: 'error', title: 'No se pudo subir el archivo', html, confirmButtonColor: '#e80c13' });
+        return;
+    }
+    if (previo.creados === 0 && previo.actualizados === 0) {
+        notifyWarning('No se encontró ninguna fila válida para procesar en ese archivo.');
+        return;
+    }
+
+    const confirmado = (await Swal.fire({
+        icon: 'question',
+        title: `¿Confirmas subir este archivo de ${nombrePlural}?`,
+        html: construirResumenHtmlCsv(previo),
+        showCancelButton: true,
+        confirmButtonText: 'Sí, aplicar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e80c13',
+        cancelButtonColor: '#64748b'
+    })).isConfirmed;
+    if (!confirmado) return;
+
+    const final = await enviar(false);
+    if (!final.success) {
+        notifyError(final.error || 'Error desconocido al aplicar el archivo.');
+        return;
+    }
+    await Swal.fire({ icon: 'success', title: '¡Listo!', html: construirResumenHtmlCsv(final), confirmButtonColor: '#e80c13' });
+    cargarDatosIniciales();
 }
 
 async function handleTourCsvUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    processCSV(file, async (parsedData) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const response = await fetch(`${API_URL}?path=upload-tours`, {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                notifySuccess(`Se han actualizado ${result.count} tours.`);
-                cargarDatosIniciales();
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error) {
-            notifyError("Error al subir tours: " + error.message);
-        }
-    });
+    try {
+        await subirCsvConPreview('tours', file);
+    } catch (error) {
+        notifyError('Error al subir tours: ' + error.message);
+    }
     event.target.value = '';
 }
 
 async function handleHotelCsvUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    processCSV(file, async (parsedData) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const response = await fetch(`${API_URL}?path=upload-hoteles`, {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                notifySuccess(`Se han actualizado ${result.count} hoteles.`);
-                cargarDatosIniciales();
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error) {
-            notifyError("Error al subir hoteles: " + error.message);
-        }
-    });
+    try {
+        await subirCsvConPreview('hoteles', file);
+    } catch (error) {
+        notifyError('Error al subir hoteles: ' + error.message);
+    }
     event.target.value = '';
 }
 
