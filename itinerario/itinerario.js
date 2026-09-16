@@ -2,6 +2,14 @@
 // Cada idioma tiene su propio catálogo de módulos PDF, páginas fijas y paquetes —
 // idiomaCache[idioma] es null hasta que se pide por primera vez (se cachea, y se
 // refresca puntualmente tras cada mutación exitosa).
+
+// Prefijo hacia itinerario/api.php e itinerario/upload.php: vacío en la página standalone
+// (itinerario/index.php, donde este archivo vive junto a esos endpoints), y
+// '../itinerario/' cuando este mismo archivo se incluye embebido dentro de Cotizador
+// (shared/cotizador.php, servido desde pen/ o usd/) — ahí window.ITINERARIO_API_BASE se
+// define ANTES de este <script>, ver shared/cotizador.php.
+const ITINERARIO_API_BASE = window.ITINERARIO_API_BASE || '';
+
 let idiomaActivo = 'en';
 let idiomaCache = { es: null, en: null, pt: null }; // {modules, fixedStartFiles, fixedEndFiles, paquetes, paginasFijas, generados}
 
@@ -15,8 +23,12 @@ let janoFontBytes = null;
 // Tours. Se usa para clasificar cada módulo (select Destino/Categoría en la tabla) y para
 // el selector en cascada del armador — no genera pestañas de navegación por destino (eso
 // tampoco pasa en Cotizaciones, donde Destino/Categoría es solo un dato de clasificación).
-let destinosData = [];
-let categoriasData = [];
+// Nombres con prefijo itin* (en vez de destinosData/categoriasData) para no colisionar con
+// las variables del mismo nombre en shared/cotizador.js cuando ambos scripts conviven en
+// la misma página (Cotizador embebe este archivo) — un `let` repetido en dos <script>
+// clásicos de la misma página revienta con SyntaxError al parsear el segundo.
+let itinDestinosData = [];
+let itinCategoriasData = [];
 let modulosFiltro = '';
 let itinerarioPaqueteEditandoId = null;
 let historialFiltro = { texto: '', agencia: '', desde: '', hasta: '' };
@@ -34,29 +46,43 @@ function historialGeneradosActivo() { return datosIdioma()?.generados || []; }
 // Módulo. Las páginas fijas (start/end) no se clasifican así — usan un <select> plano
 // (ver buildPaginaFijaSelect), porque nunca tienen destino/categoría.
 const itinerarioHelpersModulos = crearHelpersClasificacion(
-    () => modulosActivos(), () => categoriasData, { labelKey: 'titulo', valueKey: 'filename' }
+    () => modulosActivos(), () => itinCategoriasData, { labelKey: 'titulo', valueKey: 'filename' },
+    () => itinDestinosData
 );
 
-function nombreDestino(id) { return destinosData.find(d => d.id === id)?.nombre || null; }
-function nombreCategoria(id) { return categoriasData.find(c => c.id === id)?.nombre || null; }
+function nombreDestino(id) { return itinDestinosData.find(d => d.id === id)?.nombre || null; }
+function nombreCategoria(id) { return itinCategoriasData.find(c => c.id === id)?.nombre || null; }
 
+// Embebido en Cotizador, Destinos ya está cargado por cotizador.js (mismo catálogo
+// compartido) — se reusa esa referencia en vez de volver a pedirlo, evitando además la
+// ruta relativa '../usd/api.php' (que en modo standalone solo es correcta porque
+// itinerario/ y usd/ son carpetas hermanas). En la página standalone se sigue pidiendo
+// por su cuenta, como hasta ahora. `typeof destinosData` (no `window.destinosData`): un
+// `let`/`const` de otro <script> clásico en la misma página es visible como identificador
+// suelto compartiendo el scope léxico global, pero NUNCA se vuelve propiedad de `window`.
 async function cargarDestinosYCategorias() {
     try {
-        const [destinos, categorias] = await Promise.all([
-            fetch('../usd/api.php?path=destinos').then(r => r.json()),
-            fetch('api.php?path=categorias-itinerarios').then(r => r.json())
-        ]);
-        destinosData = destinos;
-        categoriasData = categorias;
+        const categoriasPromise = fetch(`${ITINERARIO_API_BASE}api.php?path=categorias-itinerarios`).then(r => r.json());
+        if (typeof destinosData !== 'undefined' && Array.isArray(destinosData)) {
+            itinDestinosData = destinosData;
+            itinCategoriasData = await categoriasPromise;
+        } else {
+            const [destinos, categorias] = await Promise.all([
+                fetch(`${ITINERARIO_API_BASE}../usd/api.php?path=destinos`).then(r => r.json()),
+                categoriasPromise
+            ]);
+            itinDestinosData = destinos;
+            itinCategoriasData = categorias;
+        }
     } catch (error) {
         console.error('Error al cargar destinos/categorías:', error);
-        destinosData = [];
-        categoriasData = [];
+        itinDestinosData = [];
+        itinCategoriasData = [];
     }
 }
 
 // Crea una nueva categoría de itinerario (propia, separada de las de Tours) para el
-// destino indicado, la agrega a categoriasData y devuelve su id. null si se cancela.
+// destino indicado, la agrega a itinCategoriasData y devuelve su id. null si se cancela.
 async function crearCategoriaItinerario(destinoId) {
     const { value: nombre } = await Swal.fire({
         title: 'Nueva categoría',
@@ -70,14 +96,14 @@ async function crearCategoriaItinerario(destinoId) {
     });
     if (!nombre) return null;
     try {
-        const res = await fetch('api.php?path=guardar-categoria-itinerario', {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-categoria-itinerario`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ destino_id: destinoId, nombre: nombre.trim() }),
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'Error al crear la categoría');
-        categoriasData.push({ id: Number(data.id), destino_id: Number(destinoId), nombre: nombre.trim() });
+        itinCategoriasData.push({ id: Number(data.id), destino_id: Number(destinoId), nombre: nombre.trim() });
         return Number(data.id);
     } catch (error) {
         Swal.fire('Error', error.message || 'No se pudo crear la categoría', 'error');
@@ -94,7 +120,7 @@ function llenarCategoriasSelect(categoriaSelect, destinoId, selectedId = null) {
         categoriaSelect.disabled = true;
         return;
     }
-    const opciones = categoriasData.filter(c => c.destino_id === Number(destinoId));
+    const opciones = itinCategoriasData.filter(c => c.destino_id === Number(destinoId));
     categoriaSelect.innerHTML = '<option value="">Sin categoría</option>' +
         opciones.map(c => `<option value="${c.id}" ${selectedId != null && c.id === Number(selectedId) ? 'selected' : ''}>${c.nombre}</option>`).join('') +
         `<option value="${CATEGORIA_ITINERARIO_NUEVA}">+ Crear nueva categoría...</option>`;
@@ -129,7 +155,7 @@ function habilitarCreacionCategoria(categoriaSelect, destinoSelect) {
 
 function llenarDestinosSelect(destinoSelect, selectedId = null) {
     destinoSelect.innerHTML = '<option value="">Sin clasificar</option>' +
-        destinosData.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
+        itinDestinosData.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
 }
 
 function showLoadingModal() { document.getElementById('loading-modal').style.display = 'block'; }
@@ -145,25 +171,28 @@ function updateProgress(percent, status) {
 // El botón "Seguir editando" solo tiene sentido para una generación en vivo (cierra sin
 // guardar nada, para corregir y volver a generar) — se oculta al previsualizar algo que
 // ya está en el historial, donde no hay nada que "seguir editando".
+// Ids con prefijo itinerario-pdf-preview-* (no pdf-preview-*): Cotizador ya tiene su
+// propio modal #pdf-preview-modal para la vista previa del PDF de la cotización — sin
+// este prefijo, embeber ambos en la misma página colisionaría.
 let pdfPreviewObjectUrl = null;
 function abrirVistaPreviaPDF(src, onDescargar, titulo = 'Vista previa', { seguirEditando = false } = {}) {
-    document.getElementById('pdf-preview-title').textContent = titulo;
-    document.getElementById('pdf-preview-frame').src = src;
-    document.getElementById('pdf-preview-download').onclick = onDescargar;
-    document.getElementById('pdf-preview-seguir-editando').classList.toggle('hidden', !seguirEditando);
-    document.getElementById('pdf-preview-modal').style.display = 'block';
+    document.getElementById('itinerario-pdf-preview-title').textContent = titulo;
+    document.getElementById('itinerario-pdf-preview-frame').src = src;
+    document.getElementById('itinerario-pdf-preview-download').onclick = onDescargar;
+    document.getElementById('itinerario-pdf-preview-seguir-editando').classList.toggle('hidden', !seguirEditando);
+    document.getElementById('itinerario-pdf-preview-modal').style.display = 'block';
     if (src.startsWith('blob:')) pdfPreviewObjectUrl = src;
 }
 function cerrarVistaPreviaPDF() {
-    document.getElementById('pdf-preview-modal').style.display = 'none';
-    document.getElementById('pdf-preview-frame').src = '';
+    document.getElementById('itinerario-pdf-preview-modal').style.display = 'none';
+    document.getElementById('itinerario-pdf-preview-frame').src = '';
     if (pdfPreviewObjectUrl) {
         URL.revokeObjectURL(pdfPreviewObjectUrl);
         pdfPreviewObjectUrl = null;
     }
 }
-document.getElementById('pdf-preview-close').addEventListener('click', cerrarVistaPreviaPDF);
-document.getElementById('pdf-preview-seguir-editando').addEventListener('click', cerrarVistaPreviaPDF);
+document.getElementById('itinerario-pdf-preview-close').addEventListener('click', cerrarVistaPreviaPDF);
+document.getElementById('itinerario-pdf-preview-seguir-editando').addEventListener('click', cerrarVistaPreviaPDF);
 
 function loadFonts(showModal = false) {
     return new Promise(async (resolve) => {
@@ -172,9 +201,9 @@ function loadFonts(showModal = false) {
             updateProgress(10, 'Cargando fuentes...');
         }
         try {
-            await loadFontWithXHR('./charlotte.ttf', 'charlotte');
+            await loadFontWithXHR(`${ITINERARIO_API_BASE}./charlotte.ttf`, 'charlotte');
             if (showModal) updateProgress(50, 'Fuente Charlotte cargada');
-            await loadFontWithXHR('./jano.ttf', 'jano');
+            await loadFontWithXHR(`${ITINERARIO_API_BASE}./jano.ttf`, 'jano');
             if (showModal) updateProgress(100, 'Fuentes cargadas correctamente');
             if (showModal) await new Promise(resolve => setTimeout(resolve, 500));
         } catch (error) {
@@ -212,11 +241,11 @@ function loadFontWithXHR(url, fontName) {
 // ===== Carga / cambio de idioma =====
 async function cargarIdioma(idioma) {
     const [modules, config, paquetes, paginasFijas, generados] = await Promise.all([
-        fetch(`api.php?path=modulos&idioma=${idioma}`).then(r => r.json()),
-        fetch(`api.php?path=config&idioma=${idioma}`).then(r => r.json()),
-        fetch(`api.php?path=paquetes&idioma=${idioma}`).then(r => r.json()),
-        fetch(`api.php?path=paginas-fijas&idioma=${idioma}`).then(r => r.json()),
-        fetch(`api.php?path=historial-generados&idioma=${idioma}`).then(r => r.json())
+        fetch(`${ITINERARIO_API_BASE}api.php?path=modulos&idioma=${idioma}`).then(r => r.json()),
+        fetch(`${ITINERARIO_API_BASE}api.php?path=config&idioma=${idioma}`).then(r => r.json()),
+        fetch(`${ITINERARIO_API_BASE}api.php?path=paquetes&idioma=${idioma}`).then(r => r.json()),
+        fetch(`${ITINERARIO_API_BASE}api.php?path=paginas-fijas&idioma=${idioma}`).then(r => r.json()),
+        fetch(`${ITINERARIO_API_BASE}api.php?path=historial-generados&idioma=${idioma}`).then(r => r.json())
     ]);
     idiomaCache[idioma] = {
         modules,
@@ -297,7 +326,7 @@ function buildModuloRow(it) {
         <td class="p-2 text-slate-500 text-xs">${it.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <div class="inline-flex flex-col items-center align-middle mr-2">
-                <a href="uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 modulo-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
+                <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 modulo-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
                 ${it.archivo_existe === false ? '<span class="text-[10px] leading-none text-red-500 mt-0.5" title="El archivo no existe en el servidor">roto</span>' : ''}
             </div>
             <button class="text-slate-500 hover:text-slate-700 mr-2 modulo-editar-btn" title="Editar título"><i class="fas fa-pen"></i></button>
@@ -355,7 +384,7 @@ async function guardarModulo(it, titulo, destinoId, categoriaId) {
     titulo = titulo.trim();
     if (!titulo) { notifyError('El título es obligatorio.'); return; }
     try {
-        const res = await fetch(`api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: it.id, titulo, destino_id: destinoId || null, categoria_id: categoriaId || null })
@@ -400,11 +429,11 @@ document.getElementById('upload-local-module').addEventListener('click', () => {
 
     // El archivo se sube primero (upload.php); el registro en el catálogo se agrega
     // después con una operación atómica en el servidor (api.php?path=crear-modulo).
-    fetch('upload.php', { method: 'POST', body: formData })
+    fetch(`${ITINERARIO_API_BASE}upload.php`, { method: 'POST', body: formData })
     .then(response => response.json())
     .then(data => {
         if (!data.success) throw new Error(data.error || 'Error desconocido al subir el archivo.');
-        return fetch(`api.php?path=crear-modulo&idioma=${idiomaActivo}`, {
+        return fetch(`${ITINERARIO_API_BASE}api.php?path=crear-modulo&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -440,7 +469,7 @@ async function handleItineraryDelete(id) {
     if (!(await confirmAction(`¿Eliminar "${modulo.titulo}"?`))) return;
 
     try {
-        const res = await fetch(`api.php?path=eliminar-modulo&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-modulo&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -483,7 +512,7 @@ function buildPaginaFijaRow(p) {
         <td class="p-2 text-slate-500 text-xs">${p.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <div class="inline-flex flex-col items-center align-middle mr-2">
-                <a href="uploads/${idiomaActivo}/${encodeURIComponent(p.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 pagina-fija-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
+                <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(p.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 pagina-fija-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
                 ${p.archivo_existe === false ? '<span class="text-[10px] leading-none text-red-500 mt-0.5" title="El archivo no existe en el servidor">roto</span>' : ''}
             </div>
             <button class="text-slate-500 hover:text-slate-700 mr-2 pagina-fija-editar-btn" title="Editar título"><i class="fas fa-pen"></i></button>
@@ -531,7 +560,7 @@ async function guardarPaginaFija(p, titulo, nuevoArchivo) {
             const formData = new FormData();
             formData.append('pdf', nuevoArchivo);
             formData.append('idioma', idiomaActivo);
-            const uploadRes = await fetch('upload.php', { method: 'POST', body: formData });
+            const uploadRes = await fetch(`${ITINERARIO_API_BASE}upload.php`, { method: 'POST', body: formData });
             const uploadData = await uploadRes.json();
             if (!uploadData.success) throw new Error(uploadData.error || 'Error al subir el nuevo PDF.');
             filename = uploadData.filename;
@@ -540,7 +569,7 @@ async function guardarPaginaFija(p, titulo, nuevoArchivo) {
         const payload = { id: p.id, titulo };
         if (filename) payload.filename = filename;
 
-        const res = await fetch(`api.php?path=actualizar-pagina-fija&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-pagina-fija&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -569,11 +598,11 @@ document.getElementById('upload-pagina-fija').addEventListener('click', () => {
     formData.append('pdf', file);
     formData.append('idioma', idiomaActivo);
 
-    fetch('upload.php', { method: 'POST', body: formData })
+    fetch(`${ITINERARIO_API_BASE}upload.php`, { method: 'POST', body: formData })
     .then(response => response.json())
     .then(data => {
         if (!data.success) throw new Error(data.error || 'Error desconocido al subir el archivo.');
-        return fetch(`api.php?path=crear-pagina-fija&idioma=${idiomaActivo}`, {
+        return fetch(`${ITINERARIO_API_BASE}api.php?path=crear-pagina-fija&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ titulo, filename: data.filename })
@@ -600,7 +629,7 @@ async function handlePaginaFijaDelete(p) {
     if (!(await confirmAction(`¿Eliminar "${p.titulo}"?`))) return;
 
     try {
-        const res = await fetch(`api.php?path=eliminar-pagina-fija&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-pagina-fija&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: p.id })
@@ -632,7 +661,7 @@ document.getElementById('save-default-config').addEventListener('click', async (
     const endFiles = Array.from(document.querySelectorAll('#end-builder-body .module-filename')).map(s => s.value).filter(Boolean);
 
     try {
-        const response = await fetch(`api.php?path=guardar-config&idioma=${idiomaActivo}`, {
+        const response = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-config&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ startFiles, endFiles })
@@ -714,7 +743,7 @@ function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedF
 
     tbody.appendChild(tr);
     if (isMainItinerary) recalculateDayNumbers();
-    addDragHandlers(tr);
+    itinAddDragHandlers(tr);
 }
 
 // Tras eliminar un módulo del catálogo, actualiza la etiqueta de cualquier fila (armador
@@ -741,17 +770,17 @@ function recalculateDayNumbers() {
     });
 }
 
-function addDragHandlers(row) {
+function itinAddDragHandlers(row) {
     row.setAttribute('draggable', 'true');
     row.addEventListener('dragstart', () => { row.classList.add('opacity-60'); window._dragging = row; });
     row.addEventListener('dragend', () => { row.classList.remove('opacity-60'); if (row.closest('tbody').id === 'itinerary-builder-body') recalculateDayNumbers(); });
 }
 
-function setupDragDrop() {
+function itinSetupDragDrop() {
     document.querySelectorAll('tbody').forEach(container => {
         container.addEventListener('dragover', e => {
             e.preventDefault();
-            const afterElement = getDragAfterElement(container, e.clientY);
+            const afterElement = itinGetDragAfterElement(container, e.clientY);
             const draggable = window._dragging;
             if (draggable && container.id === draggable.closest('tbody').id) {
                 afterElement ? container.insertBefore(draggable, afterElement) : container.appendChild(draggable);
@@ -760,7 +789,7 @@ function setupDragDrop() {
     });
 }
 
-function getDragAfterElement(container, y) {
+function itinGetDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('tr.draggable:not(.opacity-60)')];
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
@@ -810,7 +839,7 @@ async function guardarPaqueteItinerario() {
     try {
         const payload = { nombre, modulos };
         if (itinerarioPaqueteEditandoId) payload.id = itinerarioPaqueteEditandoId;
-        const res = await fetch(`api.php?path=guardar-paquete&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-paquete&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -838,7 +867,7 @@ function editarPaqueteItinerario(paquete) {
 async function eliminarPaqueteItinerario(paquete) {
     if (!await confirmAction(`¿Eliminar el itinerario predeterminado "${paquete.nombre}"?`)) return;
     try {
-        const res = await fetch(`api.php?path=eliminar-paquete&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-paquete&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: paquete.id })
@@ -1045,7 +1074,7 @@ function buildHistorialGeneradoRow(g) {
     const tr = document.createElement('tr');
     tr.className = 'border-b';
     const fecha = new Date(g.generado_en.replace(' ', 'T')).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
-    const url = `./uploads/${idiomaActivo}/generados/${encodeURIComponent(g.filename)}`;
+    const url = `${ITINERARIO_API_BASE}./uploads/${idiomaActivo}/generados/${encodeURIComponent(g.filename)}`;
     tr.innerHTML = `
         <td class="p-2 font-medium text-slate-700">${g.pasajero}</td>
         <td class="p-2">${g.titulo}</td>
@@ -1145,7 +1174,7 @@ async function handleGenerateItinerary() {
             const progress = 30 + (i / totalFiles * 65);
             updateProgress(progress, `Procesando ${i + 1} de ${totalFiles}: ${filename}`);
 
-            const pdfUrl = `./uploads/${idiomaPdf}/${encodeURIComponent(filename)}`;
+            const pdfUrl = `${ITINERARIO_API_BASE}./uploads/${idiomaPdf}/${encodeURIComponent(filename)}`;
             const res = await fetch(pdfUrl);
             if (!res.ok) {
                 throw new Error(`Módulo no encontrado: "${filename}" (${res.status}). El archivo PDF no está subido en el servidor para el idioma "${idiomaPdf}".`);
@@ -1206,11 +1235,11 @@ async function handleGenerateItinerary() {
                 historyForm.append('pdf', blob, nombreArchivo);
                 historyForm.append('idioma', idiomaPdf);
                 historyForm.append('carpeta', 'generados');
-                const uploadRes = await fetch('upload.php', { method: 'POST', body: historyForm });
+                const uploadRes = await fetch(`${ITINERARIO_API_BASE}upload.php`, { method: 'POST', body: historyForm });
                 const uploadData = await uploadRes.json();
                 if (!uploadData.success) throw new Error(uploadData.error || 'No se pudo subir el PDF al historial.');
 
-                const guardarRes = await fetch(`api.php?path=guardar-generado&idioma=${idiomaPdf}`, {
+                const guardarRes = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-generado&idioma=${idiomaPdf}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pasajero: passengerName, titulo: packageTitle, filename: uploadData.filename, modulos: bodyFiles })
@@ -1275,15 +1304,29 @@ document.getElementById('add-start-row').addEventListener('click', () => addItin
 document.getElementById('add-itinerary-row').addEventListener('click', () => addItineraryBuilderRow('itinerary-builder-body', true));
 document.getElementById('add-end-row').addEventListener('click', () => addItineraryBuilderRow('end-builder-body'));
 document.getElementById('generate-itinerary').addEventListener('click', handleGenerateItinerary);
-setupDragDrop();
+itinSetupDragDrop();
 
-window.addEventListener('load', async () => {
+// Envuelto en una función invocable (en vez de solo un listener de 'load') para que
+// Cotizador pueda llamarla desde su propio init(), pasándole el idioma que ya eligió el
+// usuario en Datos Pax en vez del 'en' fijo de la página standalone. Es segura de invocar
+// una sola vez — no hay guarda de re-entrada porque nada más la llama más de una vez.
+let itinerarioInicializado = false;
+async function initItinerario(idiomaInicial) {
+    if (itinerarioInicializado) return;
+    itinerarioInicializado = true;
     await cargarDestinosYCategorias();
     llenarDestinosSelect(document.getElementById('itinerary-module-destino'));
     resetItinerarioPaqueteBuilder();
-    await activarIdioma('en');
+    await activarIdioma(idiomaInicial || 'en');
     loadFonts(false);
-});
+}
+
+// En la página standalone (itinerario/index.php) arranca sola, igual que siempre. Cuando
+// este archivo se embebe en Cotizador, window.ITINERARIO_API_BASE ya viene definido y es
+// Cotizador quien llama a initItinerario() explícitamente desde su propio init().
+if (!window.ITINERARIO_API_BASE) {
+    window.addEventListener('load', () => initItinerario('en'));
+}
 
 // Guarda de una sola vez todas las clasificaciones Destino/Categoría de Módulos pendientes
 // (marcadas al tocar los selects de cada fila) — un solo request al servidor.
@@ -1291,7 +1334,7 @@ document.getElementById('modulos-guardar-flotante').addEventListener('click', as
     if (modulosCambiosPendientes.size === 0) return;
     const cambios = Array.from(modulosCambiosPendientes, ([id, v]) => ({ id, ...v }));
     try {
-        const res = await fetch(`api.php?path=guardar-clasificaciones-modulos&idioma=${idiomaActivo}`, {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-clasificaciones-modulos&idioma=${idiomaActivo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ cambios })

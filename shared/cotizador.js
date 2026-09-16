@@ -164,9 +164,14 @@ function buildHotelSelector(initialHotelName, onResolved) {
 // Cambia de subpestaña dentro de Gestión de Datos (Destinos y Categorías / Paquetes /
 // Tours / Hoteles) — misma lógica que el click en un .subnav-tab, reutilizada por los
 // avisos de "falta X" y por los enlaces cruzados Destino/Categoría de las tablas.
+// Acotado a #gestion-section (no ".subnav-tab"/"​.subtab-content" a secas): Itinerario
+// embebido tiene su propio grupo de subpestañas con las mismas clases CSS
+// (#itinerario-gestion-subtabs, manejado enteramente por itinerario.js) — sin acotar acá,
+// un clic ahí también dispararía esta función y reventaría con "gestion-modulos" inexistente.
 function irASubtabGestion(subtab) {
-    document.querySelectorAll('.subnav-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
-    document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+    const contenedor = document.getElementById('gestion-section');
+    contenedor.querySelectorAll('.subnav-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
+    contenedor.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
 }
 
@@ -1406,7 +1411,12 @@ async function guardarCotizacion() {
             descuentoEspecial: document.getElementById('descuento-especial').value,
         },
         notas: document.getElementById('notas_cotizacion').innerHTML,
-        porcentaje_reserva: document.getElementById('porcentaje_reserva').value
+        porcentaje_reserva: document.getElementById('porcentaje_reserva').value,
+        itinerarioArmado: {
+            pasajero: document.getElementById('itinerary-passenger').value,
+            titulo: document.getElementById('itinerary-title').value,
+            modulos: Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean)
+        }
     };
     try {
         const response = await fetch(`${API_URL}?path=guardar-cotizacion`, {
@@ -1452,6 +1462,7 @@ async function cargarCotizacion(id) {
         data.notas = notasLegacyToHtml(data.notas);
         document.getElementById('notas_cotizacion').innerHTML = data.notas;
         document.getElementById('porcentaje_reserva').value = data.porcentaje_reserva || 30;
+        restaurarItinerarioArmado(data.itinerarioArmado);
         calcularResumen();
         cotizaciones[id] = data;
         currentCotizacionId = id;
@@ -1475,8 +1486,33 @@ function nuevaCotizacion(showAlert = true) {
     actualizarEstadosCamposFecha();
     document.getElementById('tours-body').appendChild(createTourRow());
     document.getElementById('hotels-body').appendChild(createHotelRow());
+    limpiarItinerarioArmado();
     calcularResumen();
     if(showAlert) notifySuccess('Formulario limpiado para una nueva cotización.');
+}
+
+// ===== Itinerario (armador embebido — ver itinerario/itinerario.js) =====
+// El día-por-día que arma el usuario en "4. Itinerario" se guarda como parte de la
+// cotización (nombres de archivo de módulo, en orden), y se reconstruye con la misma
+// addItineraryBuilderRow() que ya usa el armador standalone — no hay lógica propia acá.
+function limpiarItinerarioArmado() {
+    document.getElementById('itinerary-passenger').value = '';
+    document.getElementById('itinerary-title').value = '';
+    document.getElementById('itinerary-builder-body').innerHTML = '';
+    addItineraryBuilderRow('itinerary-builder-body', true);
+}
+
+function restaurarItinerarioArmado(armado) {
+    document.getElementById('itinerary-passenger').value = armado?.pasajero || document.querySelector('input[name="nombre_pax"]').value || '';
+    document.getElementById('itinerary-title').value = armado?.titulo || '';
+    const body = document.getElementById('itinerary-builder-body');
+    body.innerHTML = '';
+    const modulos = armado?.modulos || [];
+    if (modulos.length === 0) {
+        addItineraryBuilderRow('itinerary-builder-body', true);
+    } else {
+        modulos.forEach(filename => addItineraryBuilderRow('itinerary-builder-body', true, filename));
+    }
 }
 
 // ===== COTIZACIONES GUARDADAS (pestaña con tabla, búsqueda y paginación) =====
@@ -1931,6 +1967,11 @@ function abrirPdfPreviewNuevaPestana() {
 // ===== INICIALIZACIÓN =====
 async function init() {
     await cargarDatosIniciales();
+    // Itinerario (itinerario/itinerario.js, embebido — ver window.ITINERARIO_API_BASE en
+    // este mismo archivo) arranca con el idioma que ya trae Datos Pax, en vez del 'en'
+    // fijo de la página standalone — y de ahí en más lo sigue en vivo (ver el listener
+    // del <select name="idioma"> más abajo).
+    await initItinerario(document.querySelector('select[name="idioma"]').value || 'es');
     nuevaCotizacion(false);
 
     document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -1943,7 +1984,7 @@ async function init() {
         });
     });
 
-    document.querySelectorAll('.subnav-tab').forEach(tab => {
+    document.querySelectorAll('#gestion-section .subnav-tab').forEach(tab => {
         tab.addEventListener('click', () => irASubtabGestion(tab.dataset.subtab));
     });
 
@@ -2001,6 +2042,12 @@ async function init() {
 
     document.getElementById('historial-tours-btn').addEventListener('click', abrirHistorialTours);
     document.getElementById('close-historial-tours-btn').addEventListener('click', cerrarHistorialTours);
+    // Itinerario embebido: sigue el idioma de Datos Pax en vez de sus propias pestañas
+    // (que no se renderizan acá), y el Nombre PAX precompleta el pasajero del armador.
+    document.querySelector('select[name="idioma"]').addEventListener('change', (e) => activarIdioma(e.target.value));
+    document.querySelector('input[name="nombre_pax"]').addEventListener('input', (e) => {
+        document.getElementById('itinerary-passenger').value = e.target.value;
+    });
     document.getElementById('historial-tours-modal').addEventListener('click', (e) => {
         if (e.target.id === 'historial-tours-modal') cerrarHistorialTours();
     });

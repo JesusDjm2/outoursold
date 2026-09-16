@@ -19,7 +19,11 @@ tr.draggable:active { cursor: grabbing; }
 .itinerary-table-container table { min-width: 600px; }
 
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-.modal-content { background-color: white; margin: 15% auto; padding: 20px; border-radius: 8px; width: 300px; text-align: center; }
+/* Nombre propio (no ".modal-content") porque Cotizador ya tiene una clase ".modal-content"
+   con otro significado (modal-overlay > modal-content) — evita que se pisen al convivir
+   en la misma página. Solo la usa #loading-modal; los otros modales de Itinerario tienen
+   su propia clase de contenido (.historial-modal-content, .pdf-preview-content). */
+.itinerario-loading-content { background-color: white; margin: 15% auto; padding: 20px; border-radius: 8px; width: 300px; text-align: center; }
 .small { font-size: 0.78rem; }
 
 .pdf-preview-content { background-color: white; margin: 3vh auto; padding: 16px; border-radius: 8px; width: 90%; max-width: 900px; height: 90vh; display: flex; flex-direction: column; }

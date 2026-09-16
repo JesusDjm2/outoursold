@@ -318,7 +318,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
     </div>
 
     <div id="loading-modal" class="modal">
-        <div class="modal-content">
+        <div class="itinerario-loading-content">
             <h3 class="text-lg font-semibold mb-4">Generando PDF</h3>
             <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
                 <div id="progress-bar" class="bg-cyan-600 h-2.5 rounded-full" style="width: 0%"></div>
@@ -348,16 +348,16 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
         </div>
     </div>
 
-    <div id="pdf-preview-modal" class="modal">
+    <div id="itinerario-pdf-preview-modal" class="modal">
         <div class="pdf-preview-content">
             <div class="pdf-preview-header">
-                <h3 id="pdf-preview-title" class="text-lg font-semibold text-slate-800">Vista previa</h3>
-                <button id="pdf-preview-close" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times fa-lg"></i></button>
+                <h3 id="itinerario-pdf-preview-title" class="text-lg font-semibold text-slate-800">Vista previa</h3>
+                <button id="itinerario-pdf-preview-close" class="text-slate-400 hover:text-slate-600" title="Cerrar"><i class="fas fa-times fa-lg"></i></button>
             </div>
-            <iframe id="pdf-preview-frame" class="pdf-preview-frame"></iframe>
+            <iframe id="itinerario-pdf-preview-frame" class="pdf-preview-frame"></iframe>
             <div class="pdf-preview-footer">
-                <button id="pdf-preview-seguir-editando" class="btn btn-secondary hidden"><i class="fas fa-pen mr-2"></i>Seguir editando</button>
-                <button id="pdf-preview-download" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Descargar PDF</button>
+                <button id="itinerario-pdf-preview-seguir-editando" class="btn btn-secondary hidden"><i class="fas fa-pen mr-2"></i>Seguir editando</button>
+                <button id="itinerario-pdf-preview-download" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Descargar PDF</button>
             </div>
         </div>
     </div>

@@ -4,9 +4,11 @@
 // Compartido por el Cotizador (Tours/Hoteles/Paquetes de Tours) y el Generador de
 // Itinerarios (módulos clasificados por Destino/Categoría).
 //
-// Contrato con la página que lo incluye: espera que existan las variables globales
-// `destinosData`/`categoriasData` (arrays `{id, nombre}` / `{id, destino_id, nombre}`),
-// que cada página ya carga por su cuenta desde el mismo catálogo compartido.
+// Contrato con la página que lo incluye: espera un array de Destinos `{id, nombre}`, leído
+// por defecto de la variable global `destinosData` (lo que ya hace shared/cotizador.js) —
+// o, si esa página usa otro nombre para no colisionar con un `destinosData` de otro script
+// (caso de itinerario.js, que usa `itinDestinosData` para poder convivir con cotizador.js
+// en la misma página), pasando un 5º argumento `getDestinos` a `crearHelpersClasificacion`.
 
 const SIN_DESTINO_VAL = '__sin_destino__';
 const SIN_CATEGORIA_VAL = '__sin_categoria__';
@@ -30,12 +32,13 @@ function normalizarClasificacionKeys(keys) {
 // Itinerario...): dado dónde viven sus ítems y su catálogo de categorías propio, arma las
 // funciones que necesita el selector. Los catálogos mandan sobre las opciones — un destino
 // o categoría recién creado debe aparecer aunque todavía no tenga ningún ítem asociado.
-function crearHelpersClasificacion(getItems, getCategorias, keys) {
+function crearHelpersClasificacion(getItems, getCategorias, keys, getDestinos) {
     const { labelKey, valueKey } = normalizarClasificacionKeys(keys);
+    const resolverDestinos = getDestinos || (() => destinosData);
     const destinoValDe = (item) => item.destino_id != null ? String(item.destino_id) : SIN_DESTINO_VAL;
     const categoriaValDe = (item) => item.categoria_id != null ? String(item.categoria_id) : SIN_CATEGORIA_VAL;
     const getDestinoOpciones = () => {
-        const opciones = destinosData.map(d => ({ value: String(d.id), label: d.nombre }));
+        const opciones = resolverDestinos().map(d => ({ value: String(d.id), label: d.nombre }));
         if (getItems().some(item => item.destino_id == null)) opciones.push({ value: SIN_DESTINO_VAL, label: SIN_DESTINO_LABEL });
         return opciones.sort((a, b) => a.label.localeCompare(b.label));
     };
