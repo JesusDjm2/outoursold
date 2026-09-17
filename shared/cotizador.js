@@ -1137,6 +1137,45 @@ function sugerirSiguienteCheckinHotel() {
     return anterior.querySelector('td:nth-child(3) input').value || '';
 }
 
+// Las filas que ya existían ANTES de completar la Fecha de Llegada (ej. la fila inicial
+// en blanco de una cotización nueva) no la "escuchan" retroactivamente — solo las filas
+// agregadas después vía sugerirSiguienteFechaTour()/sugerirSiguienteCheckinHotel(). Este
+// listener resincroniza las filas que sigan vacías apenas cambia Fecha de Llegada, sin
+// tocar ninguna fecha que el usuario ya haya cargado a mano.
+function resincronizarFechasConLlegada() {
+    const fLlegada = document.querySelector('input[name="f_llegada"]').value;
+    if (!fLlegada) return;
+
+    let ultimaFechaTour = null;
+    document.querySelectorAll('#tours-body tr').forEach(tr => {
+        const input = tr.querySelector('td:nth-child(2) input');
+        if (input.value) {
+            ultimaFechaTour = input.value;
+            return;
+        }
+        if (ultimaFechaTour) {
+            const siguiente = new Date(ultimaFechaTour + 'T00:00:00');
+            siguiente.setDate(siguiente.getDate() + 1);
+            input.value = siguiente.toISOString().split('T')[0];
+        } else {
+            input.value = fLlegada;
+        }
+        ultimaFechaTour = input.value;
+    });
+
+    let esPrimeraFilaHotel = true;
+    let ultimoCheckout = null;
+    document.querySelectorAll('#hotels-body tr').forEach(tr => {
+        const cin = tr.querySelector('td:nth-child(2) input');
+        const cout = tr.querySelector('td:nth-child(3) input');
+        if (!cin.value) {
+            cin.value = esPrimeraFilaHotel ? fLlegada : (ultimoCheckout || '');
+        }
+        esPrimeraFilaHotel = false;
+        ultimoCheckout = cout.value;
+    });
+}
+
 // ===== FILAS =====
 function createTourRow(data = {}) {
     const tr = document.createElement('tr');
@@ -2073,6 +2112,7 @@ async function init() {
     document.querySelector('input[name="nombre_pax"]').addEventListener('input', (e) => {
         document.getElementById('itinerary-passenger').value = e.target.value;
     });
+    document.querySelector('input[name="f_llegada"]').addEventListener('change', resincronizarFechasConLlegada);
     document.getElementById('historial-tours-modal').addEventListener('click', (e) => {
         if (e.target.id === 'historial-tours-modal') cerrarHistorialTours();
     });
