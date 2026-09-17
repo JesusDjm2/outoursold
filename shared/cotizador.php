@@ -96,8 +96,12 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                             <input type="text" name="pais" id="input-pais" placeholder="Buscar país..." title="País de procedencia del pasajero" autocomplete="off">
                             <ul id="pais-dropdown-list" class="pais-dropdown-list hidden"></ul>
                         </div>
-                        <div class="field"><input type="text" name="cod_pais" value="+51" placeholder="Cód. País" title="Código telefónico del país"></div>
-                        <div class="field"><input type="text" name="dpto" placeholder="Dpto/Est." title="Departamento o estado de destino"></div>
+                        <div class="field"><input type="text" name="cod_pais" value="+51" placeholder="Cód. País" title="Código telefónico del país (se autocompleta al elegir el país, editable)"></div>
+                        <div class="field">
+                            <select name="dpto" disabled title="Departamento/Estado del país de origen del pasajero (se completa al elegir el país)">
+                                <option value="">Elige un país primero...</option>
+                            </select>
+                        </div>
                         <div class="field field-overlay"><input type="date" name="f_llegada" title="Fecha de llegada"><span class="field-placeholder-overlay">F. Llegada</span></div>
                         <div class="field field-overlay"><input type="time" name="h_llegada" title="Hora de llegada"><span class="field-placeholder-overlay">H. Llegada</span></div>
                         <div class="field field-overlay"><input type="date" name="f_salida" title="Fecha de salida"><span class="field-placeholder-overlay">F. Salida</span></div>

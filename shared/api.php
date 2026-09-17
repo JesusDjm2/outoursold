@@ -58,6 +58,26 @@ try {
             echo json_encode($stmt->fetchAll());
             break;
 
+        // Catálogo global de Países/Departamentos (shared/migrations/027_...): a
+        // diferencia de Destinos/Categorías, NO es propio de cada usuario — es geografía,
+        // igual para todos, así que no lleva creado_por ni filtro por sesión.
+        case 'paises':
+            $stmt = $db->query("SELECT id, nombre, codigo_telefono FROM paises ORDER BY nombre");
+            echo json_encode($stmt->fetchAll());
+            break;
+
+        case 'departamentos':
+            $paisId = intval($_GET['pais_id'] ?? 0);
+            if (!$paisId) {
+                http_response_code(400);
+                echo json_encode(['error' => 'pais_id requerido']);
+                break;
+            }
+            $stmt = $db->prepare("SELECT id, nombre FROM departamentos WHERE pais_id = ? ORDER BY nombre");
+            $stmt->execute([$paisId]);
+            echo json_encode($stmt->fetchAll());
+            break;
+
         case 'destinos':
             // Acotado a TU propio catálogo (admin incluido) — ver el de todas las agencias
             // mezclado es cosa de Comparativo/Catálogo por agencia, no de este selector.

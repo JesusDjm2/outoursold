@@ -33,6 +33,7 @@ let hotelsData = [];
 let destinosData = [];
 let categoriasData = [];
 let categoriasHotelesData = [];
+let paisesData = []; // {id, nombre, codigo_telefono} — catálogo global (shared/migrations/027_...)
 let destinoSeleccionadoId = null;
 let categoriaTipoActivo = 'tours';
 let cotizaciones = {};
@@ -120,13 +121,14 @@ function safeJsonParse(str) {
 // ===== CARGA DE DATOS =====
 async function cargarDatosIniciales() {
     try {
-        const [toursRes, hotelesRes, paquetesRes, destinosRes, categoriasRes, categoriasHotelesRes] = await Promise.all([
+        const [toursRes, hotelesRes, paquetesRes, destinosRes, categoriasRes, categoriasHotelesRes, paisesRes] = await Promise.all([
             fetch(`${API_URL}?path=tours`).then(r => r.json()),
             fetch(`${API_URL}?path=hoteles`).then(r => r.json()),
             fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json()),
             fetch(`${API_URL}?path=destinos`).then(r => r.json()),
             fetch(`${API_URL}?path=categorias`).then(r => r.json()),
-            fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json())
+            fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json()),
+            fetch(`${API_URL}?path=paises`).then(r => r.json())
         ]);
         toursData = toursRes;
         hotelsData = hotelesRes;
@@ -134,6 +136,7 @@ async function cargarDatosIniciales() {
         destinosData = destinosRes;
         categoriasData = categoriasRes;
         categoriasHotelesData = categoriasHotelesRes;
+        paisesData = paisesRes;
         cotizaciones = {};
         renderTours();
         renderHotels();
@@ -1450,6 +1453,10 @@ async function cargarCotizacion(id) {
             const input = form.querySelector(`[name="${key}"]`);
             if (input) input.value = data.pax[key];
         });
+        // El select de dpto necesita sus <option> del país guardado antes de que el
+        // .value de arriba (que ya intentó fijarlo sin opciones cargadas) pueda "pegar".
+        const paisGuardado = paisesData.find(p => p.nombre === data.pax.pais);
+        await llenarDepartamentosSelect(paisGuardado?.id || null, data.pax.dpto || '');
         actualizarEstadosCamposFecha();
         const toursBody = document.getElementById('tours-body');
         toursBody.innerHTML = '';
@@ -1486,6 +1493,7 @@ function nuevaCotizacion(showAlert = true) {
     actualizarEstadosCamposFecha();
     document.getElementById('tours-body').appendChild(createTourRow());
     document.getElementById('hotels-body').appendChild(createHotelRow());
+    llenarDepartamentosSelect(null, null);
     limpiarItinerarioArmado();
     calcularResumen();
     if(showAlert) notifySuccess('Formulario limpiado para una nueva cotización.');
@@ -2203,41 +2211,33 @@ async function init() {
 // ===== Buscador de País (Datos Pax) =====
 // El input name="pais" sigue siendo un <input type="text"> normal (lo que ya leen/escriben
 // FormData(form-pax) y la carga de cotizaciones guardadas) — esto solo le agrega un dropdown
-// de búsqueda encima para elegir rápido en vez de tipear el país completo a mano.
-const PAISES = [
-    'Afganistán', 'Albania', 'Alemania', 'Andorra', 'Angola', 'Antigua y Barbuda',
-    'Arabia Saudita', 'Argelia', 'Argentina', 'Armenia', 'Australia', 'Austria',
-    'Azerbaiyán', 'Bahamas', 'Baréin', 'Bangladés', 'Barbados', 'Bélgica', 'Belice',
-    'Benín', 'Bielorrusia', 'Birmania (Myanmar)', 'Bolivia', 'Bosnia y Herzegovina',
-    'Botsuana', 'Brasil', 'Brunéi', 'Bulgaria', 'Burkina Faso', 'Burundi', 'Bután',
-    'Cabo Verde', 'Camboya', 'Camerún', 'Canadá', 'Catar', 'Chad', 'Chile', 'China',
-    'Chipre', 'Ciudad del Vaticano', 'Colombia', 'Comoras', 'Corea del Norte',
-    'Corea del Sur', 'Costa de Marfil', 'Costa Rica', 'Croacia', 'Cuba', 'Dinamarca',
-    'Dominica', 'Ecuador', 'Egipto', 'El Salvador', 'Emiratos Árabes Unidos', 'Eritrea',
-    'Eslovaquia', 'Eslovenia', 'España', 'Estados Unidos', 'Estonia', 'Etiopía',
-    'Filipinas', 'Finlandia', 'Fiyi', 'Francia', 'Gabón', 'Gambia', 'Georgia', 'Ghana',
-    'Granada', 'Grecia', 'Guatemala', 'Guyana', 'Guinea', 'Guinea-Bisáu',
-    'Guinea Ecuatorial', 'Haití', 'Honduras', 'Hungría', 'India', 'Indonesia', 'Irak',
-    'Irán', 'Irlanda', 'Islandia', 'Islas Marshall', 'Islas Salomón', 'Israel', 'Italia',
-    'Jamaica', 'Japón', 'Jordania', 'Kazajistán', 'Kenia', 'Kirguistán', 'Kiribati',
-    'Kuwait', 'Laos', 'Lesoto', 'Letonia', 'Líbano', 'Liberia', 'Libia', 'Liechtenstein',
-    'Lituania', 'Luxemburgo', 'Macedonia del Norte', 'Madagascar', 'Malasia', 'Malaui',
-    'Maldivas', 'Malí', 'Malta', 'Marruecos', 'Mauricio', 'Mauritania', 'México',
-    'Micronesia', 'Moldavia', 'Mónaco', 'Mongolia', 'Montenegro', 'Mozambique',
-    'Namibia', 'Nauru', 'Nepal', 'Nicaragua', 'Níger', 'Nigeria', 'Noruega',
-    'Nueva Zelanda', 'Omán', 'Países Bajos', 'Pakistán', 'Palaos', 'Panamá',
-    'Papúa Nueva Guinea', 'Paraguay', 'Perú', 'Polonia', 'Portugal', 'Reino Unido',
-    'República Centroafricana', 'República Checa', 'República del Congo',
-    'República Democrática del Congo', 'República Dominicana', 'Ruanda', 'Rumania',
-    'Rusia', 'Samoa', 'San Cristóbal y Nieves', 'San Marino',
-    'San Vicente y las Granadinas', 'Santa Lucía', 'Santo Tomé y Príncipe', 'Senegal',
-    'Serbia', 'Seychelles', 'Sierra Leona', 'Singapur', 'Siria', 'Somalia', 'Sri Lanka',
-    'Suazilandia (Esuatini)', 'Sudáfrica', 'Sudán', 'Sudán del Sur', 'Suecia', 'Suiza',
-    'Surinam', 'Tailandia', 'Tanzania', 'Tayikistán', 'Timor Oriental', 'Togo', 'Tonga',
-    'Trinidad y Tobago', 'Túnez', 'Turkmenistán', 'Turquía', 'Tuvalu', 'Ucrania',
-    'Uganda', 'Uruguay', 'Uzbekistán', 'Vanuatu', 'Venezuela', 'Vietnam', 'Yemen',
-    'Yibuti', 'Zambia', 'Zimbabue',
-];
+// de búsqueda encima para elegir rápido en vez de tipear el país completo a mano. La lista
+// de países sale de paisesData (shared/migrations/027_...), ya cargada por cargarDatosIniciales().
+
+// Al elegir un país: autocompleta cod_pais (teléfono) y recarga el <select name="dpto"> con
+// los departamentos/estados de ese país (shared/migrations/027_...). cod_pais queda editable.
+async function llenarDepartamentosSelect(paisId, valorSeleccionado) {
+    const select = document.querySelector('select[name="dpto"]');
+    if (!paisId) {
+        select.innerHTML = '<option value="">Elige un país primero...</option>';
+        select.disabled = true;
+        return;
+    }
+    select.disabled = false;
+    select.innerHTML = '<option value="">Cargando...</option>';
+    try {
+        const departamentos = await fetch(`${API_URL}?path=departamentos&pais_id=${paisId}`).then(r => r.json());
+        if (!Array.isArray(departamentos) || departamentos.length === 0) {
+            select.innerHTML = '<option value="">Sin departamentos registrados</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">Selecciona...</option>' +
+            departamentos.map(d => `<option value="${d.nombre}">${d.nombre}</option>`).join('');
+        if (valorSeleccionado) select.value = valorSeleccionado;
+    } catch (error) {
+        select.innerHTML = '<option value="">Error al cargar departamentos</option>';
+    }
+}
 
 function initPaisAutocomplete() {
     const input = document.getElementById('input-pais');
@@ -2249,9 +2249,10 @@ function initPaisAutocomplete() {
 
     function renderOpciones(filtro) {
         const termino = normalizar(filtro.trim());
+        const nombres = paisesData.map(p => p.nombre);
         const coincidencias = termino
-            ? PAISES.filter(p => normalizar(p).includes(termino))
-            : PAISES;
+            ? nombres.filter(p => normalizar(p).includes(termino))
+            : nombres;
         indiceActivo = -1;
         if (coincidencias.length === 0) {
             lista.innerHTML = '<li class="sin-resultados">Sin coincidencias</li>';
@@ -2270,6 +2271,13 @@ function initPaisAutocomplete() {
         input.value = pais;
         cerrarLista();
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        const paisEncontrado = paisesData.find(p => p.nombre === pais);
+        if (paisEncontrado) {
+            document.querySelector('input[name="cod_pais"]').value = paisEncontrado.codigo_telefono;
+            llenarDepartamentosSelect(paisEncontrado.id, null);
+        } else {
+            llenarDepartamentosSelect(null, null);
+        }
     }
 
     input.addEventListener('focus', () => renderOpciones(input.value));
