@@ -1113,11 +1113,28 @@ function sugerirSiguienteFechaTour() {
     const fechas = Array.from(document.querySelectorAll('#tours-body tr td:nth-child(2) input'))
         .map(input => input.value)
         .filter(Boolean);
-    if (fechas.length === 0) return '';
+    if (fechas.length === 0) {
+        // Primer día de Actividades: parte de la Fecha de Llegada de Datos Pax.
+        return document.querySelector('input[name="f_llegada"]').value || '';
+    }
     const ultima = fechas.reduce((max, f) => f > max ? f : max);
     const siguiente = new Date(ultima + 'T00:00:00');
     siguiente.setDate(siguiente.getDate() + 1);
     return siguiente.toISOString().split('T')[0];
+}
+
+// Igual que sugerirSiguienteFechaTour() pero para Hoteles: el primer check-in parte de
+// la Fecha de Llegada de Datos Pax; los siguientes toman el check-out de la fila
+// inmediatamente anterior (el usuario define ese check-out libremente: día siguiente o
+// varios días después), y así seguidamente. Si la fila anterior todavía no tiene
+// check-out cargado, no hay de dónde correlacionar y se deja vacío para completar a mano.
+function sugerirSiguienteCheckinHotel() {
+    const filas = document.querySelectorAll('#hotels-body tr');
+    if (filas.length === 0) {
+        return document.querySelector('input[name="f_llegada"]').value || '';
+    }
+    const anterior = filas[filas.length - 1];
+    return anterior.querySelector('td:nth-child(3) input').value || '';
 }
 
 // ===== FILAS =====
@@ -2118,7 +2135,7 @@ async function init() {
     agregarFilaPaquete();
 
     document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() })));
-    document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow()));
+    document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow({ cin: sugerirSiguienteCheckinHotel() })));
     document.getElementById('clear-tours').addEventListener('click', () => { document.getElementById('tours-body').innerHTML = ''; calcularResumen(); });
     document.getElementById('clear-hotels').addEventListener('click', () => { document.getElementById('hotels-body').innerHTML = ''; calcularResumen(); });
     // Revela/edita Precio Confidencial y Precio C. Total para TODAS las filas de la tabla
