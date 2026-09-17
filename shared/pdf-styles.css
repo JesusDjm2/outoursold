@@ -1,3 +1,20 @@
+/* Tipografía Bega (tipografia/ en la raíz del proyecto) para la página de Términos y
+   Condiciones. Las rutas relativas funcionan igual tanto si este CSS se carga por
+   <link> (vive en shared/) como inlineado en <style> dentro de pen/usd (ver
+   renderHtmlPageBytes en cotizador.js): ambos casos están un nivel bajo la raíz. */
+@font-face {
+    font-family: 'Bega';
+    src: url('../tipografia/Bega-Regular.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+@font-face {
+    font-family: 'Bega';
+    src: url('../tipografia/Bega-Bold.otf') format('opentype');
+    font-weight: bold;
+    font-style: normal;
+}
+
 /* --- ESTILOS GENERALES DEL DOCUMENTO --- */
 .pdf-page {
     font-family: Helvetica, Arial, sans-serif;
@@ -156,13 +173,23 @@
     position: absolute;
     left: 2px;
 }
-.terminos-titulo { font-size: 22pt; font-weight: bold; margin: 0 0 2px 0; color: #000; }
+.terminos-titulo {
+    font-family: 'Bega', Helvetica, Arial, sans-serif;
+    font-size: 11pt; /* mismo tamaño que .terminos-content */
+    font-weight: bold;
+    text-align: center;
+    margin: 0 0 2px 0;
+    color: #808080;
+}
 .terminos-content {
     width: 1100px;
+    font-family: 'Bega', Helvetica, Arial, sans-serif;
     font-size: 11pt; /* 1pt menos que .notes-section (Notas, junto al resumen de precios) */
-    color: #000;
-    line-height: 1.6;
+    color: #808080;
+    line-height: 1.45; /* reducido desde 1.6 */
     text-align: justify;
+    hyphens: auto; /* corta palabras largas para no estirar tanto el espacio entre palabras al justificar */
+    -webkit-hyphens: auto;
     column-count: 2;
     column-gap: 50px;
 }

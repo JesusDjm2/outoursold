@@ -1728,6 +1728,9 @@ async function renderHtmlPageBytes(html) {
     container.style.position = 'absolute';
     container.style.left = '-9999px';
     document.body.appendChild(container);
+    // Sin esto, html2canvas puede capturar antes de que termine de bajar la fuente Bega
+    // (@font-face en pdf-styles.css, ver Términos y Condiciones) y usar la de respaldo.
+    await document.fonts.ready;
     const canvas = await html2canvas(container.querySelector('.pdf-page'), { scale: 1.5, useCORS: true });
     document.body.removeChild(container);
 
