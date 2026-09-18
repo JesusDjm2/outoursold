@@ -1126,8 +1126,10 @@ document.getElementById('historial-filtro-limpiar').addEventListener('click', ()
 // ===================================================================
 async function handleGenerateItinerary() {
     const passengerName = document.getElementById('itinerary-passenger').value || 'Viajero';
-    const packageTitle = document.getElementById('itinerary-title').value;
-    if (!packageTitle) return notifyWarning('Por favor, introduce un Título del Paquete.');
+    // Embebido en Cotizador, el título ya se autogenera a partir del Nombre PAX (el campo
+    // queda oculto, ver cotizador.js) — el fallback acá es solo para el caso standalone si
+    // alguien lo deja en blanco a mano, en vez de bloquear la generación con una advertencia.
+    const packageTitle = document.getElementById('itinerary-title').value || `Itinerario de ${passengerName}`;
 
     showLoadingModal();
     updateProgress(10, 'Preparando PDF...');

@@ -200,16 +200,12 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="flex items-center justify-between mb-2">
                             <h2 class="text-base font-medium">4. Itinerario</h2>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                            <div>
-                                <label for="itinerary-passenger" class="small text-slate-500">Nombre del Pasajero</label>
-                                <input type="text" id="itinerary-passenger" placeholder="Se completa solo con el Nombre PAX" class="w-full border rounded p-2 mt-1 small">
-                            </div>
-                            <div>
-                                <label for="itinerary-title" class="small text-slate-500">Título del Itinerario</label>
-                                <input type="text" id="itinerary-title" placeholder="Ej: Cusco Mágico 4 Días" class="w-full border rounded p-2 mt-1 small">
-                            </div>
-                        </div>
+                        <!-- Pasajero y título ya quedan ligados a la cotización (Nombre PAX y un título
+                             autogenerado a partir de este, ver el listener de nombre_pax en cotizador.js)
+                             en vez de pedirlos aparte acá; los inputs se mantienen ocultos porque
+                             itinerario.js (compartido con la vista standalone) sigue leyéndolos. -->
+                        <input type="text" id="itinerary-passenger" class="hidden">
+                        <input type="text" id="itinerary-title" class="hidden">
                         <div class="flex items-center gap-2 mb-3 flex-wrap">
                             <select id="itinerario-aplicar-paquete-select" class="flex-1 border rounded p-2 small" style="min-width:180px">
                                 <option value="">Aplicar itinerario predeterminado...</option>

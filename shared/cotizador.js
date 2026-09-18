@@ -1579,9 +1579,17 @@ function limpiarItinerarioArmado() {
     addItineraryBuilderRow('itinerary-builder-body', true);
 }
 
+// Título por defecto del itinerario, ligado al pasajero de la cotización (ya no se
+// escribe a mano — ver el listener de nombre_pax más abajo). Si una cotización guardada
+// antes de este cambio ya trae un título propio (armado.titulo), ese se respeta.
+function tituloItinerarioPara(nombrePax) {
+    return nombrePax ? `Itinerario de ${nombrePax}` : '';
+}
+
 function restaurarItinerarioArmado(armado) {
-    document.getElementById('itinerary-passenger').value = armado?.pasajero || document.querySelector('input[name="nombre_pax"]').value || '';
-    document.getElementById('itinerary-title').value = armado?.titulo || '';
+    const nombrePax = document.querySelector('input[name="nombre_pax"]').value || '';
+    document.getElementById('itinerary-passenger').value = armado?.pasajero || nombrePax;
+    document.getElementById('itinerary-title').value = armado?.titulo || tituloItinerarioPara(nombrePax);
     const body = document.getElementById('itinerary-builder-body');
     body.innerHTML = '';
     const modulos = armado?.modulos || [];
@@ -2123,10 +2131,12 @@ async function init() {
     document.getElementById('historial-tours-btn').addEventListener('click', abrirHistorialTours);
     document.getElementById('close-historial-tours-btn').addEventListener('click', cerrarHistorialTours);
     // Itinerario embebido: sigue el idioma de Datos Pax en vez de sus propias pestañas
-    // (que no se renderizan acá), y el Nombre PAX precompleta el pasajero del armador.
+    // (que no se renderizan acá), y el Nombre PAX precompleta el pasajero y el título del
+    // armador (ver tituloItinerarioPara) — ya no se escriben a mano.
     document.querySelector('select[name="idioma"]').addEventListener('change', (e) => activarIdioma(e.target.value));
     document.querySelector('input[name="nombre_pax"]').addEventListener('input', (e) => {
         document.getElementById('itinerary-passenger').value = e.target.value;
+        document.getElementById('itinerary-title').value = tituloItinerarioPara(e.target.value);
     });
     document.querySelector('input[name="f_llegada"]').addEventListener('change', resincronizarFechasConLlegada);
     document.getElementById('historial-tours-modal').addEventListener('click', (e) => {

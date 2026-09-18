@@ -23,9 +23,6 @@
         <a href="<?= htmlspecialchars($navRoot) ?>usd/" class="sidebar-link<?= ($navActive === 'usd' || $navActive === 'pen') ? ' active' : '' ?>" title="Cotizador">
             <i class="fas fa-calculator"></i><span>Cotizador</span>
         </a>
-        <a href="<?= htmlspecialchars($navRoot) ?>itinerario/" class="sidebar-link<?= $navActive === 'itinerario' ? ' active' : '' ?>" title="Itinerario">
-            <i class="fas fa-route"></i><span>Itinerario</span>
-        </a>
         <?php if (is_admin()): ?>
         <a href="<?= htmlspecialchars($navShared) ?>usuarios.php" class="sidebar-link<?= $navActive === 'usuarios' ? ' active' : '' ?>" title="Usuarios">
             <i class="fas fa-users-cog"></i><span>Usuarios</span>
