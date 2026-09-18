@@ -1197,12 +1197,12 @@ function createTourRow(data = {}) {
         <td class="pl-2"><div class="handle">≡</div></td>
         <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.fecha || ''}"></td>
         <td class="tour-selector-cell"></td>
-        <td><input class="input w-full max-w-20 rounded px-2 py-1 border text-right cant" type="number" min="0" value="${initialCant}"></td>
+        <td><input class="input w-14 rounded px-2 py-1 border text-right cant" type="number" min="0" value="${initialCant}"></td>
         <td><input class="input w-full rounded px-2 py-1 border distr" type="text" value="${data.distr || ''}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
-        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
-        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
+        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
+        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
         <td class="text-right total-line">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
