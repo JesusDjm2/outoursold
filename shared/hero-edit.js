@@ -73,9 +73,13 @@
                 const result = await res.json();
                 if (!result.success) throw new Error(result.error || 'No se pudo actualizar el logo.');
 
+                // Fade-in en vez de un pop abrupto: arranca en opacity:0 y sube al
+                // siguiente frame (ver transition en .page-hero-logo, hero.css).
                 const url = `${assetBase}uploads/agencias/${result.filename}?v=${result.v}`;
                 document.querySelectorAll('.page-hero-content').forEach(content => {
-                    content.innerHTML = `<img src="${url}" alt="Logo" class="page-hero-logo">`;
+                    content.innerHTML = `<img src="${url}" alt="Logo" class="page-hero-logo" style="opacity:0">`;
+                    const img = content.querySelector('img');
+                    requestAnimationFrame(() => { img.style.opacity = '1'; });
                 });
                 notifySuccess('Logo actualizado.');
             } catch (err) {
@@ -127,8 +131,13 @@
             const result = await res.json();
             if (!result.success) throw new Error(result.error || 'No se pudo actualizar el color.');
 
-            document.documentElement.style.setProperty('--accent-1', hex);
-            document.documentElement.style.setProperty('--accent-2', oscurecerColor(hex, 0.18));
+            // En <body>, no en <html>: el server-render (resolverAccentColorStyle) inyecta
+            // el color guardado como inline style justo ahí (ver <body style="--accent-1:...">
+            // en cotizador.php/itinerario/index.php) — si se pisa en <html> en vez de <body>,
+            // ese inline style (más cercano en el árbol) le sigue ganando y el cambio no se
+            // ve hasta recargar.
+            document.body.style.setProperty('--accent-1', hex);
+            document.body.style.setProperty('--accent-2', oscurecerColor(hex, 0.18));
             notifySuccess('Color de marca actualizado.');
         } catch (err) {
             notifyError(err.message);

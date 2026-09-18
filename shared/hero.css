@@ -21,6 +21,7 @@
     max-height: 56px;
     max-width: 100%;
     filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.35));
+    transition: opacity 0.25s ease;
 }
 .page-hero h1 {
     font-size: 1.6rem;
