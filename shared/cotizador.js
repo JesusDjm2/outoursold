@@ -1001,7 +1001,20 @@ function aplicarPaquete(paquete) {
     // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
     // mano) y sigue a N° PAX hasta que el usuario la edite — antes se fijaba con la
     // cantidad guardada en el paquete y quedaba sorda a los cambios de N° PAX.
-    const filas = paquete.tours.map(item => ({ tour: item.tour }));
+    // La fecha tampoco se calculaba (quedaba vacía): ahora sigue la misma correlatividad
+    // que el botón "+ Fila" — el primer tour del paquete parte de sugerirSiguienteFechaTour()
+    // (Fecha de Llegada, o el día siguiente al de las filas que ya hubiera) y cada tour
+    // siguiente del paquete es un día después del anterior.
+    let fecha = sugerirSiguienteFechaTour();
+    const filas = paquete.tours.map(item => {
+        const fila = { tour: item.tour, fecha };
+        if (fecha) {
+            const siguiente = new Date(fecha + 'T00:00:00');
+            siguiente.setDate(siguiente.getDate() + 1);
+            fecha = siguiente.toISOString().split('T')[0];
+        }
+        return fila;
+    });
     agregarFilasTours(filas, true);
     irATabCotizador();
 }
