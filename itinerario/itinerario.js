@@ -1305,7 +1305,10 @@ document.querySelectorAll('.idioma-tab').forEach(tab => {
 document.getElementById('add-start-row').addEventListener('click', () => addItineraryBuilderRow('start-builder-body'));
 document.getElementById('add-itinerary-row').addEventListener('click', () => addItineraryBuilderRow('itinerary-builder-body', true));
 document.getElementById('add-end-row').addEventListener('click', () => addItineraryBuilderRow('end-builder-body'));
-document.getElementById('generate-itinerary').addEventListener('click', handleGenerateItinerary);
+// En Cotizador (embebido) ya no existe este botón — "Guardar" genera el itinerario junto
+// con la cotización (ver guardarCotizacion() en cotizador.js). Sigue existiendo en la
+// vista standalone de Itinerario.
+document.getElementById('generate-itinerary')?.addEventListener('click', handleGenerateItinerary);
 itinSetupDragDrop();
 
 // Envuelto en una función invocable (en vez de solo un listener de 'load') para que

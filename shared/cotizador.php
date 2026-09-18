@@ -228,9 +228,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <tbody id="itinerary-builder-body"></tbody>
                             </table>
                         </div>
+                        <!-- Sin botón propio de generar: "Guardar" (Datos Pax) ya genera el PDF del
+                             itinerario junto con el de la cotización si hay módulos armados acá. -->
                         <div class="flex items-center gap-2 mt-3">
                             <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border">+ Añadir Fila</button>
-                            <button id="generate-itinerary" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)"><i class="fas fa-file-pdf mr-1"></i>Generar Itinerario</button>
                         </div>
                     </div>
                     <div class="card p-0 overflow-hidden">

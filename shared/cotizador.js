@@ -45,6 +45,10 @@ let paqueteEditandoId = null;
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
 let pdfPreviewCotizacionId = null;
+// Si guardarCotizacion() encadena la generación del PDF de Itinerario después del de la
+// cotización, queda acá y se dispara al cerrar la vista previa de la cotización (ver
+// cerrarModalPdf()) — así el usuario ve un PDF a la vez, no los dos modales superpuestos.
+let onPdfPreviewClosed = null;
 
 // Etiquetas fijas de la plantilla del PDF (shared/pdf-template.html /
 // pdf-terminos-template.html), traducidas a los 3 idiomas de exportación. Los datos
@@ -1501,8 +1505,16 @@ async function guardarCotizacion() {
             cotizaciones[id] = data;
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;
-            const generarPdf = await notifySuccessAction(`Cotización guardada con ID: ${id}`, 'Generar PDF');
-            if (generarPdf) mostrarVistaPreviaPdf(id);
+            // Guardar ya genera los PDF (antes había que pedirlo aparte con un aviso de
+            // "¿Generar PDF?", y el de Itinerario tenía su propio botón "Generar Itinerario"
+            // — ver handleGenerateItinerary en itinerario.js). Sin aviso previo: el propio
+            // PDF abriéndose ya confirma que se guardó bien (un Swal.fire() bloqueante acá
+            // tapaba la vista previa hasta cerrarlo aparte). Primero el de la cotización; si
+            // además hay módulos armados en "4. Itinerario", al cerrar esa vista previa se
+            // encadena la del itinerario.
+            const hayItinerarioArmado = data.itinerarioArmado.modulos.length > 0;
+            if (hayItinerarioArmado) onPdfPreviewClosed = () => handleGenerateItinerary();
+            await mostrarVistaPreviaPdf(id);
         } else {
             throw new Error(result.error);
         }
@@ -2034,6 +2046,11 @@ function cerrarModalPdf() {
     if (pdfPreviewUrl) {
         URL.revokeObjectURL(pdfPreviewUrl);
         pdfPreviewUrl = null;
+    }
+    if (onPdfPreviewClosed) {
+        const callback = onPdfPreviewClosed;
+        onPdfPreviewClosed = null;
+        callback();
     }
 }
 
