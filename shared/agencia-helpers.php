@@ -56,6 +56,50 @@ function resolverHeroImagenUrl($db, $navShared) {
     return $navShared . 'fondo-sistema-outours.jpg?v=' . filemtime($rutaDefault);
 }
 
+// Oscurece un color hex un porcentaje (0-1) manteniendo el tono, para derivar --accent-2
+// a partir del único color que elige el usuario con el cuentagotas del Hero (--accent-1).
+// Espejo de oscurecerColor() en hero-edit.js (mismo criterio, para que el color aplicado
+// en vivo al elegirlo coincida con el que se renderiza server-side en la próxima carga).
+function oscurecerColorHex($hex, $porcentaje) {
+    $hex = ltrim($hex, '#');
+    $r = (int) round(hexdec(substr($hex, 0, 2)) * (1 - $porcentaje));
+    $g = (int) round(hexdec(substr($hex, 2, 2)) * (1 - $porcentaje));
+    $b = (int) round(hexdec(substr($hex, 4, 2)) * (1 - $porcentaje));
+    return sprintf('#%02x%02x%02x', $r, $g, $b);
+}
+
+// Style inline con --accent-1/--accent-2 si la agencia propia del usuario logueado
+// personalizó su color de marca (color_principal), o '' si no — en ese caso el CSS usa
+// los valores por defecto de :root en cotizador.css tal cual. Se inyecta server-side en
+// el <body> (mismo criterio que resolverHeroImagenUrl con --hero-bg-image) para que no
+// haya flash del rojo por defecto antes de que cargue el JS.
+function resolverAccentColorStyle($db) {
+    $agenciaId = resolverAgenciaPropiaId($db);
+    if (!$agenciaId) return '';
+    $stmt = $db->prepare("SELECT color_principal FROM agencias WHERE id = ?");
+    $stmt->execute([$agenciaId]);
+    $color = $stmt->fetchColumn();
+    if (!$color) return '';
+    $secundario = oscurecerColorHex($color, 0.18);
+    return "--accent-1:{$color};--accent-2:{$secundario};";
+}
+
+// URL (con cache-busting) del logo de la agencia propia del usuario logueado, o null si
+// no personalizó uno — en ese caso el Hero muestra el título/subtítulo de texto normal en
+// vez del logo. Mismo criterio que resolverHeroImagenUrl(), pero sin fallback a una imagen
+// por defecto del sistema (acá "sin logo" es un estado válido, no un error).
+function resolverLogoUrl($db, $navShared) {
+    $agenciaId = resolverAgenciaPropiaId($db);
+    if (!$agenciaId) return null;
+    $stmt = $db->prepare("SELECT logo FROM agencias WHERE id = ?");
+    $stmt->execute([$agenciaId]);
+    $logo = $stmt->fetchColumn();
+    if (!$logo) return null;
+    $ruta = __DIR__ . '/uploads/agencias/' . $logo;
+    if (!file_exists($ruta)) return null;
+    return $navShared . 'uploads/agencias/' . $logo . '?v=' . filemtime($ruta);
+}
+
 function sanitizarHtmlTerminos($html) {
     $html = trim((string) $html);
     if ($html === '') return null;

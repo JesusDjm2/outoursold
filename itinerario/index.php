@@ -8,6 +8,8 @@ $navShared = '../shared/';
 $navActive = 'itinerario';
 $db = getDB();
 $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
+$accentColorStyle = resolverAccentColorStyle($db);
+$logoUrl = resolverLogoUrl($db, $navShared);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -28,17 +30,27 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/../shared/hero.css') ?>">
     <link rel="stylesheet" href="../shared/cascade-select.css?v=<?= filemtime(__DIR__ . '/../shared/cascade-select.css') ?>">
 </head>
-<body>
+<body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/../shared/sidebar.php'; ?>
 
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
-            <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
-            <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+            <div class="hero-actions">
+                <button type="button" id="hero-logo-btn" class="hero-edit-btn" title="Agregar/cambiar el logo de tu empresa"><i class="fas fa-image"></i></button>
+                <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
+                <button type="button" id="hero-color-btn" class="hero-edit-btn" title="Elegir color de marca (cuentagotas)"><i class="fas fa-eye-dropper"></i></button>
+                <input type="color" id="hero-color-input" class="hidden">
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
+                <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+            </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">
-                <div class="page-hero-content">
-                    <h1>Generador de Itinerarios</h1>
-                    <p>Plataforma B2B de cotizaciones e itinerarios turísticos</p>
+                <div class="page-hero-content" id="page-hero-content">
+                    <?php if ($logoUrl): ?>
+                        <img src="<?= htmlspecialchars($logoUrl) ?>" alt="Generador de Itinerarios" class="page-hero-logo">
+                    <?php else: ?>
+                        <h1>Generador de Itinerarios</h1>
+                        <p>Plataforma B2B de cotizaciones e itinerarios turísticos</p>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="filter-tabs-bar">

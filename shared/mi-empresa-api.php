@@ -169,6 +169,68 @@ try {
             echo json_encode(['success' => true, 'filename' => $nuevoNombre, 'v' => filemtime($rutaFinal)]);
             break;
 
+        // Logo de MI agencia, autoservicio instantáneo desde el botón del Hero (igual
+        // criterio que 'subir-hero': independiente del formulario completo de "Guardar
+        // cambios", para poder cambiarlo desde cualquier vista sin abrir Mi Empresa).
+        case 'subir-logo':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $id = resolverAgenciaPropiaId($db);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No tienes una agencia/empresa asignada. Contacta a tu administrador.']);
+                break;
+            }
+            [$logo, $logoError] = guardarLogoAgencia($_FILES['logo'] ?? null, $uploadDir);
+            if ($logoError) {
+                http_response_code(400);
+                echo json_encode(['error' => $logoError]);
+                break;
+            }
+            if (!$logo) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No se recibió ningún logo.']);
+                break;
+            }
+            $stmt = $db->prepare("SELECT logo FROM agencias WHERE id = ?");
+            $stmt->execute([$id]);
+            $anterior = $stmt->fetchColumn();
+            $db->prepare("UPDATE agencias SET logo = ? WHERE id = ?")->execute([$logo, $id]);
+            if ($anterior && file_exists($uploadDir . $anterior)) {
+                @unlink($uploadDir . $anterior);
+            }
+            echo json_encode(['success' => true, 'filename' => $logo, 'v' => filemtime($uploadDir . $logo)]);
+            break;
+
+        // Color de marca (color_principal) de MI agencia, autoservicio instantáneo desde
+        // el botón de cuentagotas del Hero. Aplica en vivo a --accent-1/--accent-2 en el
+        // navegador (ver hero-edit.js) y, en las siguientes cargas de página, server-side
+        // vía resolverAccentColorStyle() (agencia-helpers.php).
+        case 'guardar-color':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $id = resolverAgenciaPropiaId($db);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No tienes una agencia/empresa asignada. Contacta a tu administrador.']);
+                break;
+            }
+            $color = trim($_POST['color_principal'] ?? '');
+            if (!preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Color inválido.']);
+                break;
+            }
+            $db->prepare("UPDATE agencias SET color_principal = ? WHERE id = ?")->execute([$color, $id]);
+            echo json_encode(['success' => true, 'color_principal' => $color]);
+            break;
+
         default:
             http_response_code(404);
             echo json_encode(['error' => 'Ruta no encontrada']);
