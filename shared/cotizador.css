@@ -16,6 +16,16 @@ body {
     box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
 }
 .input { appearance: none; }
+/* Mismo alto/borde que el selector en cascada de Tour/Alojamiento (.cascade-select-trigger
+   en cascade-select.css), para que todos los campos de una fila de Actividades/Hoteles
+   midan igual — si no, el selector (padding 6px, radius 8px) queda más alto/redondeado
+   que los <input> comunes (py-1 de Tailwind = 4px, rounded = 4px). */
+#tours-table .input,
+#hotels-table .input {
+    padding: 6px 8px;
+    border-radius: 8px;
+    border-color: #cbd5e1;
+}
 .draggable { cursor: grab; }
 tr.draggable:active { cursor: grabbing; }
 .handle {

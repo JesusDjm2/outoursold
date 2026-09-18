@@ -143,13 +143,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     <tr>
                                         <th class="w-8 pl-2">&nbsp;</th>
                                         <th class="w-40">Fecha</th>
-                                        <th class="w-[32%]">Tour / Actividad</th>
-                                        <th class="w-24">Cant.</th>
+                                        <th class="w-full">Tour / Actividad</th>
+                                        <th class="w-16">Cant.</th>
                                         <th class="w-24">Distr.</th>
                                         <th class="w-24" hidden>P.Reg</th>
                                         <th class="w-24" hidden>P.Promo</th>
-                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
-                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
+                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
+                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
                                         <th class="w-28">Total Línea</th>
                                         <th class="w-12 pr-2">Acc.</th>
                                     </tr>
