@@ -642,26 +642,146 @@ function renderCategorias() {
     }
 }
 
+// ===== Asignaciones de una categoría (ver y editar desde Destinos y Categorías) =====
+// Categorías abiertas ("tipo:id"), para que sigan desplegadas tras cada re-render.
+const categoriasExpandidas = new Set();
+
+// Elementos de cada catálogo en forma común {id, nombre, destino_id, categoria_id, idioma?}.
+// Un módulo de itinerario existe una vez por idioma, así que puede repetirse su título.
+function listaElementos(tipo) {
+    if (tipo === 'tours') return toursData.map(t => ({ id: t.id, nombre: t.tour, destino_id: t.destino_id, categoria_id: t.categoria_id }));
+    if (tipo === 'hoteles') return hotelsData.map(h => ({ id: h.id, nombre: h.aloj, destino_id: h.destino_id, categoria_id: h.categoria_id }));
+    return IDIOMAS_ITIN.flatMap(idioma => modulosItinTodos[idioma].map(m => ({ id: m.id, nombre: m.titulo, destino_id: m.destino_id, categoria_id: m.categoria_id, idioma })));
+}
+
+// Guarda de inmediato el destino/categoría de UN elemento (mismos endpoints de clasificación
+// en lote que usan las tablas de Tours/Hoteles/Módulos, con un solo cambio) y refresca.
+// Sin aviso de éxito a propósito: el propio panel actualizándose ya lo muestra, y un
+// Swal.fire() por cada movimiento haría tedioso reasignar varios.
+async function asignarElemento(tipo, elemento, destinoId, categoriaId) {
+    const cambios = [{ id: elemento.id, destino_id: destinoId, categoria_id: categoriaId }];
+    const url = tipo === 'itinerarios'
+        ? `${ITINERARIO_API_BASE}api.php?path=guardar-clasificaciones-modulos&idioma=${elemento.idioma}`
+        : `${API_URL}?path=${tipo === 'tours' ? 'guardar-clasificaciones-tours' : 'guardar-clasificaciones-hoteles'}`;
+    try {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cambios }) });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        if (tipo === 'tours') await refrescarTours();
+        else if (tipo === 'hoteles') await refrescarHoteles();
+        else {
+            await recargarModulosIdioma(elemento.idioma);
+            await refrescarModulosItinerario();
+        }
+        renderDestinos();
+    } catch (e) {
+        notifyError('Error al cambiar la asignación: ' + e.message);
+    }
+}
+
+const crearNodo = (tag, clase, texto) => {
+    const nodo = document.createElement(tag);
+    if (clase) nodo.className = clase;
+    if (texto != null) nodo.textContent = texto;
+    return nodo;
+};
+
+function construirPanelAsignaciones(tipo, c) {
+    const t = CATEGORIA_TIPOS[tipo];
+    const todos = listaElementos(tipo);
+    const asignados = todos.filter(x => Number(x.categoria_id) === c.id).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const otrasCategorias = t.getDataset().filter(x => x.destino_id === c.destino_id && x.id !== c.id).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const etiqueta = (x) => x.idioma ? `${x.nombre} [${x.idioma.toUpperCase()}]` : x.nombre;
+    const nombreCategoria = (id) => t.getDataset().find(x => x.id === Number(id))?.nombre;
+
+    const panel = crearNodo('div', 'categoria-asignados ml-4 mt-1 mb-2 p-3 rounded-lg bg-slate-50 border');
+    panel.appendChild(crearNodo('div', 'text-xs font-semibold text-slate-600 mb-2', `Asignados a "${c.nombre}" (${asignados.length})`));
+
+    if (asignados.length === 0) {
+        panel.appendChild(crearNodo('p', 'text-sm text-slate-400 mb-2', `Todavía no hay ${t.sustantivo[1]} en esta categoría.`));
+    } else {
+        const ul = crearNodo('ul', 'space-y-1 mb-3');
+        asignados.forEach(x => {
+            const li = crearNodo('li', 'flex items-center justify-between gap-2 text-sm');
+            li.appendChild(crearNodo('span', 'min-w-0 truncate', etiqueta(x)));
+            const mover = crearNodo('select', 'rounded-md small border px-2 py-0.5 shrink-0');
+            mover.title = 'Mover a otra categoría de este destino, o quitarlo de esta';
+            mover.appendChild(new Option('Mover a…', ''));
+            mover.appendChild(new Option('— Quitar de esta categoría —', '__quitar__'));
+            otrasCategorias.forEach(oc => mover.appendChild(new Option(oc.nombre, String(oc.id))));
+            mover.addEventListener('change', () => {
+                if (!mover.value) return;
+                asignarElemento(tipo, x, c.destino_id, mover.value === '__quitar__' ? null : Number(mover.value));
+            });
+            li.appendChild(mover);
+            ul.appendChild(li);
+        });
+        panel.appendChild(ul);
+    }
+
+    // Candidatos a sumar: los del mismo destino (sin categoría primero) y los aún sin
+    // destino — a estos se les asigna también el destino de la categoría.
+    const candidatos = todos.filter(x => Number(x.categoria_id) !== c.id && (Number(x.destino_id) === c.destino_id || x.destino_id == null));
+    if (candidatos.length) {
+        const grupos = [
+            ['Sin categoría en este destino', candidatos.filter(x => Number(x.destino_id) === c.destino_id && x.categoria_id == null)],
+            ['En otras categorías de este destino', candidatos.filter(x => Number(x.destino_id) === c.destino_id && x.categoria_id != null)],
+            ['Sin destino (se les asignará también este destino)', candidatos.filter(x => x.destino_id == null)]
+        ];
+        const agregar = crearNodo('select', 'rounded-md small border px-2 py-1 w-full');
+        agregar.appendChild(new Option('+ Agregar a esta categoría…', ''));
+        grupos.forEach(([titulo, items]) => {
+            if (!items.length) return;
+            const og = document.createElement('optgroup');
+            og.label = titulo;
+            items.sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(x => {
+                const actual = x.categoria_id != null ? nombreCategoria(x.categoria_id) : null;
+                const opt = new Option(etiqueta(x) + (actual ? ` (en ${actual})` : ''), '');
+                opt.dataset.clave = `${x.idioma || ''}:${x.id}`;
+                og.appendChild(opt);
+            });
+            agregar.appendChild(og);
+        });
+        agregar.addEventListener('change', () => {
+            const clave = agregar.selectedOptions[0]?.dataset.clave;
+            if (!clave) return;
+            const x = candidatos.find(y => `${y.idioma || ''}:${y.id}` === clave);
+            if (x) asignarElemento(tipo, x, c.destino_id, c.id);
+        });
+        panel.appendChild(agregar);
+    }
+    return panel;
+}
+
 function buildCategoriaRow(tipo, c) {
+    const t = CATEGORIA_TIPOS[tipo];
+    const clave = `${tipo}:${c.id}`;
+    const abierta = categoriasExpandidas.has(clave);
+    const wrapper = document.createElement('div');
+    wrapper.className = 'categoria-bloque';
     const div = document.createElement('div');
     div.className = 'categoria-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg';
-    const t = CATEGORIA_TIPOS[tipo];
     const cuenta = t.items(enCategoria(c.id));
     const noun = t.sustantivo[cuenta.total === 1 ? 0 : 1];
     div.innerHTML = `
         <span class="min-w-0 truncate">${c.nombre} <span class="text-xs text-slate-400">· ${c.creado_por_nombre || '—'}</span></span>
         <div class="flex items-center gap-2 shrink-0">
-            <span class="conteo-chip${cuenta.total === 0 ? ' is-cero' : ''}" title="${cuenta.desglose || ''}"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}</span>
+            <button type="button" class="conteo-chip categoria-ver-btn${cuenta.total === 0 ? ' is-cero' : ''}" title="${cuenta.desglose ? cuenta.desglose + ' — ' : ''}Ver y editar sus asignaciones"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}<i class="fas fa-chevron-${abierta ? 'up' : 'down'}"></i></button>
             <div class="flex items-center gap-1 shrink-0">
-                <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
-                <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+                <button class="text-slate-400 hover:text-slate-700 p-1 categoria-editar-btn" title="Editar"><i class="fas fa-pen text-xs"></i></button>
+                <button class="text-red-400 hover:text-red-600 p-1 categoria-eliminar-btn" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
             </div>
         </div>
     `;
-    const [editBtn, delBtn] = div.querySelectorAll('button');
-    editBtn.addEventListener('click', () => div.replaceWith(buildCategoriaEditRow(tipo, c)));
-    delBtn.addEventListener('click', () => eliminarCategoria(tipo, c));
-    return div;
+    div.querySelector('.categoria-ver-btn').addEventListener('click', () => {
+        if (categoriasExpandidas.has(clave)) categoriasExpandidas.delete(clave); else categoriasExpandidas.add(clave);
+        renderCategorias();
+    });
+    div.querySelector('.categoria-editar-btn').addEventListener('click', () => wrapper.replaceWith(buildCategoriaEditRow(tipo, c)));
+    div.querySelector('.categoria-eliminar-btn').addEventListener('click', () => eliminarCategoria(tipo, c));
+    wrapper.appendChild(div);
+    if (abierta) wrapper.appendChild(construirPanelAsignaciones(tipo, c));
+    return wrapper;
 }
 
 function buildCategoriaEditRow(tipo, c) {

@@ -88,6 +88,13 @@ async function obtenerModulosIdioma(idioma) {
     if (idiomaCache[idioma]) return idiomaCache[idioma].modules;
     return fetch(`${ITINERARIO_API_BASE}api.php?path=modulos&idioma=${idioma}`).then(r => r.json());
 }
+// Tras reasignar módulos desde Destinos y Categorías: si ese idioma ya estaba cargado se
+// refresca su catálogo (armador, tablas de módulos) para que no muestre la clasificación vieja.
+async function recargarModulosIdioma(idioma) {
+    if (!idiomaCache[idioma]) return;
+    await cargarIdioma(idioma);
+    if (idioma === idiomaActivo) renderModulosTable();
+}
 async function refrescarCategoriasItinerario() {
     itinCategoriasData = await fetch(`${ITINERARIO_API_BASE}api.php?path=categorias-itinerarios`).then(r => r.json());
 }
