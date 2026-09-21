@@ -36,6 +36,9 @@ let categoriasHotelesData = [];
 let paisesData = []; // {id, nombre, codigo_telefono} — catálogo global (shared/migrations/027_...)
 let destinoSeleccionadoId = null;
 let categoriaTipoActivo = 'tours';
+// Módulos de itinerario de los 3 idiomas, solo para contar por destino/categoría en
+// Gestión de Datos > Destinos y Categorías (los cataloga itinerario.js, uno por idioma).
+let modulosItinTodos = { es: [], en: [], pt: [] };
 let cotizaciones = {};
 let currentCotizacionId = null;
 let toursFilter = '';
@@ -180,6 +183,7 @@ function irASubtabGestion(subtab) {
     contenedor.querySelectorAll('.subnav-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
     contenedor.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
+    if (subtab === 'clasificacion') actualizarConteosItinerarios();
 }
 
 // Llena un <select> de Destino (mismo catálogo para tours y hoteles).
@@ -428,29 +432,102 @@ function renderDestinos() {
     renderGestionResumen();
 }
 
-// Cuántas categorías (de Tours y de Hoteles) tiene ya este destino — ayuda a ver de un
-// vistazo dónde falta clasificar, sin tener que entrar a revisar uno por uno.
-function resumenCategoriasDestino(destinoId) {
-    const nTours = categoriasData.filter(c => c.destino_id === destinoId).length;
-    const nHoteles = categoriasHotelesData.filter(c => c.destino_id === destinoId).length;
-    if (nTours === 0 && nHoteles === 0) return 'Sin categorías';
-    const partes = [];
-    if (nTours > 0) partes.push(`${nTours} tour${nTours === 1 ? '' : 's'}`);
-    if (nHoteles > 0) partes.push(`${nHoteles} hotel${nHoteles === 1 ? '' : 'es'}`);
-    return partes.join(' · ');
+const IDIOMAS_ITIN = ['es', 'en', 'pt'];
+
+async function refrescarModulosItinerario() {
+    try {
+        const listas = await Promise.all(IDIOMAS_ITIN.map(obtenerModulosIdioma));
+        IDIOMAS_ITIN.forEach((idioma, i) => { modulosItinTodos[idioma] = Array.isArray(listas[i]) ? listas[i] : []; });
+    } catch (e) {
+        console.error('Error al cargar módulos de itinerario para los conteos:', e);
+    }
+}
+
+// Los conteos de itinerarios cambian al editar módulos en la pestaña Itinerario, así que
+// se refrescan cada vez que se entra a Destinos y Categorías.
+async function actualizarConteosItinerarios() {
+    await refrescarModulosItinerario();
+    renderDestinos();
+}
+
+// Un módulo de itinerario existe una vez por idioma (mismo destino en ES/EN/PT): el total
+// suma los 3 y el desglose por idioma va en el tooltip para no confundir.
+function contarModulosItin(predicado) {
+    const porIdioma = {};
+    let total = 0;
+    IDIOMAS_ITIN.forEach(idioma => {
+        porIdioma[idioma] = modulosItinTodos[idioma].filter(predicado).length;
+        total += porIdioma[idioma];
+    });
+    return { total, desglose: IDIOMAS_ITIN.map(i => `${NOMBRES_IDIOMA[i]}: ${porIdioma[i]}`).join(' · ') };
+}
+
+// `items(predicado)` cuenta los elementos de cada catálogo que cumplen el predicado (por
+// destino_id o categoria_id) y devuelve {total, desglose?}; `getDataset` son sus categorías.
+const CATEGORIA_TIPOS = {
+    tours: {
+        label: 'Actividades',
+        sustantivo: ['actividad', 'actividades'],
+        icono: 'fa-person-hiking',
+        getDataset: () => categoriasData,
+        apiBase: () => API_URL,
+        apiGuardar: 'guardar-categoria',
+        apiEliminar: 'eliminar-categoria',
+        items: (pred) => ({ total: toursData.filter(pred).length })
+    },
+    hoteles: {
+        label: 'Hoteles',
+        sustantivo: ['hotel', 'hoteles'],
+        icono: 'fa-hotel',
+        getDataset: () => categoriasHotelesData,
+        apiBase: () => API_URL,
+        apiGuardar: 'guardar-categoria-hotel',
+        apiEliminar: 'eliminar-categoria-hotel',
+        items: (pred) => ({ total: hotelsData.filter(pred).length })
+    },
+    itinerarios: {
+        label: 'Itinerarios',
+        sustantivo: ['módulo', 'módulos'],
+        icono: 'fa-route',
+        getDataset: () => itinCategoriasData,
+        apiBase: () => `${ITINERARIO_API_BASE}api.php`,
+        apiGuardar: 'guardar-categoria-itinerario',
+        apiEliminar: 'eliminar-categoria-itinerario',
+        items: (pred) => contarModulosItin(pred)
+    }
+};
+
+const enDestino = (destinoId) => (x) => Number(x.destino_id) === destinoId;
+const enCategoria = (categoriaId) => (x) => Number(x.categoria_id) === categoriaId;
+
+function chipConteo(icono, titulo, n, desglose) {
+    return `<span class="conteo-chip${n === 0 ? ' is-cero' : ''}" title="${titulo}${desglose ? ' — ' + desglose : ''}"><i class="fas ${icono}"></i>${n}</span>`;
+}
+
+// Cuántas actividades, hoteles e itinerarios (módulos) tiene ya este destino, y cuántas
+// categorías — para ver de un vistazo dónde hay contenido y dónde falta clasificar.
+function resumenDestino(destinoId) {
+    const chips = Object.values(CATEGORIA_TIPOS).map(t => {
+        const c = t.items(enDestino(destinoId));
+        return chipConteo(t.icono, t.label, c.total, c.desglose);
+    }).join('');
+    const nCategorias = Object.values(CATEGORIA_TIPOS).reduce((n, t) => n + t.getDataset().filter(c => c.destino_id === destinoId).length, 0);
+    return { chips, categorias: nCategorias === 0 ? 'Sin categorías' : `${nCategorias} categoría${nCategorias === 1 ? '' : 's'}` };
 }
 
 function buildDestinoRow(d) {
     const div = document.createElement('div');
     div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === destinoSeleccionadoId ? 'active' : ''}`;
     div.title = 'Ver categorías de este destino';
+    const resumen = resumenDestino(d.id);
     div.innerHTML = `
         <div class="min-w-0">
             <div class="flex items-center gap-1.5">
                 <i class="fas fa-chevron-right text-xs text-slate-300"></i>
                 <span class="destino-nombre font-medium truncate">${d.nombre}</span>
             </div>
-            <div class="text-xs text-slate-400 pl-4">${resumenCategoriasDestino(d.id)} · ${d.creado_por_nombre || '—'}</div>
+            <div class="pl-4 mt-1 flex flex-wrap gap-1">${resumen.chips}</div>
+            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias} · ${d.creado_por_nombre || '—'}</div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
             <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
@@ -528,32 +605,22 @@ async function eliminarDestino(d) {
     }
 }
 
-// Categorías de Tours y de Hoteles son catálogos separados (evita mezclar "City Tour" con
-// "Hotel Boutique"), pero comparten Destino y la misma UI de gestión — un interruptor cambia
-// cuál de los dos catálogos se está viendo/editando para el destino seleccionado.
-const CATEGORIA_TIPOS = {
-    tours: {
-        label: 'Tours',
-        getDataset: () => categoriasData,
-        apiGuardar: 'guardar-categoria',
-        apiEliminar: 'eliminar-categoria'
-    },
-    hoteles: {
-        label: 'Hoteles',
-        getDataset: () => categoriasHotelesData,
-        apiGuardar: 'guardar-categoria-hotel',
-        apiEliminar: 'eliminar-categoria-hotel'
-    }
-};
-
+// Categorías de Actividades, Hoteles e Itinerarios son catálogos separados (evita mezclar
+// "City Tour" con "Hotel Boutique"), pero comparten Destino y la misma UI de gestión — un
+// interruptor cambia cuál de los tres catálogos se está viendo/editando para el destino
+// seleccionado (ver CATEGORIA_TIPOS más arriba).
 function renderCategorias() {
     const listEl = document.getElementById('categorias-table-body');
     const sinDestino = document.getElementById('categorias-sin-destino');
     const tableWrap = document.getElementById('categorias-table-wrap');
     const destino = destinosData.find(d => d.id === destinoSeleccionadoId);
     document.getElementById('categorias-destino-actual').textContent = destino ? `· ${destino.nombre}` : '';
+    // Cada pestaña muestra cuántos elementos de ese tipo tiene el destino elegido.
     document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
+        const t = CATEGORIA_TIPOS[btn.dataset.categoriaTipo];
         btn.classList.toggle('active', btn.dataset.categoriaTipo === categoriaTipoActivo);
+        const badge = destino ? `<span class="conteo-badge" title="${t.items(enDestino(destino.id)).desglose || ''}">${t.items(enDestino(destino.id)).total}</span>` : '';
+        btn.innerHTML = `${t.label}${badge}`;
     });
     if (!destino) {
         listEl.innerHTML = '';
@@ -578,11 +645,17 @@ function renderCategorias() {
 function buildCategoriaRow(tipo, c) {
     const div = document.createElement('div');
     div.className = 'categoria-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg';
+    const t = CATEGORIA_TIPOS[tipo];
+    const cuenta = t.items(enCategoria(c.id));
+    const noun = t.sustantivo[cuenta.total === 1 ? 0 : 1];
     div.innerHTML = `
         <span class="min-w-0 truncate">${c.nombre} <span class="text-xs text-slate-400">· ${c.creado_por_nombre || '—'}</span></span>
-        <div class="flex items-center gap-1 shrink-0">
-            <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
-            <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+        <div class="flex items-center gap-2 shrink-0">
+            <span class="conteo-chip${cuenta.total === 0 ? ' is-cero' : ''}" title="${cuenta.desglose || ''}"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}</span>
+            <div class="flex items-center gap-1 shrink-0">
+                <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
+                <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
+            </div>
         </div>
     `;
     const [editBtn, delBtn] = div.querySelectorAll('button');
@@ -609,7 +682,7 @@ function buildCategoriaEditRow(tipo, c) {
 async function guardarCategoria(tipo, payload) {
     if (!payload.nombre) { notifyError('El nombre de la categoría es obligatorio.'); return false; }
     try {
-        const res = await fetch(`${API_URL}?path=${CATEGORIA_TIPOS[tipo].apiGuardar}`, {
+        const res = await fetch(`${CATEGORIA_TIPOS[tipo].apiBase()}?path=${CATEGORIA_TIPOS[tipo].apiGuardar}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -626,16 +699,19 @@ async function guardarCategoria(tipo, payload) {
 }
 
 async function eliminarCategoria(tipo, c) {
-    const dataset = tipo === 'hoteles' ? hotelsData : toursData;
-    const n = dataset.filter(x => x.categoria_id === c.id).length;
-    let mensaje = `¿Eliminar la categoría "${c.nombre}"?`;
-    if (n) {
-        const sustantivo = tipo === 'hoteles' ? `hotel${n === 1 ? '' : 'es'}` : `tour${n === 1 ? '' : 's'}`;
-        mensaje += ` Quedarían ${n} ${sustantivo} sin categoría asignada.`;
+    const t = CATEGORIA_TIPOS[tipo];
+    const n = t.items(enCategoria(c.id)).total;
+    // Las categorías de itinerario no se pueden borrar con módulos dentro (lo rechaza el
+    // servidor): se avisa de entrada en vez de dejar que falle después de confirmar.
+    if (tipo === 'itinerarios' && n) {
+        notifyWarning(`No se puede eliminar "${c.nombre}": tiene ${n} ${t.sustantivo[n === 1 ? 0 : 1]} asociados. Reasígnalos a otra categoría primero.`);
+        return;
     }
+    let mensaje = `¿Eliminar la categoría "${c.nombre}"?`;
+    if (n) mensaje += ` Quedarían ${n} ${t.sustantivo[n === 1 ? 0 : 1]} sin categoría asignada.`;
     if (!await confirmAction(mensaje)) return;
     try {
-        const res = await fetch(`${API_URL}?path=${CATEGORIA_TIPOS[tipo].apiEliminar}`, {
+        const res = await fetch(`${t.apiBase()}?path=${t.apiEliminar}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: c.id })
@@ -653,11 +729,15 @@ async function refrescarDestinosCategorias() {
     const [destinosRes, categoriasRes, categoriasHotelesRes] = await Promise.all([
         fetch(`${API_URL}?path=destinos`).then(r => r.json()),
         fetch(`${API_URL}?path=categorias`).then(r => r.json()),
-        fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json())
+        fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json()),
+        refrescarCategoriasItinerario(),
+        refrescarModulosItinerario()
     ]);
     destinosData = destinosRes;
     categoriasData = categoriasRes;
     categoriasHotelesData = categoriasHotelesRes;
+    // Itinerario guarda su propia referencia a la lista de destinos (itinDestinosData).
+    itinDestinosData = destinosData;
     renderDestinos();
     renderTourNewDestinoCategoria();
     renderHotelNewDestinoCategoria();
@@ -2324,6 +2404,7 @@ async function init() {
     // fijo de la página standalone — y de ahí en más lo sigue en vivo (ver el listener
     // del <select name="idioma"> más abajo).
     await initItinerario(document.querySelector('select[name="idioma"]').value || 'es');
+    actualizarConteosItinerarios();
     nuevaCotizacion(false);
 
     document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -2333,6 +2414,7 @@ async function init() {
             tab.classList.add('active');
             document.getElementById(`${tab.dataset.tab}-section`).classList.remove('hidden');
             if (tab.dataset.tab === 'cotizaciones') cargarCotizacionesGuardadas();
+            if (tab.dataset.tab === 'gestion') actualizarConteosItinerarios();
         });
     });
 

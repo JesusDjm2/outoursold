@@ -500,7 +500,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             <div id="gestion-clasificacion" class="subtab-content">
                 <div class="card p-6">
                     <h2 class="text-xl font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
-                    <p class="text-sm text-slate-500 mb-4">Elige un destino a la izquierda para ver y gestionar sus categorías de Tours y de Hoteles.</p>
+                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántos de cada uno tiene; elige uno a la izquierda para ver y gestionar sus categorías (y cuántos elementos hay en cada una).</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div class="md:col-span-4 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
@@ -514,8 +514,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <div class="flex items-center gap-3 mb-3 flex-wrap">
                                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
                                 <div class="flex gap-1 bg-slate-100 rounded-lg p-1 ml-auto">
-                                    <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Tours</button>
+                                    <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Actividades</button>
                                     <button class="categoria-tipo-tab" data-categoria-tipo="hoteles">Hoteles</button>
+                                    <button class="categoria-tipo-tab" data-categoria-tipo="itinerarios">Itinerarios</button>
                                 </div>
                             </div>
                             <p id="categorias-sin-destino" class="text-sm text-slate-500 hidden">Crea un destino para empezar a agregar categorías.</p>

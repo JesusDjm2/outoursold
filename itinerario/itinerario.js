@@ -81,6 +81,17 @@ async function cargarDestinosYCategorias() {
     }
 }
 
+// Para Gestión de Datos > Destinos y Categorías (shared/cotizador.js), que cuenta cuántos
+// módulos hay por destino/categoría en los 3 idiomas: usa el catálogo ya cacheado del
+// idioma si lo hay, o si no pide solo los módulos (sin cargar el resto del idioma).
+async function obtenerModulosIdioma(idioma) {
+    if (idiomaCache[idioma]) return idiomaCache[idioma].modules;
+    return fetch(`${ITINERARIO_API_BASE}api.php?path=modulos&idioma=${idioma}`).then(r => r.json());
+}
+async function refrescarCategoriasItinerario() {
+    itinCategoriasData = await fetch(`${ITINERARIO_API_BASE}api.php?path=categorias-itinerarios`).then(r => r.json());
+}
+
 // Crea una nueva categoría de itinerario (propia, separada de las de Tours) para el
 // destino indicado, la agrega a itinCategoriasData y devuelve su id. null si se cancela.
 async function crearCategoriaItinerario(destinoId) {
