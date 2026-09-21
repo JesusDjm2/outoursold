@@ -451,16 +451,42 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="gestion-paquetes" class="subtab-content hidden">
                 <div id="paquetes-sin-tours-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
-                    <span><i class="fas fa-circle-info mr-1"></i>Aún no hay tours en el catálogo. Agrega uno primero para poder armar paquetes con ellos.</span>
+                    <span><i class="fas fa-circle-info mr-1"></i>Aún no hay tours en el catálogo. Agrega uno primero para poder incluir actividades en tus paquetes.</span>
                     <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear tour →</button>
                 </div>
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Paquete de Tours</h2>
-                    <p class="text-sm text-slate-500 mb-4">Guarda una combinación de tours para insertarla completa en "Data Tours" de un clic.</p>
-                    <input id="paquete-nombre" class="input w-full rounded px-3 py-2 border mb-3" type="text" placeholder="Nombre del paquete (ej. Cusco 4 días)">
-                    <div id="paquete-builder-rows" class="space-y-2 mb-3"></div>
+                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Paquete</h2>
+                    <p class="text-sm text-slate-500 mb-4">Combina Actividades, Hoteles e Itinerario en un solo paquete para aplicarlo completo a una cotización de un clic. Alcanza con que tenga al menos una de las tres partes.</p>
+                    <input id="paquete-nombre" class="input w-full rounded px-3 py-2 border mb-4" type="text" placeholder="Nombre del paquete (ej. Cusco 4 días)">
+
+                    <div class="mb-4">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2"><i class="fas fa-person-hiking mr-1"></i>Actividades</h3>
+                        <div id="paquete-builder-rows" class="space-y-2 mb-2"></div>
+                        <button id="paquete-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Actividad</button>
+                    </div>
+
+                    <div class="mb-4">
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2"><i class="fas fa-hotel mr-1"></i>Hoteles</h3>
+                        <div id="paquete-hoteles-rows" class="space-y-2 mb-2"></div>
+                        <button id="paquete-hotel-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Hotel</button>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+                            <h3 class="text-sm font-semibold text-slate-700"><i class="fas fa-route mr-1"></i>Itinerario</h3>
+                            <label class="text-xs text-slate-500 flex items-center gap-2">Idioma del itinerario
+                                <select id="paquete-itin-idioma" class="rounded-md small border px-2 py-1">
+                                    <option value="es">Español</option>
+                                    <option value="en">English</option>
+                                    <option value="pt">Português</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="paquete-itin-rows" class="space-y-2 mb-2"></div>
+                        <button id="paquete-itin-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Módulo</button>
+                    </div>
+
                     <div class="flex flex-wrap gap-2">
-                        <button id="paquete-add-row" class="btn border"><i class="fas fa-plus mr-1"></i>Agregar Tour</button>
                         <button id="paquete-guardar" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Guardar Paquete</button>
                         <button id="paquete-cancelar-edicion" class="btn border hidden"><i class="fas fa-times mr-1"></i>Cancelar edición</button>
                     </div>

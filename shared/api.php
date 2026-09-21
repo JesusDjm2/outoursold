@@ -475,11 +475,22 @@ try {
             break;
 
         case 'paquetes-tours':
-            $stmt = $db->prepare("SELECT id, nombre, tours FROM $tablaPaquetesTours WHERE creado_por = ? ORDER BY nombre");
-            $stmt->execute([$_SESSION['user_id']]);
+            // Si la migración 030 (columnas hoteles/itinerario) todavía no se aplicó en esta
+            // base, se cae al SELECT anterior en vez de romper el arranque del Cotizador
+            // (que pide los paquetes al cargar): siguen funcionando como paquetes de solo tours.
+            try {
+                $stmt = $db->prepare("SELECT id, nombre, tours, hoteles, itinerario FROM $tablaPaquetesTours WHERE creado_por = ? ORDER BY nombre");
+                $stmt->execute([$_SESSION['user_id']]);
+            } catch (PDOException $e) {
+                $stmt = $db->prepare("SELECT id, nombre, tours, NULL AS hoteles, NULL AS itinerario FROM $tablaPaquetesTours WHERE creado_por = ? ORDER BY nombre");
+                $stmt->execute([$_SESSION['user_id']]);
+            }
             $paquetes = [];
             while ($row = $stmt->fetch()) {
-                $row['tours'] = json_decode($row['tours'], true);
+                $row['tours'] = json_decode($row['tours'], true) ?: [];
+                // Paquetes anteriores a la migración 030 (solo tours) traen NULL en estas dos.
+                $row['hoteles'] = $row['hoteles'] ? (json_decode($row['hoteles'], true) ?: []) : [];
+                $row['itinerario'] = $row['itinerario'] ? json_decode($row['itinerario'], true) : null;
                 $paquetes[] = $row;
             }
             echo json_encode($paquetes);
@@ -493,28 +504,49 @@ try {
             }
             $data = json_decode(file_get_contents('php://input'), true);
             $nombre = trim($data['nombre'] ?? '');
-            $tours = $data['tours'] ?? [];
+            $tours = is_array($data['tours'] ?? null) ? $data['tours'] : [];
+            $hoteles = is_array($data['hoteles'] ?? null) ? $data['hoteles'] : [];
+            $itinerario = is_array($data['itinerario'] ?? null) ? $data['itinerario'] : null;
             if ($nombre === '') {
                 http_response_code(400);
                 echo json_encode(['error' => 'El nombre del paquete es obligatorio']);
                 break;
             }
-            if (!is_array($tours) || count($tours) === 0) {
+            // Un paquete puede combinar Actividades, Hoteles e Itinerario; alcanza con que
+            // tenga al menos uno de los tres.
+            $tours = array_values(array_filter(array_map(function ($t) {
+                return ['tour' => trim($t['tour'] ?? ''), 'cant' => floatval($t['cant'] ?? 1)];
+            }, $tours), fn($t) => $t['tour'] !== ''));
+            $hoteles = array_values(array_filter(array_map(function ($h) {
+                return [
+                    'aloj' => trim($h['aloj'] ?? ''),
+                    'nhab' => max(1, intval($h['nhab'] ?? 1)),
+                    'noches' => max(1, intval($h['noches'] ?? 1))
+                ];
+            }, $hoteles), fn($h) => $h['aloj'] !== ''));
+            $modulos = $itinerario ? array_values(array_filter(array_map('strval', $itinerario['modulos'] ?? []))) : [];
+            $idiomaItinerario = $itinerario['idioma'] ?? '';
+            if ($modulos && !in_array($idiomaItinerario, ['es', 'en', 'pt'], true)) {
                 http_response_code(400);
-                echo json_encode(['error' => 'El paquete necesita al menos un tour']);
+                echo json_encode(['error' => 'Idioma del itinerario inválido']);
                 break;
             }
-            $toursJson = json_encode(array_values(array_map(function ($t) {
-                return ['tour' => trim($t['tour'] ?? ''), 'cant' => floatval($t['cant'] ?? 1)];
-            }, $tours)), JSON_UNESCAPED_UNICODE);
+            if (!$tours && !$hoteles && !$modulos) {
+                http_response_code(400);
+                echo json_encode(['error' => 'El paquete necesita al menos una actividad, un hotel o un módulo de itinerario']);
+                break;
+            }
+            $toursJson = json_encode($tours, JSON_UNESCAPED_UNICODE);
+            $hotelesJson = $hoteles ? json_encode($hoteles, JSON_UNESCAPED_UNICODE) : null;
+            $itinerarioJson = $modulos ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos], JSON_UNESCAPED_UNICODE) : null;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaPaquetesTours, $data['id'])) break;
-                $stmt = $db->prepare("UPDATE $tablaPaquetesTours SET nombre = ?, tours = ? WHERE id = ?");
-                $stmt->execute([$nombre, $toursJson, $data['id']]);
+                $stmt = $db->prepare("UPDATE $tablaPaquetesTours SET nombre = ?, tours = ?, hoteles = ?, itinerario = ? WHERE id = ?");
+                $stmt->execute([$nombre, $toursJson, $hotelesJson, $itinerarioJson, $data['id']]);
                 echo json_encode(['success' => true, 'id' => $data['id']]);
             } else {
-                $stmt = $db->prepare("INSERT INTO $tablaPaquetesTours (nombre, tours, creado_por) VALUES (?, ?, ?)");
-                $stmt->execute([$nombre, $toursJson, $_SESSION['user_id']]);
+                $stmt = $db->prepare("INSERT INTO $tablaPaquetesTours (nombre, tours, hoteles, itinerario, creado_por) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$nombre, $toursJson, $hotelesJson, $itinerarioJson, $_SESSION['user_id']]);
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
             }
             break;

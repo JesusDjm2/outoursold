@@ -857,12 +857,110 @@ function agregarFilaPaquete(data = {}) {
     document.getElementById('paquete-builder-rows').appendChild(row);
 }
 
-function resetPaqueteBuilder() {
+function agregarFilaPaqueteHotel(data = {}) {
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center paquete-hotel-row';
+
+    const hotelInput = document.createElement('input');
+    hotelInput.type = 'hidden';
+    hotelInput.className = 'paquete-hotel-aloj';
+    hotelInput.value = data.aloj || '';
+
+    const selector = buildHotelSelector(data.aloj || '', (alojNombre) => {
+        hotelInput.value = alojNombre;
+    });
+    selector.classList.add('flex-1');
+
+    const numInput = (clase, valor, titulo) => {
+        const input = document.createElement('input');
+        input.className = `input rounded px-2 py-1 border text-right ${clase}`;
+        input.type = 'number';
+        input.min = '1';
+        input.value = valor;
+        input.title = titulo;
+        input.style.width = '80px';
+        return input;
+    };
+    const nhabInput = numInput('paquete-hotel-nhab', data.nhab || 1, 'Nº de habitaciones');
+    const nochesInput = numInput('paquete-hotel-noches', data.noches || 1, 'Noches');
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-500 small';
+    delBtn.title = 'Quitar';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', () => row.remove());
+
+    const etiqueta = (texto) => {
+        const span = document.createElement('span');
+        span.className = 'text-xs text-slate-500';
+        span.textContent = texto;
+        return span;
+    };
+    row.append(selector, hotelInput, etiqueta('Hab.'), nhabInput, etiqueta('Noches'), nochesInput, delBtn);
+    document.getElementById('paquete-hoteles-rows').appendChild(row);
+}
+
+// Itinerario del paquete: idioma propio (select #paquete-itin-idioma), y los módulos salen
+// del catálogo de ESE idioma (helpers en itinerario.js) — no del idioma activo de la cotización.
+let paqueteItinIdiomaActual = null;
+
+async function agregarFilaPaqueteItin(filename = '') {
+    const idioma = document.getElementById('paquete-itin-idioma').value;
+    await asegurarIdiomaCargado(idioma);
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center paquete-itin-row';
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.className = 'paquete-itin-filename';
+    hiddenInput.value = filename;
+
+    const selector = buildSelectorModuloIdioma(idioma, filename, (fn) => { hiddenInput.value = fn; });
+    selector.classList.add('flex-1');
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-500 small';
+    delBtn.title = 'Quitar';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', () => row.remove());
+
+    row.append(selector, hiddenInput, delBtn);
+    document.getElementById('paquete-itin-rows').appendChild(row);
+}
+
+function modulosItinPaqueteSeleccionados() {
+    return Array.from(document.querySelectorAll('.paquete-itin-filename')).map(i => i.value).filter(Boolean);
+}
+
+// Los módulos son de un solo idioma: al cambiarlo, los ya elegidos dejarían de existir.
+async function cambiarIdiomaItinPaquete() {
+    const select = document.getElementById('paquete-itin-idioma');
+    const nuevo = select.value;
+    if (nuevo === paqueteItinIdiomaActual) return;
+    if (modulosItinPaqueteSeleccionados().length > 0 &&
+        !await confirmAction('Los módulos elegidos son del idioma anterior. Al cambiar el idioma se quitan. ¿Continuar?', 'Sí, cambiar')) {
+        select.value = paqueteItinIdiomaActual;
+        return;
+    }
+    paqueteItinIdiomaActual = nuevo;
+    document.getElementById('paquete-itin-rows').innerHTML = '';
+    await agregarFilaPaqueteItin();
+}
+
+async function resetPaqueteBuilder() {
     document.getElementById('paquete-nombre').value = '';
     document.getElementById('paquete-builder-rows').innerHTML = '';
+    document.getElementById('paquete-hoteles-rows').innerHTML = '';
+    document.getElementById('paquete-itin-rows').innerHTML = '';
     agregarFilaPaquete();
+    agregarFilaPaqueteHotel();
+    // Por defecto, el itinerario del paquete arranca en el idioma de la cotización.
+    const idiomaSelect = document.getElementById('paquete-itin-idioma');
+    idiomaSelect.value = document.querySelector('select[name="idioma"]').value || 'es';
+    paqueteItinIdiomaActual = idiomaSelect.value;
     paqueteEditandoId = null;
     document.getElementById('paquete-cancelar-edicion').classList.add('hidden');
+    await agregarFilaPaqueteItin();
 }
 
 async function guardarPaquete() {
@@ -872,9 +970,21 @@ async function guardarPaquete() {
         tour: row.querySelector('.paquete-row-tour').value.trim(),
         cant: row.querySelector('.paquete-row-cant').value
     })).filter(t => t.tour);
-    if (tours.length === 0) { notifyError('Agrega al menos un tour al paquete.'); return; }
+    const hoteles = Array.from(document.querySelectorAll('.paquete-hotel-row')).map(row => ({
+        aloj: row.querySelector('.paquete-hotel-aloj').value.trim(),
+        nhab: row.querySelector('.paquete-hotel-nhab').value,
+        noches: row.querySelector('.paquete-hotel-noches').value
+    })).filter(h => h.aloj);
+    const modulos = modulosItinPaqueteSeleccionados();
+    if (tours.length === 0 && hoteles.length === 0 && modulos.length === 0) {
+        notifyError('Agrega al menos una actividad, un hotel o un módulo de itinerario al paquete.');
+        return;
+    }
     try {
-        const payload = { nombre, tours };
+        const payload = {
+            nombre, tours, hoteles,
+            itinerario: modulos.length ? { idioma: document.getElementById('paquete-itin-idioma').value, modulos } : null
+        };
         if (paqueteEditandoId) payload.id = paqueteEditandoId;
         const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
             method: 'POST',
@@ -891,12 +1001,25 @@ async function guardarPaquete() {
     }
 }
 
-function editarPaquete(paquete) {
+async function editarPaquete(paquete) {
     document.getElementById('paquete-nombre').value = paquete.nombre;
     document.getElementById('paquete-builder-rows').innerHTML = '';
-    paquete.tours.forEach(t => agregarFilaPaquete(t));
+    document.getElementById('paquete-hoteles-rows').innerHTML = '';
+    document.getElementById('paquete-itin-rows').innerHTML = '';
+    if (paquete.tours.length) paquete.tours.forEach(t => agregarFilaPaquete(t)); else agregarFilaPaquete();
+    if (paquete.hoteles.length) paquete.hoteles.forEach(h => agregarFilaPaqueteHotel(h)); else agregarFilaPaqueteHotel();
+    const idiomaSelect = document.getElementById('paquete-itin-idioma');
+    idiomaSelect.value = paquete.itinerario?.idioma || document.querySelector('select[name="idioma"]').value || 'es';
+    paqueteItinIdiomaActual = idiomaSelect.value;
     paqueteEditandoId = paquete.id;
     document.getElementById('paquete-cancelar-edicion').classList.remove('hidden');
+    const modulos = paquete.itinerario?.modulos || [];
+    if (modulos.length) {
+        for (const filename of modulos) await agregarFilaPaqueteItin(filename);
+    } else {
+        await agregarFilaPaqueteItin();
+    }
+    document.getElementById('paquete-nombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function eliminarPaquete(paquete) {
@@ -917,6 +1040,43 @@ async function eliminarPaquete(paquete) {
     }
 }
 
+function escapeHtml(texto) {
+    return String(texto ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const NOMBRES_IDIOMA = { es: 'Español', en: 'English', pt: 'Português' };
+
+// Detalle desplegable de un paquete ("Ver"): qué trae exactamente en cada parte. El
+// itinerario necesita el catálogo de módulos de SU idioma para mostrar títulos en vez de
+// nombres de archivo, así que se arma bajo demanda al abrirlo.
+async function construirDetallePaquete(p) {
+    const seccion = (icono, titulo, itemsHtml) => `
+        <div>
+            <div class="text-xs font-semibold text-slate-600 mb-1"><i class="fas ${icono} mr-1"></i>${titulo}</div>
+            <ul class="text-sm text-slate-700 space-y-0.5">${itemsHtml}</ul>
+        </div>`;
+    const partes = [];
+    if (p.tours.length) {
+        partes.push(seccion('fa-person-hiking', `Actividades (${p.tours.length})`, p.tours.map((t, i) => {
+            const existe = toursData.some(td => td.tour === t.tour);
+            return `<li><span class="text-slate-400 mr-1">${i + 1}.</span>${escapeHtml(t.tour)} <span class="text-slate-400">x${t.cant}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+        }).join('')));
+    }
+    if (p.hoteles.length) {
+        partes.push(seccion('fa-hotel', `Hoteles (${p.hoteles.length})`, p.hoteles.map(h => {
+            const existe = hotelsData.some(hd => hd.aloj === h.aloj);
+            return `<li>${escapeHtml(h.aloj)} <span class="text-slate-400">· ${h.nhab} hab. · ${h.noches} noche${h.noches === 1 ? '' : 's'}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+        }).join('')));
+    }
+    if (p.itinerario?.modulos?.length) {
+        const { idioma, modulos } = p.itinerario;
+        await asegurarIdiomaCargado(idioma);
+        const vigentes = new Set((idiomaCache[idioma]?.modules || []).map(m => m.filename));
+        partes.push(seccion('fa-route', `Itinerario · ${NOMBRES_IDIOMA[idioma] || idioma} (${modulos.length} día${modulos.length === 1 ? '' : 's'})`, modulos.map((fn, i) => `<li><span class="text-slate-400 mr-1">Día ${i + 1}:</span>${escapeHtml(tituloModuloDeIdioma(idioma, fn))}${vigentes.has(fn) ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`).join('')));
+    }
+    return partes.join('') || '<p class="text-slate-400 text-sm">Paquete vacío.</p>';
+}
+
 function renderPaquetesList() {
     const container = document.getElementById('paquetes-list');
     container.innerHTML = '';
@@ -924,27 +1084,51 @@ function renderPaquetesList() {
         container.innerHTML = '<p class="text-slate-400 text-sm">Sin paquetes guardados.</p>';
     } else {
         paquetesData.forEach(p => {
-            const preview = p.tours.map(t => `${t.tour} x${t.cant}`).join(', ');
-            // Un paquete puede quedar referenciando tours que ya se borraron del catálogo
-            // (o se les cambió el nombre) — avisarlo acá evita aplicar filas rotas a una cotización.
-            const faltantes = p.tours.filter(t => !toursData.some(td => td.tour === t.tour));
+            const chip = (icono, texto) => `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"><i class="fas ${icono} mr-1"></i>${texto}</span>`;
+            const chips = [];
+            if (p.tours.length) chips.push(chip('fa-person-hiking', `${p.tours.length} actividad${p.tours.length === 1 ? '' : 'es'}`));
+            if (p.hoteles.length) chips.push(chip('fa-hotel', `${p.hoteles.length} hotel${p.hoteles.length === 1 ? '' : 'es'}`));
+            if (p.itinerario?.modulos?.length) chips.push(chip('fa-route', `Itinerario ${NOMBRES_IDIOMA[p.itinerario.idioma] || ''} · ${p.itinerario.modulos.length} día${p.itinerario.modulos.length === 1 ? '' : 's'}`));
+            // Un paquete puede quedar referenciando tours/hoteles que ya se borraron del
+            // catálogo (o se les cambió el nombre) — avisarlo acá evita aplicar filas rotas.
+            const faltantes = [
+                ...p.tours.filter(t => !toursData.some(td => td.tour === t.tour)).map(t => t.tour),
+                ...p.hoteles.filter(h => !hotelsData.some(hd => hd.aloj === h.aloj)).map(h => h.aloj)
+            ];
             const avisoHtml = faltantes.length
-                ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} tour${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${faltantes.map(t => t.tour).join(', ')}</div>`
+                ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} elemento${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${escapeHtml(faltantes.join(', '))}</div>`
                 : '';
             const div = document.createElement('div');
-            div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3 flex-wrap';
+            div.className = 'p-3 border rounded-lg';
             div.innerHTML = `
-                <div class="min-w-0">
-                    <div class="font-medium">${p.nombre}</div>
-                    <div class="text-xs text-slate-500 truncate">${preview}</div>
-                    ${avisoHtml}
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <div class="min-w-0">
+                        <div class="font-medium">${escapeHtml(p.nombre)}</div>
+                        <div class="flex flex-wrap gap-1 mt-1">${chips.join('')}</div>
+                        ${avisoHtml}
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button class="btn border small paquete-ver-btn" title="Ver el contenido del paquete"><i class="fas fa-eye mr-1"></i>Ver</button>
+                        <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
+                        <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
-                    <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
-                    <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
-                </div>
+                <div class="paquete-detalle hidden mt-3 pt-3 border-t grid grid-cols-1 md:grid-cols-3 gap-4"></div>
             `;
+            const detalle = div.querySelector('.paquete-detalle');
+            const verBtn = div.querySelector('.paquete-ver-btn');
+            verBtn.addEventListener('click', async () => {
+                const abrir = detalle.classList.contains('hidden');
+                if (abrir && !detalle.dataset.cargado) {
+                    detalle.innerHTML = '<p class="text-slate-400 text-sm">Cargando...</p>';
+                    detalle.classList.remove('hidden');
+                    detalle.innerHTML = await construirDetallePaquete(p);
+                    detalle.dataset.cargado = '1';
+                }
+                detalle.classList.toggle('hidden', !abrir);
+                verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash mr-1"></i>Ocultar' : '<i class="fas fa-eye mr-1"></i>Ver';
+            });
             div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
             div.querySelector('.paquete-editar-btn').addEventListener('click', () => editarPaquete(p));
             div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
@@ -1001,25 +1185,88 @@ function agregarFilasHoteles(filasDatos, dispatchInput) {
     calcularResumen();
 }
 
-function aplicarPaquete(paquete) {
-    // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
-    // mano) y sigue a N° PAX hasta que el usuario la edite — antes se fijaba con la
-    // cantidad guardada en el paquete y quedaba sorda a los cambios de N° PAX.
-    // La fecha tampoco se calculaba (quedaba vacía): ahora sigue la misma correlatividad
-    // que el botón "+ Fila" — el primer tour del paquete parte de sugerirSiguienteFechaTour()
+function sumarDiasISO(fechaISO, dias) {
+    const d = new Date(fechaISO + 'T00:00:00');
+    d.setDate(d.getDate() + dias);
+    return d.toISOString().split('T')[0];
+}
+
+// Fecha desde la que arrancan los hoteles de un paquete: el check-out del último hotel ya
+// cargado (mismo encadenado que "+ Fila" en Hoteles), o la Fecha de Llegada si todavía no
+// hay ninguno. Se ignoran las filas totalmente vacías (típicamente la inicial en blanco),
+// porque agregarFilasHoteles las va a reemplazar.
+function fechaInicioHotelesPaquete() {
+    const conDatos = Array.from(document.querySelectorAll('#hotels-body tr')).filter(tr =>
+        tr.querySelector('.hotel-name').value || tr.querySelector('td:nth-child(3) input').value);
+    if (conDatos.length === 0) return document.querySelector('input[name="f_llegada"]').value || '';
+    return conDatos[conDatos.length - 1].querySelector('td:nth-child(3) input').value || '';
+}
+
+// Aplica un paquete a la cotización: Actividades, Hoteles e Itinerario, lo que traiga.
+async function aplicarPaquete(paquete) {
+    // Actividades. Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila
+    // agregada a mano) y sigue a N° PAX hasta que el usuario la edite. La fecha sigue la
+    // misma correlatividad que "+ Fila": el primer tour parte de sugerirSiguienteFechaTour()
     // (Fecha de Llegada, o el día siguiente al de las filas que ya hubiera) y cada tour
-    // siguiente del paquete es un día después del anterior.
-    let fecha = sugerirSiguienteFechaTour();
-    const filas = paquete.tours.map(item => {
-        const fila = { tour: item.tour, fecha };
-        if (fecha) {
-            const siguiente = new Date(fecha + 'T00:00:00');
-            siguiente.setDate(siguiente.getDate() + 1);
-            fecha = siguiente.toISOString().split('T')[0];
+    // siguiente es un día después del anterior.
+    if (paquete.tours?.length) {
+        // Las filas sin tour elegido (la inicial en blanco, a la que el listener de Fecha de
+        // Llegada ya le puso fecha) las reemplaza agregarFilasTours: no cuentan para "la
+        // fecha del último día", si no el primer tour del paquete arrancaría un día tarde.
+        const fechasConTour = Array.from(document.querySelectorAll('#tours-body tr'))
+            .filter(tr => tr.querySelector('.tour-name').value)
+            .map(tr => tr.querySelector('td:nth-child(2) input').value)
+            .filter(Boolean);
+        let fecha = fechasConTour.length
+            ? sumarDiasISO(fechasConTour.reduce((max, f) => f > max ? f : max), 1)
+            : (document.querySelector('input[name="f_llegada"]').value || '');
+        const filas = paquete.tours.map(item => {
+            const fila = { tour: item.tour, fecha };
+            if (fecha) fecha = sumarDiasISO(fecha, 1);
+            return fila;
+        });
+        agregarFilasTours(filas, true);
+    }
+
+    // Hoteles: encadenados — el check-in de cada uno es el check-out del anterior, y su
+    // check-out es check-in + noches del paquete.
+    if (paquete.hoteles?.length) {
+        let cin = fechaInicioHotelesPaquete();
+        const filas = paquete.hoteles.map(h => {
+            const cout = cin ? sumarDiasISO(cin, h.noches) : '';
+            const fila = { aloj: h.aloj, nhab: h.nhab, noches: h.noches, cin, cout };
+            cin = cout;
+            return fila;
+        });
+        agregarFilasHoteles(filas, true);
+    }
+
+    // Itinerario: el armador vive en el idioma de Datos Pax (itinerario.js), y los módulos
+    // del paquete son de SU idioma — si difieren, la cotización pasa al idioma del paquete.
+    if (paquete.itinerario?.modulos?.length) {
+        const idiomaPaquete = paquete.itinerario.idioma;
+        const selectIdioma = document.querySelector('select[name="idioma"]');
+        const nombresIdioma = { es: 'Español', en: 'English', pt: 'Português' };
+        let cambioIdioma = false;
+        if (selectIdioma.value !== idiomaPaquete) {
+            const armadorTieneModulos = Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).some(el => el.value);
+            if (armadorTieneModulos && !await confirmAction(
+                `El itinerario de este paquete está en ${nombresIdioma[idiomaPaquete]}. Se cambiará el idioma de la cotización y se reiniciará el itinerario que ya armaste. ¿Continuar?`,
+                'Sí, cambiar idioma'
+            )) {
+                irATabCotizador();
+                return;
+            }
+            selectIdioma.value = idiomaPaquete;
+            await activarIdioma(idiomaPaquete);
+            cambioIdioma = true;
         }
-        return fila;
-    });
-    agregarFilasTours(filas, true);
+        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos });
+        if (cambioIdioma) {
+            notifyWarning(`El itinerario de este paquete está en ${nombresIdioma[idiomaPaquete]}: el idioma de la cotización se cambió a ${nombresIdioma[idiomaPaquete]}.`);
+        }
+    }
+
     irATabCotizador();
 }
 
@@ -2206,6 +2453,9 @@ async function init() {
         cargarCotizacionesGuardadas();
     });
     document.getElementById('paquete-add-row').addEventListener('click', () => agregarFilaPaquete());
+    document.getElementById('paquete-hotel-add-row').addEventListener('click', () => agregarFilaPaqueteHotel());
+    document.getElementById('paquete-itin-add-row').addEventListener('click', () => agregarFilaPaqueteItin());
+    document.getElementById('paquete-itin-idioma').addEventListener('change', cambiarIdiomaItinPaquete);
     document.getElementById('paquete-guardar').addEventListener('click', guardarPaquete);
     document.getElementById('paquete-cancelar-edicion').addEventListener('click', resetPaqueteBuilder);
     document.getElementById('aplicar-paquete-select').addEventListener('change', (e) => {
@@ -2215,7 +2465,7 @@ async function init() {
         if (paquete) aplicarPaquete(paquete);
         e.target.value = '';
     });
-    agregarFilaPaquete();
+    resetPaqueteBuilder();
 
     document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() })));
     document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow({ cin: sugerirSiguienteCheckinHotel() })));

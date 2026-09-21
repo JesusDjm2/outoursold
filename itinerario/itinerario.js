@@ -798,6 +798,37 @@ function itinGetDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+// ===== Itinerario dentro de un Paquete del Cotizador (idioma propio del paquete) =====
+// Los paquetes del Cotizador (shared/cotizador.js) combinan Actividades + Hoteles +
+// Itinerario, y su itinerario tiene un idioma fijo elegido al crear el paquete — que no
+// tiene por qué ser el idioma activo del armador. Estos helpers arman el selector de
+// módulos contra el catálogo de ESE idioma (cargándolo si hace falta) sin tocar idiomaActivo.
+const itinHelpersModulosPorIdioma = {};
+function helpersModulosDeIdioma(idioma) {
+    if (!itinHelpersModulosPorIdioma[idioma]) {
+        itinHelpersModulosPorIdioma[idioma] = crearHelpersClasificacion(
+            () => idiomaCache[idioma]?.modules || [], () => itinCategoriasData, { labelKey: 'titulo', valueKey: 'filename' },
+            () => itinDestinosData
+        );
+    }
+    return itinHelpersModulosPorIdioma[idioma];
+}
+async function asegurarIdiomaCargado(idioma) {
+    if (idiomaCache[idioma]) return;
+    try {
+        await cargarIdioma(idioma);
+    } catch (error) {
+        console.error('Error al cargar datos del idioma:', error);
+        idiomaCache[idioma] = { modules: [], fixedStartFiles: [], fixedEndFiles: [], paquetes: [], paginasFijas: [], generados: [] };
+    }
+}
+function buildSelectorModuloIdioma(idioma, filename, onResolved) {
+    return buildClasificacionSelector(helpersModulosDeIdioma(idioma), 'Selecciona un módulo...', filename || '', onResolved);
+}
+function tituloModuloDeIdioma(idioma, filename) {
+    return (idiomaCache[idioma]?.modules || []).find(m => m.filename === filename)?.titulo || filename;
+}
+
 // ===== Paquetes de Itinerario (combos reutilizables para el armador) =====
 function agregarFilaPaqueteItinerario(filename) {
     const row = document.createElement('div');
