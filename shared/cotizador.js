@@ -109,6 +109,15 @@ const fmt = (v) => {
     return CURRENCY_SYMBOL + n.toFixed(2);
 };
 
+// Cualquier dato que haya escrito un usuario (nombre de pasajero, tour, hotel, etc.) se
+// interpola en innerHTML al armar filas de tablas — sin esto, alguien podía guardar algo
+// como <img src=x onerror=...> en "Nombre PAX" y ejecutarlo en el navegador de quien
+// abriera esa cotización después (el admin ve las de todas las agencias).
+const ESCAPE_HTML_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (ch) => ESCAPE_HTML_MAP[ch]);
+}
+
 function safeJsonStringify(obj) {
     return btoa(encodeURIComponent(JSON.stringify(obj)));
 }
@@ -291,15 +300,15 @@ function buildTourRow(t) {
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-50';
     tr.innerHTML = `
-        <td class="p-3 font-medium">${t.tour}</td>
+        <td class="p-3 font-medium">${escapeHtml(t.tour)}</td>
         <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-destino"></select></td>
         <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-categoria" disabled></select></td>
-        <td class="p-3">${t.distr || ''}</td>
+        <td class="p-3">${escapeHtml(t.distr || '')}</td>
         <td class="p-3">${fmt(t.preg)}</td>
         <td class="p-3">${fmt(t.ppromo)}</td>
         <td class="p-3">${fmt(t.pconf)}</td>
         <td class="p-3">${fmt(t.pctotal)}</td>
-        <td class="p-3 text-slate-500">${t.creado_por_nombre || '—'}</td>
+        <td class="p-3 text-slate-500">${escapeHtml(t.creado_por_nombre || '—')}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
@@ -360,14 +369,14 @@ function buildDestinoCategoriaSelector(categoriasDataset, destinoId, categoriaId
 function buildTourEditRow(t) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.tour}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(t.tour)}"></td>
         <td class="p-2 destino-categoria-cell" colspan="2"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${t.distr || ''}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.preg}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.ppromo}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.pconf || 0}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${t.pctotal || 0}"></td>
-        <td class="p-2 text-slate-500">${t.creado_por_nombre || '—'}</td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(t.distr || '')}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.preg}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.ppromo}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.pconf || 0}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.pctotal || 0}"></td>
+        <td class="p-2 text-slate-500">${escapeHtml(t.creado_por_nombre || '—')}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
@@ -545,10 +554,10 @@ function buildDestinoRow(d) {
         <div class="min-w-0">
             <div class="flex items-center gap-1.5">
                 <i class="fas fa-chevron-right text-xs text-slate-300"></i>
-                <span class="destino-nombre font-medium truncate">${d.nombre}</span>
+                <span class="destino-nombre font-medium truncate">${escapeHtml(d.nombre)}</span>
             </div>
             <div class="pl-4 mt-1 flex flex-wrap gap-1">${resumen.chips}</div>
-            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias} · ${d.creado_por_nombre || '—'}</div>
+            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias} · ${escapeHtml(d.creado_por_nombre || '—')}</div>
         </div>
         <div class="flex items-center gap-1 shrink-0">
             <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
@@ -569,7 +578,7 @@ function buildDestinoEditRow(d) {
     const div = document.createElement('div');
     div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
     div.innerHTML = `
-        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${d.nombre}">
+        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${escapeHtml(d.nombre)}">
         <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
         <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
     `;
@@ -785,7 +794,7 @@ function buildCategoriaRow(tipo, c) {
     const cuenta = t.items(enCategoria(c.id));
     const noun = t.sustantivo[cuenta.total === 1 ? 0 : 1];
     div.innerHTML = `
-        <span class="min-w-0 truncate">${c.nombre} <span class="text-xs text-slate-400">· ${c.creado_por_nombre || '—'}</span></span>
+        <span class="min-w-0 truncate">${escapeHtml(c.nombre)} <span class="text-xs text-slate-400">· ${escapeHtml(c.creado_por_nombre || '—')}</span></span>
         <div class="flex items-center gap-2 shrink-0">
             <button type="button" class="conteo-chip categoria-ver-btn${cuenta.total === 0 ? ' is-cero' : ''}" title="${cuenta.desglose ? cuenta.desglose + ' — ' : ''}Ver y editar sus asignaciones"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}<i class="fas fa-chevron-${abierta ? 'up' : 'down'}"></i></button>
             <div class="flex items-center gap-1 shrink-0">
@@ -809,7 +818,7 @@ function buildCategoriaEditRow(tipo, c) {
     const div = document.createElement('div');
     div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
     div.innerHTML = `
-        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${c.nombre}">
+        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${escapeHtml(c.nombre)}">
         <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
         <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
     `;
@@ -923,15 +932,15 @@ function buildHotelRow(h) {
     const tr = document.createElement('tr');
     tr.className = 'hover:bg-slate-50';
     tr.innerHTML = `
-        <td class="p-3 font-medium">${h.aloj}</td>
+        <td class="p-3 font-medium">${escapeHtml(h.aloj)}</td>
         <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-destino"></select></td>
         <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-categoria" disabled></select></td>
-        <td class="p-3">${h.distr || ''}</td>
+        <td class="p-3">${escapeHtml(h.distr || '')}</td>
         <td class="p-3">${fmt(h.preg)}</td>
         <td class="p-3">${fmt(h.ppromo)}</td>
         <td class="p-3">${fmt(h.pconf)}</td>
         <td class="p-3">${fmt(h.pctotal)}</td>
-        <td class="p-3 text-slate-500">${h.creado_por_nombre || '—'}</td>
+        <td class="p-3 text-slate-500">${escapeHtml(h.creado_por_nombre || '—')}</td>
         <td class="p-3 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
             <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
@@ -959,14 +968,14 @@ function buildHotelRow(h) {
 function buildHotelEditRow(h) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.aloj}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(h.aloj)}"></td>
         <td class="p-2 destino-categoria-cell" colspan="2"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${h.distr || ''}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.preg}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.ppromo}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.pconf || 0}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" value="${h.pctotal || 0}"></td>
-        <td class="p-2 text-slate-500">${h.creado_por_nombre || '—'}</td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(h.distr || '')}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.preg}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.ppromo}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.pconf || 0}"></td>
+        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.pctotal || 0}"></td>
+        <td class="p-2 text-slate-500">${escapeHtml(h.creado_por_nombre || '—')}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
             <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
@@ -1541,8 +1550,8 @@ function renderHistorialTours(cotizacionesGuardadas, total) {
             div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
             div.innerHTML = `
                 <div class="min-w-0">
-                    <div class="font-medium truncate">${c.id} — ${nombre}</div>
-                    <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${preview}</div>
+                    <div class="font-medium truncate">${escapeHtml(c.id)} — ${escapeHtml(nombre)}</div>
+                    <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${escapeHtml(preview)}</div>
                 </div>
                 <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
             `;
@@ -1686,8 +1695,8 @@ function createTourRow(data = {}) {
         <td><input class="input w-20 rounded px-2 py-1 border distr" type="text" value="${data.distr || ''}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
-        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
-        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
+        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" min="0" value="${data.pconf || 0}"></td>
+        <td class="col-confidencial"><input class="input w-20 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" min="0" value="${data.pctotal || 0}"></td>
         <td class="text-right total-line">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
@@ -1777,8 +1786,8 @@ function createHotelRow(data = {}) {
         <td><input class="input w-full max-w-20 rounded px-2 py-1 border text-right noches" type="number" min="1" value="${initialNoches}"></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
-        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" value="${data.pconf || 0}"></td>
-        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" value="${data.pctotal || 0}"></td>
+        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" min="0" value="${data.pconf || 0}"></td>
+        <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pctotal" type="number" step="0.01" min="0" value="${data.pctotal || 0}"></td>
         <td class="text-right total-line">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
@@ -1962,6 +1971,17 @@ async function guardarCotizacion() {
             modulos: Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean)
         }
     };
+    // Antes se podía guardar el formulario vacío (un clic accidental en "Guardar" dejaba
+    // una cotización basura, ID "-", nombre "-") — se exige al menos el nombre del
+    // pasajero y una actividad u hotel antes de mandarla al servidor.
+    if (!(data.pax.nombre_pax || '').trim()) {
+        notifyWarning('Ingresa el nombre del pasajero antes de guardar.');
+        return;
+    }
+    if (!tours.some(t => t.tour.trim()) && !hotels.some(h => h.aloj.trim())) {
+        notifyWarning('Agrega al menos una actividad o un hotel antes de guardar.');
+        return;
+    }
     try {
         const response = await fetch(`${API_URL}?path=guardar-cotizacion`, {
             method: 'POST',
@@ -2117,11 +2137,11 @@ function buildCotRow(cot) {
     const tr = document.createElement('tr');
     tr.className = 'border-t hover:bg-slate-50';
     tr.innerHTML = `
-        <td class="p-3 font-medium">${cot.id}</td>
-        <td class="p-3">${pax.nombre_pax || '-'}</td>
-        <td class="p-3">${pax.contacto || '-'}</td>
-        <td class="p-3">${pax.fecha_cot || '-'}</td>
-        <td class="p-3">${pax.n_pax || '-'}</td>
+        <td class="p-3 font-medium">${escapeHtml(cot.id)}</td>
+        <td class="p-3">${escapeHtml(pax.nombre_pax || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.contacto || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.fecha_cot || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.n_pax || '-')}</td>
         <td class="p-3 text-right whitespace-nowrap"></td>
     `;
     const actionsCell = tr.querySelector('td:last-child');
@@ -2161,12 +2181,31 @@ function irATabCotizador() {
     document.getElementById('cotizador-section').classList.remove('hidden');
 }
 
+// Hay algo que se perdería si se pisa el formulario ahora mismo (nombre de pasajero, o
+// alguna actividad/hotel ya escritos) — mismo criterio que usan "Nueva cotización" y
+// "Limpiar todo", que sí confirman antes de descartar. Abrir/duplicar/ver PDF de otra
+// cotización guardada hacía exactamente lo mismo (pisar el formulario) sin preguntar.
+function formularioTieneDatosSinGuardar() {
+    const nombrePax = document.querySelector('input[name="nombre_pax"]')?.value.trim();
+    if (nombrePax) return true;
+    const hayTour = Array.from(document.querySelectorAll('#tours-body .tour-name')).some(el => el.value.trim());
+    const hayHotel = Array.from(document.querySelectorAll('#hotels-body .hotel-name')).some(el => el.value.trim());
+    return hayTour || hayHotel;
+}
+
+async function confirmarSiHayDatosSinGuardar(mensaje) {
+    if (!formularioTieneDatosSinGuardar()) return true;
+    return await confirmAction(mensaje, 'Sí, continuar');
+}
+
 async function abrirCotizacionGuardada(id) {
+    if (!await confirmarSiHayDatosSinGuardar('¿Abrir esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
     await cargarCotizacion(id);
     irATabCotizador();
 }
 
 async function duplicarCotizacionGuardada(id) {
+    if (!await confirmarSiHayDatosSinGuardar('¿Duplicar esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
     try {
         const res = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
         const data = await res.json();
@@ -2189,6 +2228,7 @@ async function duplicarCotizacionGuardada(id) {
 }
 
 async function verPdfCotizacionGuardada(id, btn) {
+    if (!await confirmarSiHayDatosSinGuardar('¿Ver el PDF de esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
     const originalHtml = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     btn.disabled = true;
@@ -2789,6 +2829,14 @@ async function init() {
         await abrirCotizacionGuardada(cotizacionUrlId);
         history.replaceState(null, '', window.location.pathname);
     }
+
+    // Mismo criterio que confirmarSiHayDatosSinGuardar(): si hay algo escrito que no se
+    // guardó, avisa también al cerrar/recargar la pestaña, no solo al navegar dentro de la app.
+    window.addEventListener('beforeunload', (e) => {
+        if (!formularioTieneDatosSinGuardar()) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
 }
 
 // ===== Buscador de País (Datos Pax) =====

@@ -279,9 +279,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <div class="text-slate-600">Total descuento</div>
                                         <div class="text-right" id="total-desc"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
                                         <div class="text-slate-600">Precio adicional</div>
-                                        <div><input id="precio-adicional" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" value="0"></input></div>
+                                        <div><input id="precio-adicional" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></input></div>
                                         <div class="text-slate-600">Descuento especial</div>
-                                        <div><input id="descuento-especial" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" value="0"></input></div>
+                                        <div><input id="descuento-especial" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></input></div>
                                         <div class="text-slate-700 font-medium">P.V. Final</div>
                                         <div class="text-right text-2xl font-bold" id="pv-final"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
                                     </div>

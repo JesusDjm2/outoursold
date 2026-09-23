@@ -5,6 +5,7 @@
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/error-helpers.php';
+require_once __DIR__ . '/agencia-helpers.php';
 
 if (!is_logged_in()) {
     http_response_code(403);
@@ -308,6 +309,11 @@ try {
             $ppromo = floatval($data['ppromo'] ?? 0);
             $pconf = floatval($data['pconf'] ?? 0);
             $pctotal = floatval($data['pctotal'] ?? 0);
+            if ($preg < 0 || $ppromo < 0 || $pconf < 0 || $pctotal < 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Los precios no pueden ser negativos']);
+                break;
+            }
             $destinoId = !empty($data['destino_id']) ? intval($data['destino_id']) : null;
             $categoriaId = !empty($data['categoria_id']) ? intval($data['categoria_id']) : null;
             if (!empty($data['id'])) {
@@ -401,6 +407,11 @@ try {
             $ppromo = floatval($data['ppromo'] ?? 0);
             $pconfHotel = floatval($data['pconf'] ?? 0);
             $pctotalHotel = floatval($data['pctotal'] ?? 0);
+            if ($preg < 0 || $ppromo < 0 || $pconfHotel < 0 || $pctotalHotel < 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Los precios no pueden ser negativos']);
+                break;
+            }
             $destinoIdHotel = !empty($data['destino_id']) ? intval($data['destino_id']) : null;
             $categoriaIdHotel = !empty($data['categoria_id']) ? intval($data['categoria_id']) : null;
             if (!empty($data['id'])) {
@@ -669,6 +680,22 @@ try {
                 echo json_encode(['error' => 'ID requerido']);
                 break;
             }
+            $paxCot = is_array($data['pax'] ?? null) ? $data['pax'] : [];
+            $tienePax = trim($paxCot['nombre_pax'] ?? '') !== '';
+            $toursCot = is_array($data['tours'] ?? null) ? $data['tours'] : [];
+            $hotelsCot = is_array($data['hotels'] ?? null) ? $data['hotels'] : [];
+            $tieneItem = array_filter($toursCot, fn($t) => trim($t['tour'] ?? '') !== '')
+                || array_filter($hotelsCot, fn($h) => trim($h['aloj'] ?? '') !== '');
+            if (!$tienePax || !$tieneItem) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Falta el nombre del pasajero o al menos una actividad/hotel.']);
+                break;
+            }
+            // Las notas vienen del editor de texto enriquecido (contenteditable): se limpian
+            // con la misma whitelist de tags/atributos que ya se usa para los Términos y
+            // Condiciones de la agencia, para no guardar HTML/JS arbitrario que luego se
+            // vuelve a inyectar con innerHTML al reabrir la cotización o listarla.
+            $data['notas'] = sanitizarHtmlTerminos($data['notas'] ?? '') ?? '';
 
             $stmt = $db->prepare("SELECT creado_por FROM $tablaCotizaciones WHERE id = ?");
             $stmt->execute([$id]);

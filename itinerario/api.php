@@ -42,6 +42,18 @@ function idOInt($val) {
     return ($val !== null && $val !== '') ? (int) $val : null;
 }
 
+// El filename que llega en el JSON de crear-modulo/crear-pagina-fija/guardar-generado
+// debería ser siempre el que devolvió upload.php, pero nada lo obliga: sin esta
+// whitelist, un valor como "../../../shared/db.php" quedaba guardado tal cual y luego
+// se usaba para leer/borrar archivos fuera de uploads/$idioma/ (ver el unlink() de
+// actualizar-pagina-fija más abajo). Se permite espacio porque upload.php conserva el
+// nombre original del PDF subido (p.ej. "Cusco City Tour.pdf").
+function validarNombreArchivoPdf($filename) {
+    return is_string($filename)
+        && strpos($filename, '..') === false
+        && preg_match('/^[A-Za-z0-9 _\-.]+\.pdf$/', $filename) === 1;
+}
+
 try {
     switch ($path) {
         case 'modulos':
@@ -183,6 +195,11 @@ try {
                 echo json_encode(['error' => 'Pasajero, título y archivo son obligatorios.']);
                 break;
             }
+            if (!validarNombreArchivoPdf($filename)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Nombre de archivo no válido.']);
+                break;
+            }
             $stmt = $db->prepare("INSERT INTO $tablaGenerados (pasajero, titulo, filename, modulos, generado_por) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$pasajero, $titulo, $filename, json_encode($modulos, JSON_UNESCAPED_UNICODE), $_SESSION['user_id']]);
             $id = $db->lastInsertId();
@@ -237,6 +254,11 @@ try {
             if ($titulo === '' || $filename === '') {
                 http_response_code(400);
                 echo json_encode(['error' => 'Título y archivo son obligatorios.']);
+                break;
+            }
+            if (!validarNombreArchivoPdf($filename)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Nombre de archivo no válido.']);
                 break;
             }
             $stmt = $db->prepare("INSERT INTO $tablaModulos (titulo, filename, destino_id, categoria_id, creado_por) VALUES (?, ?, ?, ?, ?)");
@@ -412,6 +434,11 @@ try {
                 echo json_encode(['error' => 'Título y archivo son obligatorios.']);
                 break;
             }
+            if (!validarNombreArchivoPdf($filename)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Nombre de archivo no válido.']);
+                break;
+            }
             $stmt = $db->prepare("INSERT INTO $tablaPaginasFijas (titulo, filename, creado_por) VALUES (?, ?, ?)");
             $stmt->execute([$titulo, $filename, $_SESSION['user_id']]);
             $id = $db->lastInsertId();
@@ -435,6 +462,11 @@ try {
             if (!$id || $titulo === '') {
                 http_response_code(400);
                 echo json_encode(['error' => 'ID y título son obligatorios.']);
+                break;
+            }
+            if ($filenameNuevo && !validarNombreArchivoPdf($filenameNuevo)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Nombre de archivo no válido.']);
                 break;
             }
             if (!verificarDueno($db, $tablaPaginasFijas, $id)) break;
