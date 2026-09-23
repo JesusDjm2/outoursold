@@ -66,17 +66,17 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
         <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md">
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium active" data-tab="cotizador">
-                <i class="fas fa-calculator mr-2"></i>Cotizador
+            <button class="nav-tab flex-1 rounded-xl font-medium active" data-tab="cotizador">
+                <i class="fas fa-calculator"></i><span>Cotizador</span>
             </button>
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium" data-tab="gestion">
-                <i class="fas fa-cog mr-2"></i>Gestión de Datos
+            <button class="nav-tab flex-1 rounded-xl font-medium" data-tab="gestion">
+                <i class="fas fa-cog"></i><span>Gestión de Datos</span>
             </button>
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium" data-tab="cotizaciones">
-                <i class="fas fa-folder-open mr-2"></i>Cotizaciones Guardadas
+            <button class="nav-tab flex-1 rounded-xl font-medium" data-tab="cotizaciones">
+                <i class="fas fa-folder-open"></i><span>Cotizaciones Guardadas</span>
             </button>
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium" data-tab="itinerario-gestion">
-                <i class="fas fa-route mr-2"></i>Itinerario
+            <button class="nav-tab flex-1 rounded-xl font-medium" data-tab="itinerario-gestion">
+                <i class="fas fa-route"></i><span>Itinerario</span>
             </button>
         </div>
         <div id="cotizador-section" class="tab-content">
@@ -320,7 +320,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             <div id="gestion-tours" class="subtab-content hidden">
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Tours Existentes</h2>
+                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Tours Existentes</h2>
                         <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
                             <div class="relative flex-1 min-w-[160px] sm:flex-none">
                                 <input id="tours-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar tour...">
@@ -395,7 +395,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             <div id="gestion-hoteles" class="subtab-content hidden">
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Hoteles Existentes</h2>
+                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Hoteles Existentes</h2>
                         <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
                             <div class="relative flex-1 min-w-[160px] sm:flex-none">
                                 <input id="hoteles-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar alojamiento...">
@@ -473,7 +473,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear tour →</button>
                 </div>
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Paquete</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Nuevo Paquete</h2>
                     <p class="text-sm text-slate-500 mb-4">Combina Actividades, Hoteles e Itinerario en un solo paquete para aplicarlo completo a una cotización de un clic. Alcanza con que tenga al menos una de las tres partes.</p>
                     <input id="paquete-nombre" class="input w-full rounded px-3 py-2 border mb-4" type="text" placeholder="Nombre del paquete (ej. Cusco 4 días)">
 
@@ -510,14 +510,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Paquetes Guardados</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Paquetes Guardados</h2>
                     <div id="paquetes-list" class="space-y-2"></div>
                 </div>
             </div>
 
             <div id="gestion-clasificacion" class="subtab-content">
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
                     <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántos de cada uno tiene; elige uno a la izquierda para ver y gestionar sus categorías (y cuántos elementos hay en cada una).</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div class="md:col-span-4 border rounded-lg p-3">
@@ -554,7 +554,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         <div id="cotizaciones-section" class="tab-content hidden">
             <div class="card p-6">
                 <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                    <h2 class="text-xl font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
+                    <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
                     <div class="flex items-center gap-2 flex-wrap">
                         <div class="relative">
                             <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
@@ -615,7 +615,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-modulos" class="subtab-content">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Subir Nuevo Módulo PDF</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nuevo Módulo PDF</h2>
                     <form id="itinerary-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
                             <label for="itinerary-module-title" class="font-medium text-slate-700">Título del Módulo</label>
@@ -643,7 +643,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                        <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Módulos Existentes</h2>
+                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Módulos Existentes</h2>
                         <div class="relative">
                             <input id="itinerario-modulos-search" class="rounded-lg pl-8 pr-3 py-1.5 border text-sm w-64" type="text" placeholder="Buscar módulo...">
                             <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -671,7 +671,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-predeterminados" class="subtab-content hidden">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Itinerario Predeterminado</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Nuevo Itinerario Predeterminado</h2>
                     <p class="text-sm text-slate-500 mb-4">Guarda una secuencia de módulos predefinida (por ejemplo, los días de un paquete típico) para insertarla completa en el armador de un clic.</p>
                     <input id="itinerario-paquete-nombre" class="w-full rounded px-3 py-2 border mb-3" type="text" placeholder="Nombre del itinerario predeterminado (ej. Cusco 4 días)">
                     <div id="itinerario-paquete-builder-rows" class="space-y-2 mb-3"></div>
@@ -682,14 +682,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Itinerarios Predeterminados Guardados</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Predeterminados Guardados</h2>
                     <div id="itinerario-paquetes-list" class="space-y-2"></div>
                 </div>
             </div>
 
             <div id="itinerario-gestion-paginas" class="subtab-content hidden">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
                     <p class="text-sm text-slate-500 mb-4">Documentos que no se clasifican por destino ni categoría — siempre van al inicio o cierre del itinerario (portada, legalidad, términos, etc.).</p>
                     <form id="pagina-fija-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
@@ -705,7 +705,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
 
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Páginas Fijas Existentes</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Páginas Fijas Existentes</h2>
                     <div class="itinerary-table-container">
                         <table class="w-full">
                             <thead class="bg-slate-50">
@@ -722,10 +722,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
 
                 <div class="card p-4">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Configuración de Páginas Fijas</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Configuración de Páginas Fijas</h2>
 
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-slate-700 mb-2">Páginas de Presentación</h3>
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Presentación</h3>
                         <div class="itinerary-table-container">
                             <table class="w-full">
                                 <thead class="bg-slate-50">
@@ -742,7 +742,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
 
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-slate-700 mb-2">Páginas de Cierre</h3>
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Cierre</h3>
                         <div class="itinerary-table-container">
                             <table class="w-full">
                                 <thead class="bg-slate-50">
@@ -764,7 +764,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-historial" class="subtab-content hidden">
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
                     <div class="flex flex-wrap items-end gap-3 mb-4">
                         <div>
                             <label for="historial-filtro-texto" class="block text-xs font-medium text-slate-600 mb-1">Pasajero o título</label>

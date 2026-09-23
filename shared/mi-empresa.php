@@ -62,7 +62,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                         <i class="fas fa-building"></i>
                     </div>
                     <div>
-                        <h2 id="ve-nombre" class="text-xl font-semibold text-slate-800"></h2>
+                        <h2 id="ve-nombre" class="text-base font-semibold text-slate-800"></h2>
                         <p class="text-sm text-slate-500"><i class="fas fa-id-card mr-1.5 text-slate-400"></i>RUC: <span id="ve-ruc"></span></p>
                     </div>
                 </div>

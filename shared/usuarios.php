@@ -60,7 +60,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
         <div id="panel-usuarios" class="subtab-content">
             <div class="card p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold text-slate-800">Usuarios Existentes</h2>
+                    <h2 class="text-base font-semibold text-slate-800">Usuarios Existentes</h2>
                     <button type="button" id="abrir-nuevo-usuario-btn" class="btn btn-primary">
                         <i class="fas fa-user-plus mr-2"></i>Nuevo Usuario
                     </button>
@@ -94,7 +94,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 
             <div id="agsub-listado" class="agsub-panel">
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Agencias Existentes</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Agencias Existentes</h2>
                     <p class="text-xs text-slate-500 mb-4">Los datos de contacto, logo y términos de cada agencia los completa la propia agencia desde su "Mi Empresa". Aquí solo se administra la cuenta.</p>
                     <div class="overflow-x-auto">
                         <table class="w-full small">
@@ -119,7 +119,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
             <div id="agsub-comparativo" class="agsub-panel hidden">
                 <div class="card p-6 mb-5">
                     <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
-                        <h2 class="text-xl font-semibold text-slate-800">Cotizaciones generadas</h2>
+                        <h2 class="text-base font-semibold text-slate-800">Cotizaciones generadas</h2>
                         <div class="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
                             <button type="button" class="categoria-tipo-tab cotchart-grano active" data-grano="dia">Día</button>
                             <button type="button" class="categoria-tipo-tab cotchart-grano" data-grano="mes">Mes</button>
@@ -135,7 +135,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 
                 <div class="card p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-slate-800">Comparativo entre Agencias</h2>
+                        <h2 class="text-base font-semibold text-slate-800">Comparativo entre Agencias</h2>
                         <span class="text-xs text-slate-500">Clic en una columna para ordenar el ranking. Clic en una agencia para ver su detalle.</span>
                     </div>
                     <div id="comparativo-empty" class="text-center text-slate-400 py-6 hidden">Sin agencias registradas.</div>
@@ -173,7 +173,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                 <div id="conexiones-panel-conectados" class="conexiones-panel">
                     <div class="card p-6">
                         <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-slate-800">Conectados ahora</h2>
+                            <h2 class="text-base font-semibold text-slate-800">Conectados ahora</h2>
                             <button type="button" id="conectados-refresh-btn" class="text-xs text-slate-500 hover:text-[var(--accent-2)]"><i class="fas fa-rotate mr-1"></i>Actualizar</button>
                         </div>
                         <div id="conectados-vacio" class="text-center text-slate-400 py-6 hidden">Nadie conectado en los últimos minutos.</div>
@@ -184,7 +184,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
                 <div id="conexiones-panel-ranking" class="conexiones-panel hidden">
                     <div class="card p-6">
                         <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-                            <h2 class="text-xl font-semibold text-slate-800">Ranking de accesos por agencia</h2>
+                            <h2 class="text-base font-semibold text-slate-800">Ranking de accesos por agencia</h2>
                             <span class="text-xs text-slate-500">Clic en una columna para ordenar — de menor a mayor para ver quién conecta menos.</span>
                         </div>
                         <div id="accesos-empty" class="text-center text-slate-400 py-6 hidden">Sin agencias registradas.</div>
@@ -208,7 +208,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 
                 <div id="conexiones-panel-bitacora" class="conexiones-panel hidden">
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Bitácora de accesos</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Bitácora de accesos</h2>
                     <p class="text-xs text-slate-500 mb-4">Historial de inicios de sesión, exitosos y fallidos.</p>
                     <div class="flex flex-wrap gap-3 items-center mb-3">
                         <div class="relative flex-1 min-w-[220px]">

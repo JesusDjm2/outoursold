@@ -67,11 +67,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         <div class="max-w-7xl mx-auto">
 
         <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md" id="itinerario-main-tabs">
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium active" data-tab="itinerario">
-                <i class="fas fa-route mr-2"></i>Nuevo Itinerario
+            <button class="nav-tab flex-1 rounded-xl font-medium active" data-tab="itinerario">
+                <i class="fas fa-route"></i><span>Nuevo Itinerario</span>
             </button>
-            <button class="nav-tab flex-1 py-3 px-4 rounded-xl font-medium" data-tab="gestion">
-                <i class="fas fa-cog mr-2"></i>Gestión de Módulos
+            <button class="nav-tab flex-1 rounded-xl font-medium" data-tab="gestion">
+                <i class="fas fa-cog"></i><span>Gestión de Módulos</span>
             </button>
         </div>
 
@@ -137,7 +137,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-modulos" class="subtab-content">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Subir Nuevo Módulo PDF</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nuevo Módulo PDF</h2>
                     <form id="itinerary-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
                             <label for="itinerary-module-title" class="font-medium text-slate-700">Título del Módulo</label>
@@ -165,7 +165,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
-                        <h2 class="text-xl font-semibold text-slate-800 whitespace-nowrap">Módulos Existentes</h2>
+                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Módulos Existentes</h2>
                         <div class="relative">
                             <input id="itinerario-modulos-search" class="rounded-lg pl-8 pr-3 py-1.5 border text-sm w-64" type="text" placeholder="Buscar módulo...">
                             <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
@@ -193,7 +193,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-predeterminados" class="subtab-content hidden">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-1">Nuevo Itinerario Predeterminado</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Nuevo Itinerario Predeterminado</h2>
                     <p class="text-sm text-slate-500 mb-4">Guarda una secuencia de módulos predefinida (por ejemplo, los días de un paquete típico) para insertarla completa en el armador de un clic.</p>
                     <input id="itinerario-paquete-nombre" class="w-full rounded px-3 py-2 border mb-3" type="text" placeholder="Nombre del itinerario predeterminado (ej. Cusco 4 días)">
                     <div id="itinerario-paquete-builder-rows" class="space-y-2 mb-3"></div>
@@ -204,14 +204,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Itinerarios Predeterminados Guardados</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Predeterminados Guardados</h2>
                     <div id="itinerario-paquetes-list" class="space-y-2"></div>
                 </div>
             </div>
 
             <div id="itinerario-gestion-paginas" class="subtab-content hidden">
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
                     <p class="text-sm text-slate-500 mb-4">Documentos que no se clasifican por destino ni categoría — siempre van al inicio o cierre del itinerario (portada, legalidad, términos, etc.).</p>
                     <form id="pagina-fija-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
@@ -227,7 +227,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
 
                 <div class="card p-6 mb-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Páginas Fijas Existentes</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Páginas Fijas Existentes</h2>
                     <div class="itinerary-table-container">
                         <table class="w-full">
                             <thead class="bg-slate-50">
@@ -244,10 +244,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
 
                 <div class="card p-4">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Configuración de Páginas Fijas</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Configuración de Páginas Fijas</h2>
 
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-slate-700 mb-2">Páginas de Presentación</h3>
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Presentación</h3>
                         <div class="itinerary-table-container">
                             <table class="w-full">
                                 <thead class="bg-slate-50">
@@ -264,7 +264,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
 
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-slate-700 mb-2">Páginas de Cierre</h3>
+                        <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Cierre</h3>
                         <div class="itinerary-table-container">
                             <table class="w-full">
                                 <thead class="bg-slate-50">
@@ -286,7 +286,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
             <div id="itinerario-gestion-historial" class="subtab-content hidden">
                 <div class="card p-6">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
+                    <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
                     <div class="flex flex-wrap items-end gap-3 mb-4">
                         <div>
                             <label for="historial-filtro-texto" class="block text-xs font-medium text-slate-600 mb-1">Pasajero o título</label>
