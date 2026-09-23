@@ -374,6 +374,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </div>
     </div>
 
+    <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/../shared/notify.css') ?>">
     <script src="../shared/notify.js?v=<?= filemtime(__DIR__ . '/../shared/notify.js') ?>"></script>
     <script>window.ME_API_URL = '../shared/mi-empresa-api.php'; window.HERO_ASSET_BASE = '../shared/';</script>
     <script src="../shared/hero-edit.js?v=<?= filemtime(__DIR__ . '/../shared/hero-edit.js') ?>"></script>

@@ -1,0 +1,28 @@
+/* shared/notify.css
+   Los avisos de SweetAlert2 (notify.js) vienen con tipografía bastante grande por
+   defecto — se achica para que combine con el resto de la interfaz (compacta, .small a
+   0.78rem en varios lados). Compartido por las 4 páginas que cargan notify.js. */
+.swal2-popup {
+    font-size: 0.85rem;
+    padding: 1.4em 1.2em 1.2em;
+}
+.swal2-title {
+    font-size: 1.15rem;
+    padding: 0.4em 0.6em 0;
+}
+.swal2-html-container {
+    font-size: 0.85rem;
+    margin: 0.8em 1.2em 0.2em;
+}
+.swal2-icon {
+    width: 3.2em;
+    height: 3.2em;
+    margin: 1em auto 0.6em;
+}
+.swal2-actions button {
+    font-size: 0.82rem;
+    padding: 0.5em 1.2em;
+}
+.swal2-input, .swal2-textarea {
+    font-size: 0.85rem;
+}

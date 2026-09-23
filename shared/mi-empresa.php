@@ -194,6 +194,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
         </div>
     </div>
 
+    <link rel="stylesheet" href="notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">
     <script src="notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
     <script src="rte.js?v=<?= filemtime(__DIR__ . '/rte.js') ?>"></script>
     <script>

@@ -429,6 +429,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
         </div>
     </div>
 
+    <link rel="stylesheet" href="notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">
     <script src="notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
     <script>window.ME_API_URL = 'mi-empresa-api.php';</script>
     <script src="hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>
