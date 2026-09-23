@@ -2702,8 +2702,8 @@ async function init() {
 
     document.getElementById('add-tour').addEventListener('click', () => document.getElementById('tours-body').appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() })));
     document.getElementById('add-hotel').addEventListener('click', () => document.getElementById('hotels-body').appendChild(createHotelRow({ cin: sugerirSiguienteCheckinHotel() })));
-    document.getElementById('clear-tours').addEventListener('click', () => { document.getElementById('tours-body').innerHTML = ''; calcularResumen(); });
-    document.getElementById('clear-hotels').addEventListener('click', () => { document.getElementById('hotels-body').innerHTML = ''; calcularResumen(); });
+    // Los "Limpiar" sueltos de Actividades/Hoteles/Itinerario se quitaron: "Limpiar todo"
+    // (junto a Guardar) ya cubre las 4 secciones desde un solo lugar, con confirmación.
     // Revela/edita Precio Confidencial y Precio C. Total para TODAS las filas de la tabla
     // a la vez (columnas .col-confidencial, ver cotizador.css). Siempre arranca oculto al
     // cargar la página — es información sensible, no debe quedar expuesta por defecto.

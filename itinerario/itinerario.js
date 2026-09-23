@@ -1003,7 +1003,10 @@ document.getElementById('itinerario-aplicar-paquete-select').addEventListener('c
     e.target.value = '';
 });
 
-document.getElementById('itinerario-limpiar-builder').addEventListener('click', () => {
+// En Cotizador (embebido) este botón se quitó — "Limpiar todo" (junto a Guardar) ya
+// limpia el armador de itinerario junto con el resto. Sigue existiendo en la vista
+// standalone de Itinerario.
+document.getElementById('itinerario-limpiar-builder')?.addEventListener('click', () => {
     document.getElementById('itinerary-builder-body').innerHTML = '';
     addItineraryBuilderRow('itinerary-builder-body', true);
 });

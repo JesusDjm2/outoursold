@@ -14,10 +14,15 @@
     font-size: 0.85rem;
     margin: 0.8em 1.2em 0.2em;
 }
+/* Los íconos de SweetAlert2 (check, X, !, ?) se dibujan con partes internas (líneas,
+   aros) posicionadas en em fijos relativos a su tamaño original — achicarlos con
+   width/height directo las desalineaba y rompía el dibujo (el check quedaba cortado).
+   Con transform: scale() se reduce todo el ícono de una pieza, artwork incluido, y el
+   margin negativo compensa el espacio en blanco que deja alrededor (la caja de layout
+   sigue siendo la original, scale() no la achica). */
 .swal2-icon {
-    width: 3.2em;
-    height: 3.2em;
-    margin: 1em auto 0.6em;
+    transform: scale(0.62);
+    margin: 0.4em auto -0.7em;
 }
 .swal2-actions button {
     font-size: 0.82rem;

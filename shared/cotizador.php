@@ -142,7 +142,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <button id="toggle-conf-tours" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
                                     <i class="fas fa-eye mr-1"></i>Precios confid.
                                 </button>
-                                <button id="clear-tours" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
                         <div class="accordion-body">
@@ -181,7 +180,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <button id="toggle-conf-hoteles" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
                                     <i class="fas fa-eye mr-1"></i>Precios confid.
                                 </button>
-                                <button id="clear-hotels" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
                         <div class="accordion-body">
@@ -232,7 +230,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <button id="itinerario-historial-btn" type="button" class="px-3 py-1 rounded-md small border" title="Reusar un itinerario ya generado">
                                 <i class="fas fa-clock-rotate-left mr-1"></i>Historial
                             </button>
-                            <button id="itinerario-limpiar-builder" type="button" class="px-3 py-1 rounded-md small border" title="Limpiar el armador">Limpiar</button>
                         </div>
                         <div class="itinerary-table-container">
                             <table class="w-full small">
