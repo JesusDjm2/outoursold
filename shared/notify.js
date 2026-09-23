@@ -30,10 +30,20 @@ async function notifySuccessAction(msg, actionText) {
     return result.isConfirmed;
 }
 
+// Si el mensaje trae "¿Pregunta? Detalle adicional.", la pregunta queda en negrita
+// (title de SweetAlert2) y el detalle abajo en texto normal, con el salto de línea que
+// separa ambos bloques ya puesto por el propio layout de Swal — sin esto, un mensaje
+// largo salía entero como título, todo del mismo tamaño y peso, muy plano/brusco.
+// Si no hay un "?" (o está al final, como en "...¿Continuar?"), se muestra igual que
+// antes: todo en el título.
 async function confirmAction(msg, confirmText = 'Sí', cancelText = 'Cancelar') {
+    const corte = msg.indexOf('?');
+    const pregunta = corte === -1 ? msg : msg.slice(0, corte + 1);
+    const detalle = corte === -1 ? '' : msg.slice(corte + 1).trim();
     const result = await Swal.fire({
         icon: 'question',
-        title: msg,
+        title: pregunta,
+        text: detalle || undefined,
         showCancelButton: true,
         confirmButtonText: confirmText,
         cancelButtonText: cancelText,
