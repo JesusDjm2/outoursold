@@ -296,6 +296,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             </div>
                             <div class="mt-4 pt-4 border-t flex flex-wrap gap-2">
                                 <button id="guardar-cotizacion" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Guardar</button>
+                                <button id="limpiar-todo" type="button" class="btn border" title="Limpia Datos Pax, Actividades, Hoteles e Itinerario de esta cotización"><i class="fas fa-broom mr-2"></i>Limpiar todo</button>
                             </div>
                         </div>
                     </div>

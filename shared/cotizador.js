@@ -2655,9 +2655,18 @@ async function init() {
     document.getElementById('pdf-preview-descargar').addEventListener('click', descargarPdfPreview);
     document.getElementById('pdf-preview-nueva-pestana').addEventListener('click', abrirPdfPreviewNuevaPestana);
 
-    document.getElementById('cot-nueva').addEventListener('click', () => {
+    document.getElementById('cot-nueva').addEventListener('click', async () => {
+        if (!await confirmAction('¿Empezar una cotización nueva? Se perderá lo que no hayas guardado en Datos Pax, Actividades, Hoteles e Itinerario.', 'Sí, empezar de nuevo')) return;
         nuevaCotizacion();
         irATabCotizador();
+    });
+    // Único botón que limpia las 4 secciones a la vez (Datos Pax, Actividades, Hoteles e
+    // Itinerario) — antes solo existía "Nueva Cotización" en Cotizaciones Guardadas, o los
+    // "Limpiar" sueltos de cada sección por separado.
+    document.getElementById('limpiar-todo').addEventListener('click', async () => {
+        if (!await confirmAction('¿Limpiar todo el formulario? Se borrarán los datos de Pasajero, Actividades, Hoteles e Itinerario de esta cotización.', 'Sí, limpiar todo')) return;
+        nuevaCotizacion(false);
+        notifySuccess('Formulario limpiado.');
     });
     document.getElementById('cot-search').addEventListener('input', (e) => {
         clearTimeout(cotSearchDebounce);
