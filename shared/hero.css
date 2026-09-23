@@ -105,15 +105,19 @@
     border-radius: 12px 12px 0 0;
     font-weight: 600;
     font-size: 0.82rem;
-    color: #64748b;
-    background: #e2e8f0;
+    /* Inactivo: fondo transparente (se ve la imagen del Hero detrás) — texto claro con
+       sombra para que siga siendo legible sobre cualquier imagen de fondo. */
+    color: rgba(255, 255, 255, 0.85);
+    background: transparent;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
     border: none;
     cursor: pointer;
     transition: all 0.2s;
 }
-.filter-tab:hover { background: #cbd5e1; color: #334155; }
+.filter-tab:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 .filter-tab.active {
     background: #f5fbff;
     color: var(--accent-2, #bb3135);
+    text-shadow: none;
     box-shadow: 0 -4px 10px rgba(2, 6, 23, 0.06);
 }

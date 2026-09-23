@@ -80,12 +80,16 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </button>
         </div>
         <div id="cotizador-section" class="tab-content">
-            <main class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                <section class="lg:col-span-1 card p-3">
+            <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+                <section class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
-                        <h2 class="text-base font-medium">1. Datos Pax</h2>
+                        <button type="button" class="accordion-toggle" aria-expanded="true">
+                            <i class="fas fa-chevron-down accordion-caret"></i>
+                            <h2 class="text-base font-medium">Datos Pax</h2>
+                        </button>
                         <span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
                     </div>
+                    <div class="accordion-body">
                     <form id="form-pax" class="grid grid-cols-1 gap-2 small">
                         <div class="field">
                             <select name="idioma" title="Idioma de la cotización / PDF">
@@ -119,11 +123,15 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="field field-overlay"><input type="date" name="f_salida" title="Fecha de salida"><span class="field-placeholder-overlay">F. Salida</span></div>
                         <div class="field field-overlay"><input type="time" name="h_salida" title="Hora de salida"><span class="field-placeholder-overlay">H. Salida</span></div>
                     </form>
+                    </div>
                 </section>
                 <section class="lg:col-span-3 space-y-4">
-                    <div class="card p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h2 class="text-base font-medium">2. Actividades del Tour</h2>
+                    <div class="card p-3 accordion-section" data-accordion-key="actividades">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <h2 class="text-base font-medium">Actividades</h2>
+                            </button>
                             <div class="flex items-center gap-2">
                                 <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1">
                                     <option value="">Aplicar paquete...</option>
@@ -137,6 +145,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <button id="clear-tours" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
+                        <div class="accordion-body">
                         <div class="overflow-x-auto">
                             <table id="tours-table" class="w-full small">
                                 <thead>
@@ -160,10 +169,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="mt-2">
                             <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
                         </div>
+                        </div>
                     </div>
-                    <div class="card p-3">
-                         <div class="flex items-center justify-between mb-2">
-                            <h2 class="text-base font-medium">3. Gestionar Hoteles</h2>
+                    <div class="card p-3 accordion-section" data-accordion-key="hoteles">
+                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <h2 class="text-base font-medium">Hoteles</h2>
+                            </button>
                             <div class="flex items-center gap-2">
                                 <button id="toggle-conf-hoteles" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
                                     <i class="fas fa-eye mr-1"></i>Precios confid.
@@ -171,6 +184,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <button id="clear-hotels" class="px-3 py-1 rounded-md small border">Limpiar</button>
                             </div>
                         </div>
+                        <div class="accordion-body">
                         <div class="overflow-x-auto">
                             <table id="hotels-table" class="w-full small">
                                 <thead>
@@ -195,11 +209,16 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="mt-2">
                             <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-2)">+ Fila</button>
                         </div>
-                    </div>
-                    <div class="card p-3">
-                        <div class="flex items-center justify-between mb-2">
-                            <h2 class="text-base font-medium">4. Itinerario</h2>
                         </div>
+                    </div>
+                    <div class="card p-3 accordion-section" data-accordion-key="itinerario">
+                        <div class="flex items-center justify-between mb-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <h2 class="text-base font-medium">Itinerario</h2>
+                            </button>
+                        </div>
+                        <div class="accordion-body">
                         <!-- Pasajero y título ya quedan ligados a la cotización (Nombre PAX y un título
                              autogenerado a partir de este, ver el listener de nombre_pax en cotizador.js)
                              en vez de pedirlos aparte acá; los inputs se mantienen ocultos porque
@@ -232,6 +251,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              itinerario junto con el de la cotización si hay módulos armados acá. -->
                         <div class="flex items-center gap-2 mt-3">
                             <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border">+ Añadir Fila</button>
+                        </div>
                         </div>
                     </div>
                     <div class="card p-0 overflow-hidden">

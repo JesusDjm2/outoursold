@@ -186,6 +186,27 @@ function irASubtabGestion(subtab) {
     if (subtab === 'clasificacion') actualizarConteosItinerarios();
 }
 
+// Acordeones de Datos Pax / Actividades / Hoteles / Itinerario: colapsan/expanden y
+// recuerdan el estado por sección en localStorage, para que la vista siga compacta en la
+// próxima carga si el usuario así la dejó (ej. Datos Pax, que tiene muchos campos).
+function inicializarAcordeones() {
+    document.querySelectorAll('.accordion-section[data-accordion-key]').forEach(section => {
+        const key = section.dataset.accordionKey;
+        const toggle = section.querySelector('.accordion-toggle');
+        if (!toggle) return;
+        let colapsado = false;
+        try { colapsado = localStorage.getItem(`acc-${key}`) === '1'; } catch (e) {}
+        section.classList.toggle('is-collapsed', colapsado);
+        toggle.setAttribute('aria-expanded', String(!colapsado));
+
+        toggle.addEventListener('click', () => {
+            const ahoraColapsado = section.classList.toggle('is-collapsed');
+            toggle.setAttribute('aria-expanded', String(!ahoraColapsado));
+            try { localStorage.setItem(`acc-${key}`, ahoraColapsado ? '1' : '0'); } catch (e) {}
+        });
+    });
+}
+
 // Llena un <select> de Destino (mismo catálogo para tours y hoteles).
 function llenarSelectDestino(select, selectedId) {
     select.innerHTML = '<option value="">Sin clasificar</option>' +
@@ -2587,6 +2608,7 @@ async function init() {
         }
     });
 
+    inicializarAcordeones();
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
     document.querySelectorAll('.field-overlay input').forEach(input => {

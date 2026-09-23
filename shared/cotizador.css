@@ -16,6 +16,35 @@ body {
     box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
 }
 .input { appearance: none; }
+/* Acordeones de Datos Pax / Actividades / Hoteles / Itinerario (Cotizador): colapsan para
+   una vista más compacta, sobre todo Datos Pax que tiene muchos campos. El estado
+   (colapsado/expandido) se guarda por sección en localStorage — ver cotizador.js. */
+.accordion-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+}
+.accordion-caret {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.accordion-section.is-collapsed .accordion-caret { transform: rotate(-90deg); }
+.accordion-section.is-collapsed .accordion-body { display: none; }
+/* Encabezados de las tablas de Actividades/Hoteles/Itinerario: gris en vez del negro por
+   defecto, para que pesen menos visualmente que el contenido de las filas. */
+#tours-table thead th,
+#hotels-table thead th,
+.itinerary-table-container thead th {
+    color: #94a3b8;
+    font-weight: 600;
+}
 /* Mismo alto/borde que el selector en cascada de Tour/Alojamiento (.cascade-select-trigger
    en cascade-select.css), para que todos los campos de una fila de Actividades/Hoteles
    midan igual — si no, el selector (padding 6px, radius 8px) queda más alto/redondeado
