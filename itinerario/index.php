@@ -26,6 +26,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="itinerario.css?v=<?= filemtime(__DIR__ . '/itinerario.css') ?>">
+    <link rel="stylesheet" href="../shared/tabs.css?v=<?= filemtime(__DIR__ . '/../shared/tabs.css') ?>">
     <link rel="stylesheet" href="../shared/sidebar.css?v=<?= filemtime(__DIR__ . '/../shared/sidebar.css') ?>">
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/../shared/hero.css') ?>">
     <link rel="stylesheet" href="../shared/cascade-select.css?v=<?= filemtime(__DIR__ . '/../shared/cascade-select.css') ?>">

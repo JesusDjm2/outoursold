@@ -417,7 +417,7 @@ async function guardarTour(payload) {
 }
 
 async function eliminarTour(t) {
-    if (!await confirmAction(`¿Eliminar "${t.tour}" del catálogo de tours?`)) return;
+    if (!await confirmAction(`¿Eliminar "${t.tour}" del catálogo de tours? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-tour`, {
             method: 'POST',
@@ -618,7 +618,8 @@ async function eliminarDestino(d) {
         if (nHoteles) partes.push(`${nHoteles} hotel${nHoteles === 1 ? '' : 'es'}`);
         mensaje += ` Quedarían ${partes.join(' y ')} sin destino asignado.`;
     }
-    if (!await confirmAction(mensaje)) return;
+    mensaje += ' Esta acción no se puede deshacer.';
+    if (!await confirmAction(mensaje, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-destino`, {
             method: 'POST',
@@ -859,7 +860,8 @@ async function eliminarCategoria(tipo, c) {
     }
     let mensaje = `¿Eliminar la categoría "${c.nombre}"?`;
     if (n) mensaje += ` Quedarían ${n} ${t.sustantivo[n === 1 ? 0 : 1]} sin categoría asignada.`;
-    if (!await confirmAction(mensaje)) return;
+    mensaje += ' Esta acción no se puede deshacer.';
+    if (!await confirmAction(mensaje, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${t.apiBase()}?path=${t.apiEliminar}`, {
             method: 'POST',
@@ -1016,7 +1018,7 @@ async function guardarHotel(payload) {
 }
 
 async function eliminarHotel(h) {
-    if (!await confirmAction(`¿Eliminar "${h.aloj}" del catálogo de hoteles?`)) return;
+    if (!await confirmAction(`¿Eliminar "${h.aloj}" del catálogo de hoteles? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-hotel`, {
             method: 'POST',
@@ -1253,7 +1255,7 @@ async function editarPaquete(paquete) {
 }
 
 async function eliminarPaquete(paquete) {
-    if (!await confirmAction(`¿Eliminar el paquete "${paquete.nombre}"?`)) return;
+    if (!await confirmAction(`¿Eliminar el paquete "${paquete.nombre}"? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-paquete-tour`, {
             method: 'POST',
@@ -2242,7 +2244,7 @@ async function verPdfCotizacionGuardada(id, btn) {
 }
 
 async function eliminarCotizacionGuardada(id, nombre) {
-    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`)) return;
+    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-cotizacion`, {
             method: 'POST',
@@ -2650,6 +2652,11 @@ async function init() {
 
     inicializarAcordeones();
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
+    document.getElementById('itinerario-ir-guardar').addEventListener('click', () => {
+        const btn = document.getElementById('guardar-cotizacion');
+        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        btn.focus({ preventScroll: true });
+    });
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
     document.querySelectorAll('.field-overlay input').forEach(input => {
         input.addEventListener('input', () => actualizarEstadoCampoFecha(input));
@@ -3058,10 +3065,10 @@ async function subirCsvConPreview(tipo, file) {
 
     const previo = await enviar(true);
     if (!previo.success) {
-        let html = `<p>${previo.error}</p>`;
+        let html = `<p>${escapeHtml(previo.error)}</p>`;
         if (previo.errores?.length) {
             html += `<ul class="text-xs text-left mt-2" style="max-height:10rem;overflow-y:auto">` +
-                previo.errores.slice(0, 15).map(e => `<li>Fila ${e.fila}: ${e.motivo}</li>`).join('') +
+                previo.errores.slice(0, 15).map(e => `<li>Fila ${escapeHtml(e.fila)}: ${escapeHtml(e.motivo)}</li>`).join('') +
                 (previo.errores.length > 15 ? `<li>... y ${previo.errores.length - 15} más.</li>` : '') + `</ul>`;
         }
         await Swal.fire({ icon: 'error', title: 'No se pudo subir el archivo', html, confirmButtonColor: '#e80c13' });

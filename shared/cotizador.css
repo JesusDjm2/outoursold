@@ -70,45 +70,6 @@ tr.draggable:active { cursor: grabbing; }
     color: white;
 }
 .opacity-60 { opacity: 0.6; }
-/* Pestañas principales (Cotizador / Gestión de Datos / Cotizaciones Guardadas /
-   Itinerario). Antes usaban el text-base (1rem) por defecto de Tailwind sin ningún
-   límite de ancho — con 4 pestañas y etiquetas largas ("Cotizaciones Guardadas"), en
-   mobile el texto se partía en 2-3 líneas y "Itinerario" se salía del contenedor. Mismo
-   criterio que .subnav-tab/.categoria-tipo-tab (tamaño chico definido acá, no en la
-   plantilla) + min-width:0 para que el texto pueda truncar en vez de desbordar.
-   El label va en un <span> propio para truncar solo el texto, no el ícono. */
-.nav-tab {
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    min-width: 0;
-    font-size: 0.72rem;
-    padding: 9px 6px;
-}
-.nav-tab i { flex-shrink: 0; }
-.nav-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-tab.active {
-    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
-    color: white;
-}
-@media (min-width: 640px) {
-    .nav-tab { font-size: 0.85rem; padding: 11px 14px; gap: 7px; }
-}
-.subnav-tab {
-    transition: all 0.2s;
-    padding: 6px 16px;
-    border-radius: 6px;
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: #64748b;
-}
-.subnav-tab:hover { background: #f1f5f9; }
-.subnav-tab.active {
-    background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
-    color: white;
-}
 .categoria-tipo-tab {
     transition: all 0.2s;
     padding: 5px 14px;

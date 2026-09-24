@@ -27,6 +27,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../shared/cotizador.css?v=<?= filemtime(__DIR__ . '/cotizador.css') ?>">
+    <link rel="stylesheet" href="../shared/tabs.css?v=<?= filemtime(__DIR__ . '/tabs.css') ?>">
     <link rel="stylesheet" href="../shared/cascade-select.css?v=<?= filemtime(__DIR__ . '/cascade-select.css') ?>">
     <link rel="stylesheet" href="../shared/sidebar.css?v=<?= filemtime(__DIR__ . '/sidebar.css') ?>">
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/hero.css') ?>">
@@ -244,10 +245,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <tbody id="itinerary-builder-body"></tbody>
                             </table>
                         </div>
-                        <!-- Sin botón propio de generar: "Guardar" (Datos Pax) ya genera el PDF del
-                             itinerario junto con el de la cotización si hay módulos armados acá. -->
-                        <div class="flex items-center gap-2 mt-3">
+                        <!-- Sin botón propio de generar: "Guardar" (Resumen de Factura) ya genera el PDF
+                             del itinerario junto con el de la cotización si hay módulos armados acá. El
+                             aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
+                        <div class="flex flex-wrap items-center gap-2 mt-3">
                             <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border">+ Añadir Fila</button>
+                            <span class="small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
+                            <button id="itinerario-ir-guardar" type="button" class="small text-[var(--accent-2)] hover:underline">Ir a Guardar <i class="fas fa-arrow-down"></i></button>
                         </div>
                         </div>
                     </div>

@@ -484,7 +484,7 @@ document.getElementById('upload-local-module').addEventListener('click', () => {
 async function handleItineraryDelete(id) {
     const modulo = modulosActivos().find(m => m.id === id);
     if (!modulo) return;
-    if (!(await confirmAction(`¿Eliminar "${modulo.titulo}"?`))) return;
+    if (!(await confirmAction(`¿Eliminar "${modulo.titulo}"? Esta acción no se puede deshacer.`, 'Sí, eliminar'))) return;
 
     try {
         const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-modulo&idioma=${idiomaActivo}`, {
@@ -644,7 +644,7 @@ document.getElementById('upload-pagina-fija').addEventListener('click', () => {
 });
 
 async function handlePaginaFijaDelete(p) {
-    if (!(await confirmAction(`¿Eliminar "${p.titulo}"?`))) return;
+    if (!(await confirmAction(`¿Eliminar "${p.titulo}"? Esta acción no se puede deshacer.`, 'Sí, eliminar'))) return;
 
     try {
         const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-pagina-fija&idioma=${idiomaActivo}`, {
@@ -914,7 +914,7 @@ function editarPaqueteItinerario(paquete) {
 }
 
 async function eliminarPaqueteItinerario(paquete) {
-    if (!await confirmAction(`¿Eliminar el itinerario predeterminado "${paquete.nombre}"?`)) return;
+    if (!await confirmAction(`¿Eliminar el itinerario predeterminado "${paquete.nombre}"? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
         const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=eliminar-paquete&idioma=${idiomaActivo}`, {
             method: 'POST',

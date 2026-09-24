@@ -759,6 +759,16 @@ try {
             // y el usuario confirma con números reales, no una advertencia genérica.
             $esPreview = !empty($_POST['preview']);
             $file = $_FILES['file']['tmp_name'];
+            // Sin esta revisión, un .xlsx (o cualquier binario) se leía igual línea por línea y
+            // devolvía decenas de errores de "formato" fila por fila, sin decir cuál era el
+            // problema real. Un .xlsx es un zip: trae bytes nulos en el arranque, un CSV no.
+            $extCsv = strtolower(pathinfo($_FILES['file']['name'] ?? '', PATHINFO_EXTENSION));
+            $arranque = is_readable($file) ? (string) file_get_contents($file, false, null, 0, 4096) : '';
+            if ($extCsv !== 'csv' || strpos($arranque, "\0") !== false) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Solo se aceptan archivos .csv. Si tienes un Excel (.xlsx), guárdalo como "CSV (delimitado por comas)" y vuelve a subirlo.']);
+                break;
+            }
             $lineas = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             // Excel en español (configuración regional de Perú/Latam) exporta e importa CSV
             // separados por punto y coma, no por coma — si se abre a doble clic un CSV con

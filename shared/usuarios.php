@@ -26,6 +26,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="cotizador.css?v=<?= filemtime(__DIR__ . '/cotizador.css') ?>">
+    <link rel="stylesheet" href="tabs.css?v=<?= filemtime(__DIR__ . '/tabs.css') ?>">
     <link rel="stylesheet" href="sidebar.css?v=<?= filemtime(__DIR__ . '/sidebar.css') ?>">
     <link rel="stylesheet" href="hero.css?v=<?= filemtime(__DIR__ . '/hero.css') ?>">
 </head>
@@ -789,7 +790,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
         }
 
         async function eliminarAgencia(a) {
-            if (!await confirmAction(`¿Eliminar la agencia "${a.nombre}"? Los usuarios asignados quedarán sin agencia.`)) return;
+            if (!await confirmAction(`¿Eliminar la agencia "${a.nombre}"? Los usuarios asignados quedarán sin agencia. Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
             const res = await fetch(`${AGENCIAS_API_URL}?path=eliminar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

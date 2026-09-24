@@ -54,6 +54,27 @@ function validarNombreArchivoPdf($filename) {
         && preg_match('/^[A-Za-z0-9 _\-.]+\.pdf$/', $filename) === 1;
 }
 
+// Borra el PDF físico de uploads/$idioma/ tras eliminar su módulo o página fija — antes
+// quedaba huérfano en disco para siempre. Solo se borra si ya no lo referencia ningún
+// otro módulo ni página fija (nada impide que dos filas apunten al mismo archivo), y si
+// el nombre pasa la whitelist (filas viejas con nombres raros se dejan tal cual).
+function borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idioma, $filename) {
+    if (!validarNombreArchivoPdf($filename)) return;
+    try {
+        foreach ([$tablaModulos, $tablaPaginasFijas] as $tabla) {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM $tabla WHERE filename = ?");
+            $stmt->execute([$filename]);
+            if ($stmt->fetchColumn() > 0) return;
+        }
+    } catch (Exception $e) {
+        return; // el registro ya se borró: limpiar el archivo es opcional, no debe fallar la respuesta
+    }
+    $ruta = __DIR__ . "/uploads/$idioma/" . $filename;
+    if (is_file($ruta)) {
+        @unlink($ruta);
+    }
+}
+
 try {
     switch ($path) {
         case 'modulos':
@@ -413,6 +434,7 @@ try {
                 }
 
                 $db->commit();
+                borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idioma, $filename);
                 echo json_encode(['success' => true, 'paquetes_afectados' => $paquetesAfectados]);
             } catch (Exception $e) {
                 $db->rollBack();
@@ -553,6 +575,7 @@ try {
                     ->execute([json_encode($startFiles, JSON_UNESCAPED_UNICODE), json_encode($endFiles, JSON_UNESCAPED_UNICODE)]);
 
                 $db->commit();
+                borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idioma, $filename);
                 echo json_encode([
                     'success' => true,
                     'config' => ['startFiles' => $startFiles, 'endFiles' => $endFiles],
