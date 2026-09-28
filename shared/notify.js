@@ -30,6 +30,26 @@ async function notifySuccessAction(msg, actionText) {
     return result.isConfirmed;
 }
 
+// Pide un texto corto (ej. nombre de un paquete nuevo) con un input dentro del propio
+// Swal, en vez de un prompt() nativo (feo y sin estilo). Devuelve el texto ya recortado,
+// o null si el usuario canceló o lo dejó vacío.
+async function promptText(title, placeholder = '', defaultValue = '') {
+    const { value } = await Swal.fire({
+        icon: 'question',
+        title,
+        input: 'text',
+        inputPlaceholder: placeholder,
+        inputValue: defaultValue,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e80c13',
+        cancelButtonColor: '#64748b',
+        inputValidator: (v) => !v?.trim() ? 'Escribe un nombre.' : undefined
+    });
+    return value?.trim() || null;
+}
+
 // Si el mensaje trae "¿Pregunta? Detalle adicional.", la pregunta queda en negrita
 // (title de SweetAlert2) y el detalle abajo en texto normal, con el salto de línea que
 // separa ambos bloques ya puesto por el propio layout de Swal — sin esto, un mensaje

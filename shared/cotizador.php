@@ -137,7 +137,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1">
                                     <option value="">Aplicar paquete...</option>
                                 </select>
-                                <button id="historial-tours-btn" type="button" class="px-3 py-1 rounded-md small border" title="Ver historial de actividades usadas en cotizaciones guardadas">
+                                <button id="historial-tours-btn" type="button" class="px-3 py-1 rounded-md small border" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
                                     <i class="fas fa-clock-rotate-left mr-1"></i>Historial
                                 </button>
                                 <button id="toggle-conf-tours" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
@@ -251,7 +251,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="flex flex-wrap items-center gap-2 mt-3">
                             <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border">+ Añadir Fila</button>
                             <span class="small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
-                            <button id="itinerario-ir-guardar" type="button" class="small text-[var(--accent-2)] hover:underline">Ir a Guardar <i class="fas fa-arrow-down"></i></button>
                         </div>
                         </div>
                     </div>
@@ -297,6 +296,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             </div>
                             <div class="mt-4 pt-4 border-t flex flex-wrap gap-2">
                                 <button id="guardar-cotizacion" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Guardar</button>
+                                <button id="guardar-como-paquete" type="button" class="btn border" title="Guarda las Actividades, Hoteles e Itinerario de esta cotización como un paquete predefinido reutilizable (sin fechas ni datos de pasajero)"><i class="fas fa-box-archive mr-2"></i>Guardar como paquete</button>
                                 <button id="limpiar-todo" type="button" class="btn border" title="Limpia Datos Pax, Actividades, Hoteles e Itinerario de esta cotización"><i class="fas fa-broom mr-2"></i>Limpiar todo</button>
                             </div>
                         </div>

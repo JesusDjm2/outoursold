@@ -1534,26 +1534,39 @@ function cerrarHistorialTours() {
     document.getElementById('historial-tours-modal').classList.add('hidden');
 }
 
+// Resumen de lo que trae una cotización histórica, para el preview de la lista y para
+// decidir si aparece en ella — ya no exige que tenga actividades: una cotización con
+// solo hoteles o solo itinerario también es reusable.
+function resumenHistorialCotizacion(c) {
+    const tours = (c.data?.tours || []).filter(t => t.tour);
+    const hoteles = (c.data?.hotels || []).filter(h => h.aloj);
+    const modulos = c.data?.itinerarioArmado?.modulos?.filter(Boolean) || [];
+    const partes = [];
+    if (tours.length) partes.push(`${tours.length} actividad${tours.length === 1 ? '' : 'es'}`);
+    if (hoteles.length) partes.push(`${hoteles.length} hotel${hoteles.length === 1 ? '' : 'es'}`);
+    if (modulos.length) partes.push(`${modulos.length} módulo${modulos.length === 1 ? '' : 's'} de itinerario`);
+    return { tours, hoteles, modulos, resumen: partes.join(' · ') };
+}
+
 function renderHistorialTours(cotizacionesGuardadas, total) {
     const container = document.getElementById('historial-tours-list');
-    // Solo interesan las que ya traen actividades, y no la que se está editando ahora mismo.
-    const conActividades = cotizacionesGuardadas.filter(c =>
-        c.id !== currentCotizacionId && Array.isArray(c.data?.tours) && c.data.tours.filter(t => t.tour).length > 0
-    );
+    // No la que se está editando ahora mismo, y que traiga algo de las 3 secciones.
+    const conContenido = cotizacionesGuardadas
+        .filter(c => c.id !== currentCotizacionId)
+        .map(c => ({ c, r: resumenHistorialCotizacion(c) }))
+        .filter(({ r }) => r.tours.length || r.hoteles.length || r.modulos.length);
     container.innerHTML = '';
-    if (!conActividades.length) {
-        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-6">${histState.term ? 'Sin resultados.' : 'Todavía no hay cotizaciones guardadas con actividades.'}</p>`;
+    if (!conContenido.length) {
+        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-6">${histState.term ? 'Sin resultados.' : 'Todavía no hay cotizaciones guardadas con actividades, hoteles o itinerario.'}</p>`;
     } else {
-        conActividades.forEach(c => {
+        conContenido.forEach(({ c, r }) => {
             const nombre = c.data.pax?.nombre_pax || 'Sin nombre';
-            const tours = c.data.tours.filter(t => t.tour);
-            const preview = tours.map(t => t.tour).join(', ');
             const div = document.createElement('div');
             div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
             div.innerHTML = `
                 <div class="min-w-0">
                     <div class="font-medium truncate">${escapeHtml(c.id)} — ${escapeHtml(nombre)}</div>
-                    <div class="text-xs text-slate-500 truncate">${tours.length} actividad(es): ${escapeHtml(preview)}</div>
+                    <div class="text-xs text-slate-500 truncate">${escapeHtml(r.resumen)}</div>
                 </div>
                 <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
             `;
@@ -1567,15 +1580,16 @@ function renderHistorialTours(cotizacionesGuardadas, total) {
     document.getElementById('historial-tours-next').disabled = shown >= total;
 }
 
-// Trae TODAS las actividades y hoteles de esa cotización guardada a la vista actual,
-// tal cual quedaron (misma fecha/cant/precio/distribuidor). Reutiliza primero las filas
-// vacías que ya haya en las tablas (ver agregarFilasTours/agregarFilasHoteles) y recién
-// luego agrega al final.
-function reusarHistorialCotizacion(c) {
+// Trae TODAS las actividades, hoteles e itinerario de esa cotización guardada a la vista
+// actual, tal cual quedaron (misma fecha/cant/precio/distribuidor). Reutiliza primero las
+// filas vacías que ya haya en las tablas (ver agregarFilasTours/agregarFilasHoteles) y
+// recién luego agrega al final; el itinerario siempre se agrega al final (mismo criterio
+// que aplicarPaquete, vía aplicarPaqueteItinerario).
+async function reusarHistorialCotizacion(c) {
     // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
     // mano o un paquete aplicado) y sigue a N° PAX hasta que el usuario la edite — antes
     // se fijaba con la cantidad de la cotización histórica y quedaba sorda a N° PAX.
-    const filasTours = c.data.tours.filter(t => t.tour).map(t => ({
+    const filasTours = (c.data.tours || []).filter(t => t.tour).map(t => ({
         tour: t.tour,
         fecha: t.fecha || '',
         distr: t.distr,
@@ -1598,6 +1612,34 @@ function reusarHistorialCotizacion(c) {
         pctotal: h.pctotal
     }));
     agregarFilasHoteles(filasHoteles, false);
+
+    // El itinerario no guarda su propio idioma (es el de Datos Pax de esa cotización,
+    // vía c.data.pax.idioma) — si difiere del idioma activo ahora, se pide confirmar el
+    // cambio, igual que al aplicar un paquete con itinerario en otro idioma.
+    const modulos = (c.data.itinerarioArmado?.modulos || []).filter(Boolean);
+    if (modulos.length) {
+        const idiomaOrigen = c.data.pax?.idioma;
+        const selectIdioma = document.querySelector('select[name="idioma"]');
+        const nombresIdioma = { es: 'Español', en: 'English', pt: 'Português' };
+        let cambioIdioma = false;
+        if (idiomaOrigen && selectIdioma.value !== idiomaOrigen) {
+            const armadorTieneModulos = Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).some(el => el.value);
+            if (armadorTieneModulos && !await confirmAction(
+                `El itinerario de esta cotización está en ${nombresIdioma[idiomaOrigen] || idiomaOrigen}. Se cambiará el idioma de la cotización y se reiniciará el itinerario que ya armaste. ¿Continuar?`,
+                'Sí, cambiar idioma'
+            )) {
+                cerrarHistorialTours();
+                return;
+            }
+            selectIdioma.value = idiomaOrigen;
+            await activarIdioma(idiomaOrigen);
+            cambioIdioma = true;
+        }
+        aplicarPaqueteItinerario({ modulos });
+        if (cambioIdioma) {
+            notifyWarning(`El itinerario de esta cotización está en ${nombresIdioma[idiomaOrigen] || idiomaOrigen}: el idioma de la cotización se cambió a ${nombresIdioma[idiomaOrigen] || idiomaOrigen}.`);
+        }
+    }
 
     cerrarHistorialTours();
 }
@@ -1927,6 +1969,44 @@ function calcularResumen() {
     document.getElementById('pv-promo').textContent = fmt(pvPromo);
     document.getElementById('total-desc').textContent = fmt(totalDesc);
     document.getElementById('pv-final').textContent = fmt(pvFinal);
+}
+
+// Guarda las Actividades/Hoteles/Itinerario que ya tiene armados la cotización actual
+// como un paquete predefinido reutilizable — mismo endpoint y misma forma de datos que
+// el armador de "Gestión de Datos > Paquetes" (guardarPaquete), pero leyendo directo de
+// la cotización en pantalla en vez de las filas propias del formulario de paquete. Sin
+// fechas/cin-cout/precios ni datos de pasajero: un paquete es una plantilla reutilizable,
+// no una cotización concreta.
+async function guardarComoPaquete() {
+    const tours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
+        .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value }))
+        .filter(t => t.tour);
+    const hoteles = Array.from(document.getElementById('hotels-body').querySelectorAll('tr'))
+        .map(tr => ({ aloj: tr.querySelector('.hotel-name').value, nhab: tr.querySelector('.nhab').value, noches: tr.querySelector('.noches').value }))
+        .filter(h => h.aloj);
+    const modulos = Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean);
+    if (!tours.length && !hoteles.length && !modulos.length) {
+        notifyWarning('Agrega al menos una actividad, un hotel o un módulo de itinerario antes de guardar como paquete.');
+        return;
+    }
+    const nombre = await promptText('Nombre del paquete', 'ej. Cusco Clásico 3D/2N');
+    if (!nombre) return;
+    try {
+        const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nombre, tours, hoteles,
+                itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos } : null
+            })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        await notifySuccess(`Paquete "${nombre}" guardado. Ya está disponible en Gestión de Datos y en "Aplicar paquete".`);
+        await cargarPaquetes();
+    } catch (e) {
+        notifyError('Error al guardar el paquete: ' + e.message);
+    }
 }
 
 // ===== COTIZACIONES =====
@@ -2652,11 +2732,7 @@ async function init() {
 
     inicializarAcordeones();
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
-    document.getElementById('itinerario-ir-guardar').addEventListener('click', () => {
-        const btn = document.getElementById('guardar-cotizacion');
-        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        btn.focus({ preventScroll: true });
-    });
+    document.getElementById('guardar-como-paquete').addEventListener('click', guardarComoPaquete);
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
     document.querySelectorAll('.field-overlay input').forEach(input => {
         input.addEventListener('input', () => actualizarEstadoCampoFecha(input));
