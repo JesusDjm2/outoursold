@@ -136,7 +136,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </button>
             </div>
 
-            <div id="itinerario-gestion-modulos" class="subtab-content">
+            <div id="itinerario-gestion-modulos" class="itin-panel">
                 <div class="card p-6 mb-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nuevo Módulo PDF</h2>
                     <form id="itinerary-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -192,7 +192,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </button>
             </div>
 
-            <div id="itinerario-gestion-predeterminados" class="subtab-content hidden">
+            <div id="itinerario-gestion-predeterminados" class="itin-panel hidden">
                 <div class="card p-6 mb-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-1">Nuevo Itinerario Predeterminado</h2>
                     <p class="text-sm text-slate-500 mb-4">Guarda una secuencia de módulos predefinida (por ejemplo, los días de un paquete típico) para insertarla completa en el armador de un clic.</p>
@@ -210,7 +210,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
             </div>
 
-            <div id="itinerario-gestion-paginas" class="subtab-content hidden">
+            <div id="itinerario-gestion-paginas" class="itin-panel hidden">
                 <div class="card p-6 mb-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
                     <p class="text-sm text-slate-500 mb-4">Documentos que no se clasifican por destino ni categoría — siempre van al inicio o cierre del itinerario (portada, legalidad, términos, etc.).</p>
@@ -285,7 +285,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
             </div>
 
-            <div id="itinerario-gestion-historial" class="subtab-content hidden">
+            <div id="itinerario-gestion-historial" class="itin-panel hidden">
                 <div class="card p-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
                     <div class="flex flex-wrap items-end gap-3 mb-4">

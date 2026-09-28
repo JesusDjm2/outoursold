@@ -181,16 +181,23 @@ function buildHotelSelector(initialHotelName, onResolved) {
 }
 
 // Cambia de subpestaña dentro de Gestión de Datos (Destinos y Categorías / Paquetes /
-// Tours / Hoteles) — misma lógica que el click en un .subnav-tab, reutilizada por los
-// avisos de "falta X" y por los enlaces cruzados Destino/Categoría de las tablas.
-// Acotado a #gestion-section (no ".subnav-tab"/"​.subtab-content" a secas): Itinerario
-// embebido tiene su propio grupo de subpestañas con las mismas clases CSS
-// (#itinerario-gestion-subtabs, manejado enteramente por itinerario.js) — sin acotar acá,
-// un clic ahí también dispararía esta función y reventaría con "gestion-modulos" inexistente.
+// Tours / Hoteles / Itinerarios) — misma lógica que el click en un .subnav-tab, reutilizada
+// por los avisos de "falta X" y por los enlaces cruzados Destino/Categoría de las tablas.
+// "Itinerarios" (#gestion-itinerarios) trae anidado su PROPIO grupo de sub-pestañas
+// (#itinerario-gestion-subtabs, manejado enteramente por itinerario.js, con las mismas
+// clases .subnav-tab) — se excluye explícitamente para no pisarlo: sin esto, cualquier
+// clic acá le quitaría el "active" a sus botones internos, y un clic allá ocultaría estos
+// paneles de más (ver el mismo cuidado del lado de itinerario.js, con .itin-panel).
 function irASubtabGestion(subtab) {
     const contenedor = document.getElementById('gestion-section');
-    contenedor.querySelectorAll('.subnav-tab').forEach(t => t.classList.toggle('active', t.dataset.subtab === subtab));
-    contenedor.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+    const wrapperItin = document.getElementById('gestion-itinerarios');
+    const esInternoItin = (el) => el !== wrapperItin && wrapperItin.contains(el);
+    contenedor.querySelectorAll('.subnav-tab').forEach(t => {
+        if (!esInternoItin(t)) t.classList.toggle('active', t.dataset.subtab === subtab);
+    });
+    contenedor.querySelectorAll('.subtab-content').forEach(c => {
+        if (!esInternoItin(c)) c.classList.add('hidden');
+    });
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
     if (subtab === 'clasificacion') actualizarConteosItinerarios();
 }
@@ -2681,7 +2688,12 @@ async function init() {
         });
     });
 
-    document.querySelectorAll('#gestion-section .subnav-tab').forEach(tab => {
+    // "> div >" (no "#gestion-section .subnav-tab" a secas): las sub-pestañas propias de
+    // Itinerarios (#itinerario-gestion-subtabs, dentro de #gestion-itinerarios) también
+    // tienen clase .subnav-tab pero están 3 niveles más adentro — sin acotar por
+    // descendencia directa, este listener también se les pegaría encima del suyo propio
+    // (itinerario.js) y reventaría al buscar un "gestion-paginas" que no existe.
+    document.querySelectorAll('#gestion-section > div > .subnav-tab').forEach(tab => {
         tab.addEventListener('click', () => irASubtabGestion(tab.dataset.subtab));
     });
 

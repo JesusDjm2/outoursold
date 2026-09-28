@@ -873,6 +873,11 @@ function agregarFilaPaqueteItinerario(filename) {
 }
 
 function resetItinerarioPaqueteBuilder() {
+    // Panel "Itinerarios Predeterminados": solo existe en la página standalone (en
+    // Cotizador se quitó, cubierto por el Paquete unificado de Actividades/Hoteles/
+    // Itinerario) — sin esta guarda, activarIdioma()/initItinerario() reventaban al
+    // buscar un elemento que ahí no existe.
+    if (!document.getElementById('itinerario-paquete-nombre')) return;
     document.getElementById('itinerario-paquete-nombre').value = '';
     document.getElementById('itinerario-paquete-builder-rows').innerHTML = '';
     agregarFilaPaqueteItinerario();
@@ -935,6 +940,7 @@ async function eliminarPaqueteItinerario(paquete) {
 
 function renderPaquetesListItinerario() {
     const container = document.getElementById('itinerario-paquetes-list');
+    if (!container) return; // no existe en Cotizador — ver resetItinerarioPaqueteBuilder
     container.innerHTML = '';
     const paquetes = paquetesActivos();
     if (paquetes.length === 0) {
@@ -968,6 +974,7 @@ function renderPaquetesListItinerario() {
 
 function renderAplicarPaqueteSelectItinerario() {
     const select = document.getElementById('itinerario-aplicar-paquete-select');
+    if (!select) return; // no existe en Cotizador — ver resetItinerarioPaqueteBuilder
     select.innerHTML = '<option value="">Aplicar itinerario predeterminado...</option>';
     paquetesActivos().forEach(p => {
         const opt = document.createElement('option');
@@ -993,10 +1000,13 @@ function aplicarPaqueteItinerario(paquete) {
     recalculateDayNumbers();
 }
 
-document.getElementById('itinerario-paquete-add-row').addEventListener('click', () => agregarFilaPaqueteItinerario());
-document.getElementById('itinerario-paquete-guardar').addEventListener('click', guardarPaqueteItinerario);
-document.getElementById('itinerario-paquete-cancelar-edicion').addEventListener('click', resetItinerarioPaqueteBuilder);
-document.getElementById('itinerario-aplicar-paquete-select').addEventListener('change', (e) => {
+// "Itinerarios Predeterminados" (solo itinerario, sin actividades/hoteles) se quitó de
+// Cotizador — cubierto por el Paquete unificado (ver aplicarPaquete/guardarComoPaquete en
+// cotizador.js). Sigue existiendo en la vista standalone de Itinerario, de ahí el `?.`.
+document.getElementById('itinerario-paquete-add-row')?.addEventListener('click', () => agregarFilaPaqueteItinerario());
+document.getElementById('itinerario-paquete-guardar')?.addEventListener('click', guardarPaqueteItinerario);
+document.getElementById('itinerario-paquete-cancelar-edicion')?.addEventListener('click', resetItinerarioPaqueteBuilder);
+document.getElementById('itinerario-aplicar-paquete-select')?.addEventListener('change', (e) => {
     if (!e.target.value) return;
     const paquete = paquetesActivos().find(p => p.id == e.target.value);
     if (paquete) aplicarPaqueteItinerario(paquete);
@@ -1337,7 +1347,11 @@ document.querySelectorAll('#itinerario-main-tabs .nav-tab').forEach(tab => {
 document.querySelectorAll('#itinerario-gestion-subtabs .subnav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('#itinerario-gestion-subtabs .subnav-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
+        // .itin-panel (no ".subtab-content" a secas): en Cotizador este grupo de
+        // sub-pestañas vive ANIDADO dentro de #gestion-section ("Gestión de Datos"),
+        // que tiene sus propios .subtab-content — con la clase genérica, un clic acá
+        // también los ocultaba a ellos (y viceversa, ver irASubtabGestion en cotizador.js).
+        document.querySelectorAll('.itin-panel').forEach(c => c.classList.add('hidden'));
         tab.classList.add('active');
         document.getElementById(`itinerario-gestion-${tab.dataset.subtab}`).classList.remove('hidden');
     });
