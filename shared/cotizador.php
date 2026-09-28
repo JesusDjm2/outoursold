@@ -249,7 +249,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              del itinerario junto con el de la cotización si hay módulos armados acá. El
                              aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
                         <div class="flex flex-wrap items-center gap-2 mt-3">
-                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border">+ Añadir Fila</button>
+                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-3)">+ Fila</button>
                             <span class="small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
                         </div>
                         </div>
