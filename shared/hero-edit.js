@@ -92,10 +92,11 @@
     }
 
     // ===== Color de marca (cuentagotas) =====
-    // Reemplaza --accent-1/--accent-2 (botones/degradados actualmente rojos, definidos en
-    // :root de cotizador.css) por el color que el usuario elija. --accent-2 se deriva
-    // oscureciendo el mismo color un 18% (ver oscurecerColorHex() en agencia-helpers.php,
-    // mismo criterio, para que coincida con lo que se renderiza server-side la próxima vez).
+    // Reemplaza --accent-1/--accent-2/--accent-3 (botones/degradados actualmente rojos,
+    // definidos en :root de cotizador.css) por el color que el usuario elija. --accent-2
+    // se deriva oscureciendo ese color un 18%, --accent-3 aclarándolo un 35% (ver
+    // oscurecerColorHex()/aclararColorHex() en agencia-helpers.php, mismo criterio, para
+    // que coincida con lo que se renderiza server-side la próxima vez).
     const colorBtn = document.getElementById('hero-color-btn');
     const colorInput = document.getElementById('hero-color-input');
     if (colorBtn) {
@@ -138,6 +139,7 @@
             // ve hasta recargar.
             document.body.style.setProperty('--accent-1', hex);
             document.body.style.setProperty('--accent-2', oscurecerColor(hex, 0.18));
+            document.body.style.setProperty('--accent-3', aclararColor(hex, 0.35));
             notifySuccess('Color de marca actualizado.');
         } catch (err) {
             notifyError(err.message);
@@ -152,6 +154,14 @@
         const r = Math.round(((num >> 16) & 0xff) * (1 - porcentaje));
         const g = Math.round(((num >> 8) & 0xff) * (1 - porcentaje));
         const b = Math.round((num & 0xff) * (1 - porcentaje));
+        return `#${[r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function aclararColor(hex, porcentaje) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.round(((num >> 16) & 0xff) + (255 - ((num >> 16) & 0xff)) * porcentaje);
+        const g = Math.round(((num >> 8) & 0xff) + (255 - ((num >> 8) & 0xff)) * porcentaje);
+        const b = Math.round((num & 0xff) + (255 - (num & 0xff)) * porcentaje);
         return `#${[r, g, b].map(c => c.toString(16).padStart(2, '0')).join('')}`;
     }
 })();

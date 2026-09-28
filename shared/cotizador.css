@@ -1,3 +1,7 @@
+/* Valores por defecto (sin agencia propia, o sin color de marca elegido todavía) — si la
+   agencia sí personalizó su color con el cuentagotas del Hero, estos 3 quedan pisados por
+   un inline style en <body> (accent-2 y accent-3 derivados de accent-1: oscurecido 18% y
+   aclarado 35% respectivamente — ver resolverAccentColorStyle()/hero-edit.js). */
 :root {
     --accent-1: #e80c13;
     --accent-2: #bb3135;
