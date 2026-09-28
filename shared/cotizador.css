@@ -171,9 +171,10 @@ tr.draggable:active { cursor: grabbing; }
 }
 .field input::placeholder { color: #94a3b8; }
 
-/* N° PAX: al ser number con valor por defecto (1), siempre tiene contenido — el
-   placeholder nunca llegaría a mostrarse, así que necesita un prefijo fijo en vez de
-   uno que se oculte al escribir (como los demás campos de este formulario). */
+/* N° PAX y F. Cot.: al tener valor por defecto (1, y la fecha de hoy respectivamente),
+   siempre tienen contenido — el placeholder/overlay nunca llegaría a mostrarse, así que
+   necesitan un prefijo fijo en vez de uno que se oculte al tener valor (como los demás
+   campos de este formulario). */
 .field-prefix-label {
     flex-shrink: 0;
     white-space: nowrap;

@@ -101,7 +101,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="field"><input type="number" name="edad" placeholder="Edad" title="Edad del pasajero"></div>
                         <div class="field"><input type="text" name="contacto" placeholder="Contacto (tel./correo)" title="Teléfono o correo de contacto"></div>
                         <div class="field"><input type="text" name="canal" placeholder="Canal (WhatsApp, Web...)" title="Canal por el que llegó el cliente"></div>
-                        <div class="field field-overlay"><input type="date" name="fecha_cot" title="Fecha de la cotización"><span class="field-placeholder-overlay">F. Cot.</span></div>
+                        <div class="field field-prefix">
+                            <span class="field-prefix-label">F. Cot.</span>
+                            <input type="date" name="fecha_cot" title="Fecha de la cotización">
+                        </div>
                         <div class="field field-prefix">
                             <span class="field-prefix-label">N° PAX</span>
                             <input type="number" name="n_pax" value="1" min="1" title="Número de pasajeros">
