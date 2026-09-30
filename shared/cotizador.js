@@ -1687,37 +1687,32 @@ function sugerirSiguienteCheckinHotel() {
 // agregadas después vía sugerirSiguienteFechaTour()/sugerirSiguienteCheckinHotel(). Este
 // listener resincroniza las filas que sigan vacías apenas cambia Fecha de Llegada, sin
 // tocar ninguna fecha que el usuario ya haya cargado a mano.
+// Se dispara en cada cambio de Fecha de Llegada (ver el listener 'change' más abajo) para
+// que Actividades y Hoteles SIEMPRE queden correlativos a ella — no solo la primera vez
+// (antes solo llenaba fechas vacías; si una fila ya traía fecha de un cambio anterior, se
+// respetaba tal cual y quedaba "sorda" a la nueva Fecha de Llegada).
 function resincronizarFechasConLlegada() {
     const fLlegada = document.querySelector('input[name="f_llegada"]').value;
     if (!fLlegada) return;
 
-    let ultimaFechaTour = null;
+    // Actividades: día 1 = Fecha de Llegada, cada fila siguiente un día más, en el orden
+    // en que están las filas (se recalculan todas, tengan tour elegido o no).
+    let fecha = fLlegada;
     document.querySelectorAll('#tours-body tr').forEach(tr => {
-        const input = tr.querySelector('td:nth-child(2) input');
-        if (input.value) {
-            ultimaFechaTour = input.value;
-            return;
-        }
-        if (ultimaFechaTour) {
-            const siguiente = new Date(ultimaFechaTour + 'T00:00:00');
-            siguiente.setDate(siguiente.getDate() + 1);
-            input.value = siguiente.toISOString().split('T')[0];
-        } else {
-            input.value = fLlegada;
-        }
-        ultimaFechaTour = input.value;
+        tr.querySelector('td:nth-child(2) input').value = fecha;
+        fecha = sumarDiasISO(fecha, 1);
     });
 
-    let esPrimeraFilaHotel = true;
-    let ultimoCheckout = null;
+    // Hoteles: encadenados desde la Fecha de Llegada — el check-in del primero es la
+    // Fecha de Llegada, el check-out respeta las noches que ya tenía cada fila, y el
+    // check-in del siguiente hotel es el check-out del anterior.
+    let cin = fLlegada;
     document.querySelectorAll('#hotels-body tr').forEach(tr => {
-        const cin = tr.querySelector('td:nth-child(2) input');
-        const cout = tr.querySelector('td:nth-child(3) input');
-        if (!cin.value) {
-            cin.value = esPrimeraFilaHotel ? fLlegada : (ultimoCheckout || '');
-        }
-        esPrimeraFilaHotel = false;
-        ultimoCheckout = cout.value;
+        const noches = parseFloat(tr.querySelector('.noches')?.value) || 1;
+        tr.querySelector('td:nth-child(2) input').value = cin;
+        const cout = sumarDiasISO(cin, noches);
+        tr.querySelector('td:nth-child(3) input').value = cout;
+        cin = cout;
     });
 }
 
