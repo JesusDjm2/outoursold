@@ -69,6 +69,12 @@ tr.draggable:active {
     min-width: 600px;
 }
 
+/* Mismo criterio que .overflow-x-auto td en shared/cotizador.css: sin nowrap, el texto de
+   una celda larga se envolvía en varias líneas dentro de su columna en vez de mantener la
+   fila en una sola línea y dejar que el contenedor scrollee horizontal — filas altísimas en
+   mobile en vez de una tabla angosta y compacta con scroll lateral. */
+.itinerary-table-container td { white-space: nowrap; }
+
 .modal {
     display: none;
     position: fixed;

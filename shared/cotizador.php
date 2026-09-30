@@ -731,7 +731,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="md:col-span-8 border rounded-lg p-3">
                             <div class="flex items-center gap-3 mb-3 flex-wrap">
                                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
-                                <div class="flex gap-1 bg-slate-100 rounded-lg p-1 ml-auto">
+                                <div class="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 sm:ml-auto">
                                     <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Actividades</button>
                                     <button class="categoria-tipo-tab" data-categoria-tipo="hoteles">Hoteles</button>
                                     <button class="categoria-tipo-tab" data-categoria-tipo="itinerarios">Itinerarios</button>

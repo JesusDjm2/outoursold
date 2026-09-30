@@ -89,7 +89,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 mb-3">
+                <div class="flex items-center gap-2 mb-3 flex-wrap">
                     <select id="itinerario-aplicar-paquete-select" class="flex-1 border rounded p-2">
                         <option value="">Aplicar itinerario predeterminado...</option>
                     </select>

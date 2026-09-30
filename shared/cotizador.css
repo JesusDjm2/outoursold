@@ -73,14 +73,22 @@ tr.draggable:active { cursor: grabbing; }
     color: white;
 }
 .opacity-60 { opacity: 0.6; }
+/* Tamaño chico por defecto (como .nav-tab/.subnav-tab en tabs.css): en mobile, los 3
+   pills (con su conteo-badge cada uno) más el "ml-auto" que los empuja a la derecha del
+   título "Categorías" no entraban en una fila de 360-390px de ancho y sacaban scroll
+   horizontal a TODA la página, no solo al componente. */
 .categoria-tipo-tab {
     transition: all 0.2s;
-    padding: 5px 14px;
+    padding: 4px 8px;
     border-radius: 6px;
     font-weight: 500;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     color: #64748b;
     border: 1px solid transparent;
+    white-space: nowrap;
+}
+@media (min-width: 480px) {
+    .categoria-tipo-tab { padding: 5px 14px; font-size: 0.8rem; }
 }
 .categoria-tipo-tab:hover { background: #f1f5f9; }
 .categoria-tipo-tab.active {
@@ -211,6 +219,14 @@ tr.draggable:active { cursor: grabbing; }
 }
 .field-overlay.has-value .field-placeholder-overlay { display: none; }
 th { background-color: #f8fafc; white-space: nowrap; }
+/* Tablas de gestión (Tours/Hoteles/Cotizaciones Guardadas/Usuarios/Itinerarios, todas
+   envueltas en .overflow-x-auto): sin esto, el texto largo de una celda (ej. el nombre de
+   un tour) se envolvía en varias líneas dentro de su columna en vez de mantener la fila en
+   una sola línea y dejar que el contenedor se desplace horizontalmente — con decenas de
+   filas, eso disparaba el alto de cada una (una tabla de 104 tours llegaba a ~15000px de
+   alto en mobile). Con nowrap, la tabla mantiene su ancho natural y el scroll horizontal
+   del contenedor hace el resto, igual que cualquier tabla de datos densa. */
+.overflow-x-auto td { white-space: nowrap; }
 .hidden { display: none; }
 
 /* Precios confidenciales (Actividades del Tour / Data Hotel): ocultos por defecto, un

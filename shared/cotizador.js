@@ -1067,7 +1067,7 @@ async function cargarPaquetes() {
 
 function agregarFilaPaquete(data = {}) {
     const row = document.createElement('div');
-    row.className = 'flex gap-2 items-center paquete-builder-row';
+    row.className = 'flex flex-wrap gap-2 items-center paquete-builder-row';
 
     const tourInput = document.createElement('input');
     tourInput.type = 'hidden';
@@ -1098,7 +1098,7 @@ function agregarFilaPaquete(data = {}) {
 
 function agregarFilaPaqueteHotel(data = {}) {
     const row = document.createElement('div');
-    row.className = 'flex gap-2 items-center paquete-hotel-row';
+    row.className = 'flex flex-wrap gap-2 items-center paquete-hotel-row';
 
     const hotelInput = document.createElement('input');
     hotelInput.type = 'hidden';
@@ -1147,7 +1147,7 @@ async function agregarFilaPaqueteItin(filename = '') {
     const idioma = document.getElementById('paquete-itin-idioma').value;
     await asegurarIdiomaCargado(idioma);
     const row = document.createElement('div');
-    row.className = 'flex gap-2 items-center paquete-itin-row';
+    row.className = 'flex flex-wrap gap-2 items-center paquete-itin-row';
 
     const hiddenInput = document.createElement('input');
     hiddenInput.type = 'hidden';
