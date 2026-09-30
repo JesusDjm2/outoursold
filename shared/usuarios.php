@@ -34,7 +34,7 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
     <?php require __DIR__ . '/sidebar.php'; ?>
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
-            <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
+            <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
             <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             <div class="max-w-7xl mx-auto px-4 md:px-6">
                 <div class="page-hero-content">

@@ -38,11 +38,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
             <div class="hero-actions">
-                <button type="button" id="hero-logo-btn" class="hero-edit-btn" title="Agregar/cambiar el logo de tu empresa"><i class="fas fa-image"></i></button>
+                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de tu agencia" data-tooltip="Logo de tu agencia — se muestra en el encabezado y en el PDF de tus cotizaciones."><i class="fas fa-image"></i></button>
                 <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
-                <button type="button" id="hero-color-btn" class="hero-edit-btn" title="Elegir color de marca (cuentagotas)"><i class="fas fa-eye-dropper"></i></button>
+                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-eye-dropper"></i></button>
                 <input type="color" id="hero-color-input" class="hidden">
-                <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
                 <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">
@@ -206,7 +206,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             </table>
                         </div>
                         <div class="mt-2">
-                            <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-2)">+ Fila</button>
+                            <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
                         </div>
                         </div>
                     </div>
@@ -249,7 +249,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              del itinerario junto con el de la cotización si hay módulos armados acá. El
                              aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
                         <div class="flex flex-wrap items-center gap-2 mt-3">
-                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-3)">+ Fila</button>
+                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
                             <span class="small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
                         </div>
                         </div>

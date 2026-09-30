@@ -63,6 +63,7 @@
     gap: 8px;
 }
 .hero-edit-btn {
+    position: relative;
     width: 34px;
     height: 34px;
     border-radius: 50%;
@@ -84,6 +85,51 @@
     transform: scale(1.06);
 }
 .hero-edit-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+/* Los íconos del Hero (logo/color/foto) no dicen mucho por sí solos — reemplaza el
+   tooltip nativo del navegador (title: lento, sin estilo) por uno propio, legible desde
+   el primer hover, con un pequeño detalle de qué hace cada botón. El texto vive en
+   data-tooltip (ver aria-label en el propio <button> para lectores de pantalla). */
+.hero-edit-btn::after,
+.hero-edit-btn::before {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+    pointer-events: none;
+    z-index: 20;
+}
+.hero-edit-btn::after {
+    content: attr(data-tooltip);
+    width: max-content;
+    max-width: 210px;
+    padding: 8px 11px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.96);
+    color: #f1f5f9;
+    font-size: 0.72rem;
+    font-weight: 400;
+    line-height: 1.45;
+    text-align: left;
+    letter-spacing: 0.01em;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
+.hero-edit-btn::before {
+    content: '';
+    top: calc(100% + 4px);
+    right: 12px;
+    border: 6px solid transparent;
+    border-bottom-color: rgba(15, 23, 42, 0.96);
+}
+.hero-edit-btn:hover::after, .hero-edit-btn:hover::before,
+.hero-edit-btn:focus-visible::after, .hero-edit-btn:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
 
 /* Tabs de filtro: fuera del flujo, ancladas a la base del hero. Al ir con
    position:absolute no empujan al contenedor p-4/md:p-6 de abajo: ese

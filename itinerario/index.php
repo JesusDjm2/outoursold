@@ -37,11 +37,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
             <div class="hero-actions">
-                <button type="button" id="hero-logo-btn" class="hero-edit-btn" title="Agregar/cambiar el logo de tu empresa"><i class="fas fa-image"></i></button>
+                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de tu agencia" data-tooltip="Logo de tu agencia — se muestra en el encabezado y en el PDF de tus cotizaciones."><i class="fas fa-image"></i></button>
                 <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
-                <button type="button" id="hero-color-btn" class="hero-edit-btn" title="Elegir color de marca (cuentagotas)"><i class="fas fa-eye-dropper"></i></button>
+                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-eye-dropper"></i></button>
                 <input type="color" id="hero-color-input" class="hidden">
-                <button type="button" id="hero-edit-btn" class="hero-edit-btn" title="Cambiar imagen del Hero de tu empresa"><i class="fas fa-camera"></i></button>
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
                 <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">

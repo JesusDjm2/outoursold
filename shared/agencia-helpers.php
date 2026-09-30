@@ -68,21 +68,11 @@ function oscurecerColorHex($hex, $porcentaje) {
     return sprintf('#%02x%02x%02x', $r, $g, $b);
 }
 
-// Aclara un color hex un porcentaje (0-1) hacia blanco, para derivar --accent-3 (botón "+
-// Fila" de Itinerario) del mismo color de marca — espejo de aclararColor() en hero-edit.js.
-function aclararColorHex($hex, $porcentaje) {
-    $hex = ltrim($hex, '#');
-    $r = (int) round(hexdec(substr($hex, 0, 2)) + (255 - hexdec(substr($hex, 0, 2))) * $porcentaje);
-    $g = (int) round(hexdec(substr($hex, 2, 2)) + (255 - hexdec(substr($hex, 2, 2))) * $porcentaje);
-    $b = (int) round(hexdec(substr($hex, 4, 2)) + (255 - hexdec(substr($hex, 4, 2))) * $porcentaje);
-    return sprintf('#%02x%02x%02x', $r, $g, $b);
-}
-
-// Style inline con --accent-1/--accent-2/--accent-3 si la agencia propia del usuario
-// logueado personalizó su color de marca (color_principal), o '' si no — en ese caso el
-// CSS usa los valores por defecto de :root en cotizador.css tal cual. Se inyecta
-// server-side en el <body> (mismo criterio que resolverHeroImagenUrl con
-// --hero-bg-image) para que no haya flash del rojo por defecto antes de que cargue el JS.
+// Style inline con --accent-1/--accent-2 si la agencia propia del usuario logueado
+// personalizó su color de marca (color_principal), o '' si no — en ese caso el CSS usa
+// los valores por defecto de :root en cotizador.css tal cual. Se inyecta server-side en
+// el <body> (mismo criterio que resolverHeroImagenUrl con --hero-bg-image) para que no
+// haya flash del rojo por defecto antes de que cargue el JS.
 function resolverAccentColorStyle($db) {
     $agenciaId = resolverAgenciaPropiaId($db);
     if (!$agenciaId) return '';
@@ -91,8 +81,7 @@ function resolverAccentColorStyle($db) {
     $color = $stmt->fetchColumn();
     if (!$color) return '';
     $secundario = oscurecerColorHex($color, 0.18);
-    $terciario = aclararColorHex($color, 0.35);
-    return "--accent-1:{$color};--accent-2:{$secundario};--accent-3:{$terciario};";
+    return "--accent-1:{$color};--accent-2:{$secundario};";
 }
 
 // URL (con cache-busting) del logo de la agencia propia del usuario logueado, o null si
