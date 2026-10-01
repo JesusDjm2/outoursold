@@ -1,10 +1,11 @@
 <?php
 // shared/sidebar.php
-// Menú lateral compartido por cotizador.php y usuarios.php.
+// Menú lateral compartido por cotizador.php, gestion-datos.php y usuarios.php.
 // El caller debe definir antes de incluir este archivo:
 //   $navRoot   ruta relativa hasta la raíz del proyecto (siempre '../' para pen/, usd/ y shared/)
 //   $navShared ruta relativa hasta la carpeta shared/ ('../shared/' desde pen//usd/, '' desde shared/)
-//   $navActive clave de la sección activa: 'pen' | 'usd' | 'itinerario' | 'usuarios'
+//   $navActive clave de la sección activa: 'pen' | 'usd' | 'gestion-pen' | 'gestion-usd' |
+//              'mi-empresa' | 'usuarios'
 // y haber cargado auth.php (usa is_admin() y $_SESSION).
 ?>
 <script>
@@ -22,6 +23,9 @@
         </a>
         <a href="<?= htmlspecialchars($navRoot) ?>usd/" class="sidebar-link<?= ($navActive === 'usd' || $navActive === 'pen') ? ' active' : '' ?>" title="Cotizador">
             <i class="fas fa-calculator"></i><span>Cotizador</span>
+        </a>
+        <a href="<?= htmlspecialchars($navRoot) ?>usd/gestion.php" class="sidebar-link<?= ($navActive === 'gestion-usd' || $navActive === 'gestion-pen') ? ' active' : '' ?>" title="Gestión de Datos">
+            <i class="fas fa-database"></i><span>Gestión de Datos</span>
         </a>
         <?php if (is_admin()): ?>
         <a href="<?= htmlspecialchars($navShared) ?>usuarios.php" class="sidebar-link<?= $navActive === 'usuarios' ? ' active' : '' ?>" title="Usuarios">

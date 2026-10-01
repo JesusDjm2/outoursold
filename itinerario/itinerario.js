@@ -209,8 +209,10 @@ function cerrarVistaPreviaPDF() {
         pdfPreviewObjectUrl = null;
     }
 }
-document.getElementById('itinerario-pdf-preview-close').addEventListener('click', cerrarVistaPreviaPDF);
-document.getElementById('itinerario-pdf-preview-seguir-editando').addEventListener('click', cerrarVistaPreviaPDF);
+// Vista previa del PDF generado: solo existe donde hay armador (Cotizador y standalone),
+// no en Gestión de Datos.
+document.getElementById('itinerario-pdf-preview-close')?.addEventListener('click', cerrarVistaPreviaPDF);
+document.getElementById('itinerario-pdf-preview-seguir-editando')?.addEventListener('click', cerrarVistaPreviaPDF);
 
 function loadFonts(showModal = false) {
     return new Promise(async (resolve) => {
@@ -299,8 +301,12 @@ function renderTodoIdioma() {
     loadFixedSections();
     renderPaquetesListItinerario();
     renderAplicarPaqueteSelectItinerario();
-    document.getElementById('itinerary-builder-body').innerHTML = '';
-    addItineraryBuilderRow('itinerary-builder-body', true);
+    // No existe en Gestión de Datos — el armador día-a-día vive solo en Cotizador (y en la
+    // página standalone).
+    if (document.getElementById('itinerary-builder-body')) {
+        document.getElementById('itinerary-builder-body').innerHTML = '';
+        addItineraryBuilderRow('itinerary-builder-body', true);
+    }
 }
 
 // ===== Tabla de Módulos Existentes =====
@@ -319,6 +325,7 @@ function actualizarBotonGuardarModulos() {
 
 function renderModulosTable() {
     const tbody = document.getElementById('itinerario-modulos-table-body');
+    if (!tbody) return; // no existe en Cotizador — la gestión de módulos vive en Gestión de Datos
     const term = modulosFiltro.trim().toLowerCase();
     const visibles = modulosActivos().filter(it => {
         if (term && !it.titulo.toLowerCase().includes(term)) return false;
@@ -417,20 +424,23 @@ async function guardarModulo(it, titulo, destinoId, categoriaId) {
     }
 }
 
-document.getElementById('itinerary-module-destino').addEventListener('change', (e) => {
-    llenarCategoriasSelect(document.getElementById('itinerary-module-categoria'), e.target.value, null);
-});
-habilitarCreacionCategoria(
-    document.getElementById('itinerary-module-categoria'),
-    document.getElementById('itinerary-module-destino')
-);
+// Este bloque (alta/subida de módulos) solo existe en Gestión de Datos — no en Cotizador.
+if (document.getElementById('itinerary-module-destino')) {
+    document.getElementById('itinerary-module-destino').addEventListener('change', (e) => {
+        llenarCategoriasSelect(document.getElementById('itinerary-module-categoria'), e.target.value, null);
+    });
+    habilitarCreacionCategoria(
+        document.getElementById('itinerary-module-categoria'),
+        document.getElementById('itinerary-module-destino')
+    );
+}
 
-document.getElementById('itinerario-modulos-search').addEventListener('input', (e) => {
+document.getElementById('itinerario-modulos-search')?.addEventListener('input', (e) => {
     modulosFiltro = e.target.value;
     renderModulosTable();
 });
 
-document.getElementById('upload-local-module').addEventListener('click', () => {
+document.getElementById('upload-local-module')?.addEventListener('click', () => {
     const titleInput = document.getElementById('itinerary-module-title');
     const fileInput = document.getElementById('itinerary-module-pdf');
     const destinoSel = document.getElementById('itinerary-module-destino');
@@ -512,6 +522,7 @@ async function handleItineraryDelete(id) {
 // su propio CRUD, y son la fuente de la que eligen los selectores de inicio/cierre más abajo.
 function renderPaginasFijasTable() {
     const tbody = document.getElementById('paginas-fijas-table-body');
+    if (!tbody) return; // no existe en Cotizador — Páginas Fijas vive en Gestión de Datos
     const visibles = paginasFijasActivas();
     tbody.innerHTML = '';
     if (visibles.length === 0) {
@@ -603,7 +614,7 @@ async function guardarPaginaFija(p, titulo, nuevoArchivo) {
     }
 }
 
-document.getElementById('upload-pagina-fija').addEventListener('click', () => {
+document.getElementById('upload-pagina-fija')?.addEventListener('click', () => {
     const titleInput = document.getElementById('pagina-fija-titulo');
     const fileInput = document.getElementById('pagina-fija-pdf');
     const titulo = titleInput.value.trim();
@@ -668,13 +679,14 @@ async function handlePaginaFijaDelete(p) {
 function loadFixedSections() {
     const startBody = document.getElementById('start-builder-body');
     const endBody = document.getElementById('end-builder-body');
+    if (!startBody || !endBody) return; // no existen en Cotizador — Páginas Fijas vive en Gestión de Datos
     startBody.innerHTML = '';
     endBody.innerHTML = '';
     fixedStartFilesActivos().forEach(file => addItineraryBuilderRow('start-builder-body', false, file));
     fixedEndFilesActivos().forEach(file => addItineraryBuilderRow('end-builder-body', false, file));
 }
 
-document.getElementById('save-default-config').addEventListener('click', async () => {
+document.getElementById('save-default-config')?.addEventListener('click', async () => {
     const startFiles = Array.from(document.querySelectorAll('#start-builder-body .module-filename')).map(s => s.value).filter(Boolean);
     const endFiles = Array.from(document.querySelectorAll('#end-builder-body .module-filename')).map(s => s.value).filter(Boolean);
 
@@ -1082,18 +1094,20 @@ function reusarHistorialGenerado(g) {
     cerrarHistorialReusar();
     notifySuccess(`Se agregaron ${g.modulos.length} día(s) de "${g.pasajero} — ${g.titulo}".`);
 }
-document.getElementById('itinerario-historial-btn').addEventListener('click', abrirHistorialReusar);
-document.getElementById('itinerario-historial-close').addEventListener('click', cerrarHistorialReusar);
-document.getElementById('itinerario-historial-search').addEventListener('input', (e) => {
+// "Reusar un itinerario ya generado": solo existe donde hay armador (Cotizador y
+// standalone), no en Gestión de Datos.
+document.getElementById('itinerario-historial-btn')?.addEventListener('click', abrirHistorialReusar);
+document.getElementById('itinerario-historial-close')?.addEventListener('click', cerrarHistorialReusar);
+document.getElementById('itinerario-historial-search')?.addEventListener('input', (e) => {
     itinerarioHistorialReusarState.term = e.target.value;
     itinerarioHistorialReusarState.offset = 0;
     renderHistorialReusarList();
 });
-document.getElementById('itinerario-historial-prev').addEventListener('click', () => {
+document.getElementById('itinerario-historial-prev')?.addEventListener('click', () => {
     itinerarioHistorialReusarState.offset = Math.max(0, itinerarioHistorialReusarState.offset - ITINERARIO_HISTORIAL_PAGE_SIZE);
     renderHistorialReusarList();
 });
-document.getElementById('itinerario-historial-next').addEventListener('click', () => {
+document.getElementById('itinerario-historial-next')?.addEventListener('click', () => {
     itinerarioHistorialReusarState.offset += ITINERARIO_HISTORIAL_PAGE_SIZE;
     renderHistorialReusarList();
 });
@@ -1113,8 +1127,9 @@ function actualizarFiltroAgenciaHistorial() {
 }
 
 function renderHistorialGeneradosTable() {
-    actualizarFiltroAgenciaHistorial();
     const tbody = document.getElementById('historial-generados-table-body');
+    if (!tbody) return; // no existe en Cotizador — Itinerarios Generados vive en Gestión de Datos
+    actualizarFiltroAgenciaHistorial();
     const texto = historialFiltro.texto.trim().toLowerCase();
     const visibles = historialGeneradosActivo().filter(g => {
         if (texto && !g.pasajero.toLowerCase().includes(texto) && !g.titulo.toLowerCase().includes(texto)) return false;
@@ -1158,23 +1173,24 @@ function buildHistorialGeneradoRow(g) {
     return tr;
 }
 
-document.getElementById('historial-filtro-texto').addEventListener('input', (e) => {
+// Filtros de "Itinerarios Generados": solo existen en Gestión de Datos.
+document.getElementById('historial-filtro-texto')?.addEventListener('input', (e) => {
     historialFiltro.texto = e.target.value;
     renderHistorialGeneradosTable();
 });
-document.getElementById('historial-filtro-agencia').addEventListener('change', (e) => {
+document.getElementById('historial-filtro-agencia')?.addEventListener('change', (e) => {
     historialFiltro.agencia = e.target.value;
     renderHistorialGeneradosTable();
 });
-document.getElementById('historial-filtro-desde').addEventListener('change', (e) => {
+document.getElementById('historial-filtro-desde')?.addEventListener('change', (e) => {
     historialFiltro.desde = e.target.value;
     renderHistorialGeneradosTable();
 });
-document.getElementById('historial-filtro-hasta').addEventListener('change', (e) => {
+document.getElementById('historial-filtro-hasta')?.addEventListener('change', (e) => {
     historialFiltro.hasta = e.target.value;
     renderHistorialGeneradosTable();
 });
-document.getElementById('historial-filtro-limpiar').addEventListener('click', () => {
+document.getElementById('historial-filtro-limpiar')?.addEventListener('click', () => {
     historialFiltro = { texto: '', agencia: '', desde: '', hasta: '' };
     document.getElementById('historial-filtro-texto').value = '';
     document.getElementById('historial-filtro-agencia').value = '';
@@ -1368,9 +1384,12 @@ document.querySelectorAll('.idioma-tab').forEach(tab => {
 });
 
 // === Inicializar ===
-document.getElementById('add-start-row').addEventListener('click', () => addItineraryBuilderRow('start-builder-body'));
-document.getElementById('add-itinerary-row').addEventListener('click', () => addItineraryBuilderRow('itinerary-builder-body', true));
-document.getElementById('add-end-row').addEventListener('click', () => addItineraryBuilderRow('end-builder-body'));
+// Los 3 "?." son necesarios ahora que este script sirve 3 contextos (standalone: los 3
+// botones existen; Cotizador: solo add-itinerary-row, el armador; Gestión de Datos: solo
+// add-start-row/add-end-row, Páginas Fijas — sin armador propio).
+document.getElementById('add-start-row')?.addEventListener('click', () => addItineraryBuilderRow('start-builder-body'));
+document.getElementById('add-itinerary-row')?.addEventListener('click', () => addItineraryBuilderRow('itinerary-builder-body', true));
+document.getElementById('add-end-row')?.addEventListener('click', () => addItineraryBuilderRow('end-builder-body'));
 // En Cotizador (embebido) ya no existe este botón — "Guardar" genera el itinerario junto
 // con la cotización (ver guardarCotizacion() en cotizador.js). Sigue existiendo en la
 // vista standalone de Itinerario.
@@ -1386,7 +1405,11 @@ async function initItinerario(idiomaInicial) {
     if (itinerarioInicializado) return;
     itinerarioInicializado = true;
     await cargarDestinosYCategorias();
-    llenarDestinosSelect(document.getElementById('itinerary-module-destino'));
+    // El select de Destino del formulario "Subir Nuevo Itinerario" existe en la standalone
+    // y en Gestión de Datos, pero no en Cotizador (ahí no hay gestión de módulos, solo el
+    // armador día-a-día).
+    const selectDestinoModulo = document.getElementById('itinerary-module-destino');
+    if (selectDestinoModulo) llenarDestinosSelect(selectDestinoModulo);
     resetItinerarioPaqueteBuilder();
     await activarIdioma(idiomaInicial || 'en');
     loadFonts(false);
@@ -1401,7 +1424,7 @@ if (!window.ITINERARIO_API_BASE) {
 
 // Guarda de una sola vez todas las clasificaciones Destino/Categoría de Módulos pendientes
 // (marcadas al tocar los selects de cada fila) — un solo request al servidor.
-document.getElementById('modulos-guardar-flotante').addEventListener('click', async () => {
+document.getElementById('modulos-guardar-flotante')?.addEventListener('click', async () => {
     if (modulosCambiosPendientes.size === 0) return;
     const cambios = Array.from(modulosCambiosPendientes, ([id, v]) => ({ id, ...v }));
     try {
