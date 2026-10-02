@@ -56,6 +56,26 @@ function resolverHeroImagenUrl($db, $navShared) {
     return $navShared . 'fondo-sistema-outours.jpg?v=' . filemtime($rutaDefault);
 }
 
+// Posición vertical del recorte de la imagen del Hero (0-100, 50 = centrado), elegida al
+// subirla con el ajuste de "arrastrar para reposicionar" (ver hero-edit.js). Con la imagen
+// por defecto del sistema (sin agencia propia o sin hero_imagen) siempre es 50 — ese caso
+// no se guarda, no tiene sentido ajustarlo.
+// Si la migración 031 (columna hero_pos_y) todavía no se aplicó en esta base, se cae a 50
+// en vez de romper el Hero de todas las vistas (mismo criterio que paquetes-tours en
+// shared/api.php con la migración 030).
+function resolverHeroPosY($db) {
+    $agenciaId = resolverAgenciaPropiaId($db);
+    if (!$agenciaId) return 50;
+    try {
+        $stmt = $db->prepare("SELECT hero_pos_y FROM agencias WHERE id = ?");
+        $stmt->execute([$agenciaId]);
+        $posY = $stmt->fetchColumn();
+        return $posY !== false ? (int) $posY : 50;
+    } catch (PDOException $e) {
+        return 50;
+    }
+}
+
 // Oscurece un color hex un porcentaje (0-1) manteniendo el tono, para derivar --accent-2
 // a partir del único color que elige el usuario con el cuentagotas del Hero (--accent-1).
 // Espejo de oscurecerColor() en hero-edit.js (mismo criterio, para que el color aplicado

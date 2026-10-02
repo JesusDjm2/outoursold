@@ -10,6 +10,7 @@ $navRoot = '../';
 $navShared = '../shared/';
 $db = getDB();
 $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
+$heroPosY = resolverHeroPosY($db);
 $accentColorStyle = resolverAccentColorStyle($db);
 $logoUrl = resolverLogoUrl($db, $navShared);
 ?>
@@ -33,7 +34,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 <body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/sidebar.php'; ?>
     <div class="app-content">
-        <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>')">
+        <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>');--hero-pos-y:<?= (int) $heroPosY ?>%">
             <div class="hero-actions">
                 <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de tu agencia" data-tooltip="Logo de tu agencia — se muestra en el encabezado y en el PDF de tus cotizaciones."><i class="fas fa-image"></i></button>
                 <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">

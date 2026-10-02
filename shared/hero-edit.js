@@ -9,6 +9,10 @@
     const assetBase = window.HERO_ASSET_BASE || '';
 
     // ===== Imagen de fondo del Hero =====
+    // Antes de subir la imagen, se abre un ajuste de "arrastrar para reposicionar" (como
+    // la foto de portada de Facebook/LinkedIn): el usuario elige qué parte de la imagen
+    // queda visible en el recorte angosto del Hero (background-size:cover), sobre todo
+    // importante en fotos verticales/retrato donde el centro por defecto corta mal.
     const btn = document.getElementById('hero-edit-btn');
     const input = document.getElementById('hero-edit-input');
     if (btn && input) {
@@ -18,32 +22,118 @@
             const file = input.files[0];
             input.value = '';
             if (!file) return;
-
-            if (!await confirmAction('¿Reemplazar la imagen del Hero de tu empresa?', 'Sí, reemplazar')) return;
-
-            btn.disabled = true;
-            const iconoOriginal = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
+            const objectUrl = URL.createObjectURL(file);
             try {
-                const formData = new FormData();
-                formData.append('imagen', file);
-                const res = await fetch(`${meApiUrl}?path=subir-hero`, { method: 'POST', body: formData });
-                const result = await res.json();
-                if (!result.success) throw new Error(result.error || 'No se pudo actualizar la imagen.');
-
-                const url = `${assetBase}uploads/agencias/${result.filename}?v=${result.v}`;
-                document.querySelectorAll('.page-hero').forEach(hero => {
-                    hero.style.setProperty('--hero-bg-image', `url('${url}')`);
-                });
-                notifySuccess('Imagen del Hero actualizada.');
-            } catch (err) {
-                notifyError(err.message);
+                const posY = await abrirAjusteDePosicion(objectUrl);
+                if (posY === null) return; // canceló
+                await subirHero(file, posY);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = iconoOriginal;
+                URL.revokeObjectURL(objectUrl);
             }
         });
+    }
+
+    // Devuelve la posición elegida (0-100) o null si el usuario canceló. previewUrl es un
+    // object URL del archivo recién elegido — todavía no se subió nada al servidor.
+    // Dos marcos sincronizados al mismo valor: el de PC (ancho y bajo, ~7:1 — la forma real
+    // del Hero en pantallas grandes) es el que se arrastra; el de celular (~2.15:1) es solo
+    // de referencia, para no perder de vista cómo queda ahí también.
+    function abrirAjusteDePosicion(previewUrl) {
+        return new Promise((resolve) => {
+            let posY = 50;
+            const overlay = document.createElement('div');
+            overlay.className = 'hero-pos-overlay';
+            overlay.innerHTML = `
+                <div class="hero-pos-modal">
+                    <h3>Ajustar la imagen del Hero</h3>
+                    <p>Arrastra la imagen para elegir qué parte se ve en el encabezado. Prioriza cómo queda en PC: es la vista que ve la mayoría de tus clientes.</p>
+                    <div class="hero-pos-previews">
+                        <div class="hero-pos-preview-block hero-pos-preview-block-pc">
+                            <span class="hero-pos-label">Vista en PC</span>
+                            <div class="hero-pos-frame hero-pos-frame-pc">
+                                <div class="hero-pos-preview" style="background-image:url('${previewUrl}');background-position:center 50%"></div>
+                                <span class="hero-pos-hint">Arrastra para ajustar</span>
+                            </div>
+                        </div>
+                        <div class="hero-pos-preview-block hero-pos-preview-block-mobile">
+                            <span class="hero-pos-label">Vista en celular</span>
+                            <div class="hero-pos-frame hero-pos-frame-mobile">
+                                <div class="hero-pos-preview" style="background-image:url('${previewUrl}');background-position:center 50%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hero-pos-actions">
+                        <button type="button" class="btn border" id="hero-pos-cancelar">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="hero-pos-guardar">Guardar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const frame = overlay.querySelector('.hero-pos-frame-pc');
+            const previews = overlay.querySelectorAll('.hero-pos-preview');
+            let arrastrando = false, startY = 0, startPos = 50;
+
+            const aplicarPosY = () => {
+                previews.forEach(p => { p.style.backgroundPosition = `center ${posY}%`; });
+            };
+
+            frame.addEventListener('pointerdown', (e) => {
+                arrastrando = true;
+                startY = e.clientY;
+                startPos = posY;
+                frame.classList.add('is-dragging', 'ya-arrastro');
+                frame.setPointerCapture(e.pointerId);
+            });
+            frame.addEventListener('pointermove', (e) => {
+                if (!arrastrando) return;
+                // Arrastrar la imagen hacia abajo revela más de su parte de arriba (como
+                // correr una cortina): el delta del puntero resta a la posición.
+                const deltaPorcentaje = ((e.clientY - startY) / frame.offsetHeight) * 100;
+                posY = Math.max(0, Math.min(100, Math.round(startPos - deltaPorcentaje)));
+                aplicarPosY();
+            });
+            const soltar = () => frame.classList.remove('is-dragging');
+            frame.addEventListener('pointerup', soltar);
+            frame.addEventListener('pointercancel', soltar);
+            frame.addEventListener('pointerup', () => { arrastrando = false; });
+            frame.addEventListener('pointercancel', () => { arrastrando = false; });
+
+            const cerrar = (valor) => {
+                overlay.remove();
+                resolve(valor);
+            };
+            overlay.querySelector('#hero-pos-cancelar').addEventListener('click', () => cerrar(null));
+            overlay.querySelector('#hero-pos-guardar').addEventListener('click', () => cerrar(posY));
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrar(null); });
+        });
+    }
+
+    async function subirHero(file, posY) {
+        btn.disabled = true;
+        const iconoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const formData = new FormData();
+            formData.append('imagen', file);
+            formData.append('pos_y', String(posY));
+            const res = await fetch(`${meApiUrl}?path=subir-hero`, { method: 'POST', body: formData });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error || 'No se pudo actualizar la imagen.');
+
+            const url = `${assetBase}uploads/agencias/${result.filename}?v=${result.v}`;
+            document.querySelectorAll('.page-hero').forEach(hero => {
+                hero.style.setProperty('--hero-bg-image', `url('${url}')`);
+                hero.style.setProperty('--hero-pos-y', `${result.pos_y}%`);
+            });
+            notifySuccess('Imagen del Hero actualizada.');
+        } catch (err) {
+            notifyError(err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = iconoOriginal;
+        }
     }
 
     // ===== Logo de la empresa =====

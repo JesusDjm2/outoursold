@@ -158,15 +158,19 @@ try {
                 break;
             }
 
+            // Posición vertical elegida al arrastrar la imagen en el ajuste previo (ver
+            // hero-edit.js) — 0-100, 50 (centrado) si no vino o vino inválida.
+            $posY = isset($_POST['pos_y']) ? max(0, min(100, (int) $_POST['pos_y'])) : 50;
+
             $stmt = $db->prepare("SELECT hero_imagen FROM agencias WHERE id = ?");
             $stmt->execute([$id]);
             $anterior = $stmt->fetchColumn();
-            $db->prepare("UPDATE agencias SET hero_imagen = ? WHERE id = ?")->execute([$nuevoNombre, $id]);
+            $db->prepare("UPDATE agencias SET hero_imagen = ?, hero_pos_y = ? WHERE id = ?")->execute([$nuevoNombre, $posY, $id]);
             if ($anterior && file_exists($uploadDir . $anterior)) {
                 @unlink($uploadDir . $anterior);
             }
 
-            echo json_encode(['success' => true, 'filename' => $nuevoNombre, 'v' => filemtime($rutaFinal)]);
+            echo json_encode(['success' => true, 'filename' => $nuevoNombre, 'v' => filemtime($rutaFinal), 'pos_y' => $posY]);
             break;
 
         // Logo de MI agencia, autoservicio instantáneo desde el botón del Hero (igual

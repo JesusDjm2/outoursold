@@ -13,7 +13,9 @@
        (donde está el texto y las tabs de filtro). */
     background-image: linear-gradient(to top, rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0)), var(--hero-bg-image);
     background-size: cover;
-    background-position: center;
+    /* --hero-pos-y: 0-100%, elegida al subir la imagen (arrastrar para reposicionar, ver
+       hero-edit.js) — 50% (centrado) si la agencia no la personalizó. */
+    background-position: center var(--hero-pos-y, 50%);
 }
 .page-hero-content { position: relative; z-index: 1; max-width: 640px; }
 .page-hero-logo {
@@ -48,6 +50,84 @@
         padding-left: 0;
         padding-right: 0.5rem;
     }
+}
+
+/* Modal de "arrastrar para reposicionar" (hero-edit.js) — se arma por JS, inyectado al
+   elegir una imagen nueva de Hero, antes de subirla. Dos marcos, mismo valor sincronizado:
+   el de PC (ancho y bajo, el real: ~7-9:1 medido con Playwright en 1440-1920px) es el que
+   se arrastra, porque es la vista que ve la mayoría de los clientes; el de celular (~2.15:1,
+   igual medido) es solo de referencia, no interactivo. Antes había un solo marco ~3:1 que no
+   se parecía a ninguna de las dos formas reales — en especial no a la de PC. */
+.hero-pos-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.hero-pos-modal {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    width: 100%;
+    max-width: 720px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+.hero-pos-modal h3 { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 4px; }
+.hero-pos-modal p { font-size: 0.82rem; color: #64748b; margin: 0 0 14px; }
+.hero-pos-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 6px;
+}
+.hero-pos-previews { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.hero-pos-preview-block-pc { flex: 1 1 320px; }
+.hero-pos-preview-block-mobile { flex: 0 0 auto; width: 150px; }
+.hero-pos-frame {
+    position: relative;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: #0f172a;
+}
+.hero-pos-frame-pc {
+    aspect-ratio: 7 / 1;
+    min-height: 70px;
+    touch-action: none;
+    cursor: grab;
+}
+.hero-pos-frame-pc.is-dragging { cursor: grabbing; }
+.hero-pos-frame-mobile { aspect-ratio: 2.15 / 1; }
+.hero-pos-preview {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+.hero-pos-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.55);
+    color: white;
+    font-size: 0.68rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.hero-pos-frame-pc.ya-arrastro .hero-pos-hint { opacity: 0; }
+.hero-pos-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+@media (max-width: 520px) {
+    .hero-pos-previews { flex-wrap: wrap; }
+    .hero-pos-preview-block-mobile { width: 110px; }
 }
 
 /* Botones de personalización del Hero (cualquier usuario logueado, sobre SU PROPIA
