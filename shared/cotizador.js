@@ -58,6 +58,11 @@ let paisesData = []; // {id, nombre, codigo_telefono} — catálogo global (shar
 let cotizaciones = {};
 let currentCotizacionId = null;
 let paquetesData = [];
+// Id del paquete predefinido que se está editando (ver cargarPaqueteParaEditar), o null si
+// se está armando una cotización normal — cambia qué hace "Guardar como paquete" y oculta
+// Datos Pax / "Guardar" (cotización), que no aplican a un paquete.
+let paqueteEditandoId = null;
+let paqueteEditandoNombre = '';
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
 let pdfPreviewCotizacionId = null;
@@ -274,10 +279,10 @@ async function aplicarPaquete(paquete) {
                 `El itinerario de este paquete está en ${nombresIdioma[idiomaPaquete]}. Se cambiará el idioma de la cotización y se reiniciará el itinerario que ya armaste. ¿Continuar?`,
                 'Sí, cambiar idioma'
             )) {
-                irATabCotizador();
                 return;
             }
             selectIdioma.value = idiomaPaquete;
+            sincronizarTabsIdioma();
             await activarIdioma(idiomaPaquete);
             cambioIdioma = true;
         }
@@ -286,8 +291,6 @@ async function aplicarPaquete(paquete) {
             notifyWarning(`El itinerario de este paquete está en ${nombresIdioma[idiomaPaquete]}: el idioma de la cotización se cambió a ${nombresIdioma[idiomaPaquete]}.`);
         }
     }
-
-    irATabCotizador();
 }
 
 // ===== Historial de Cotizaciones guardadas (traer TODAS sus actividades a la vista actual) =====
@@ -420,6 +423,7 @@ async function reusarHistorialCotizacion(c) {
                 return;
             }
             selectIdioma.value = idiomaOrigen;
+            sincronizarTabsIdioma();
             await activarIdioma(idiomaOrigen);
             cambioIdioma = true;
         }
@@ -772,24 +776,87 @@ async function guardarComoPaquete() {
         notifyWarning('Agrega al menos una actividad, un hotel o un módulo de itinerario antes de guardar como paquete.');
         return;
     }
-    const nombre = await promptText('Nombre del paquete', 'ej. Cusco Clásico 3D/2N');
+    const nombre = await promptText('Nombre del paquete', 'ej. Cusco Clásico 3D/2N', paqueteEditandoId ? paqueteEditandoNombre : '');
     if (!nombre) return;
     try {
+        const payload = {
+            nombre, tours, hoteles,
+            itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos } : null
+        };
+        if (paqueteEditandoId) payload.id = paqueteEditandoId;
         const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                nombre, tours, hoteles,
-                itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos } : null
-            })
+            body: JSON.stringify(payload)
         });
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
-        await notifySuccess(`Paquete "${nombre}" guardado. Ya está disponible en Gestión de Datos y en "Aplicar paquete".`);
+        if (paqueteEditandoId) {
+            await notifySuccess(`Paquete "${nombre}" actualizado.`);
+            salirModoEdicionPaquete();
+            nuevaCotizacion(false);
+        } else {
+            await notifySuccess(`Paquete "${nombre}" guardado. Ya está disponible en Gestión de Datos y en "Aplicar paquete".`);
+        }
         await refrescarPaquetesData();
     } catch (e) {
         notifyError('Error al guardar el paquete: ' + e.message);
     }
+}
+
+// ===== Editar un paquete predefinido en esta misma vista (reusa el drag-and-drop de
+// Actividades/Hoteles/Itinerario) — entra vía ?editarPaquete=ID, ver init() más abajo. =====
+async function cargarPaqueteParaEditar(id) {
+    const paquete = paquetesData.find(p => String(p.id) === String(id));
+    if (!paquete) {
+        notifyError('No se encontró el paquete. Puede que ya no exista.');
+        return;
+    }
+    nuevaCotizacion(false);
+
+    const toursBody = document.getElementById('tours-body');
+    toursBody.innerHTML = '';
+    (paquete.tours.length ? paquete.tours : [{}]).forEach(t => toursBody.appendChild(createTourRow(t)));
+
+    const hotelsBody = document.getElementById('hotels-body');
+    hotelsBody.innerHTML = '';
+    (paquete.hoteles.length ? paquete.hoteles : [{}]).forEach(h => hotelsBody.appendChild(createHotelRow(h)));
+
+    const idioma = paquete.itinerario?.idioma || 'es';
+    document.querySelector('select[name="idioma"]').value = idioma;
+    sincronizarTabsIdioma();
+    await activarIdioma(idioma);
+    if (paquete.itinerario?.modulos?.length) {
+        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos });
+    }
+
+    calcularResumen();
+    activarModoEdicionPaquete(paquete);
+}
+
+function activarModoEdicionPaquete(paquete) {
+    paqueteEditandoId = paquete.id;
+    paqueteEditandoNombre = paquete.nombre;
+    document.getElementById('paquete-edit-nombre').textContent = paquete.nombre;
+    document.getElementById('paquete-edit-banner').classList.remove('hidden');
+    document.getElementById('datos-pax-section').classList.add('hidden');
+    const mainCol = document.getElementById('cotizador-main-col');
+    mainCol.classList.remove('lg:col-span-3');
+    mainCol.classList.add('lg:col-span-4');
+    document.getElementById('guardar-cotizacion').classList.add('hidden');
+    document.getElementById('guardar-como-paquete').innerHTML = '<i class="fas fa-box-archive mr-2"></i>Actualizar paquete';
+}
+
+function salirModoEdicionPaquete() {
+    paqueteEditandoId = null;
+    paqueteEditandoNombre = '';
+    document.getElementById('paquete-edit-banner').classList.add('hidden');
+    document.getElementById('datos-pax-section').classList.remove('hidden');
+    const mainCol = document.getElementById('cotizador-main-col');
+    mainCol.classList.remove('lg:col-span-4');
+    mainCol.classList.add('lg:col-span-3');
+    document.getElementById('guardar-cotizacion').classList.remove('hidden');
+    document.getElementById('guardar-como-paquete').innerHTML = '<i class="fas fa-box-archive mr-2"></i>Guardar como paquete';
 }
 
 // Refresca paquetesData y el selector "Aplicar paquete..." tras guardar uno nuevo desde
@@ -898,6 +965,7 @@ async function cargarCotizacion(id) {
             const input = form.querySelector(`[name="${key}"]`);
             if (input) input.value = data.pax[key];
         });
+        sincronizarTabsIdioma();
         // El select de dpto necesita sus <option> del país guardado antes de que el
         // .value de arriba (que ya intentó fijarlo sin opciones cargadas) pueda "pegar".
         const paisGuardado = paisesData.find(p => p.nombre === data.pax.pais);
@@ -926,6 +994,7 @@ async function cargarCotizacion(id) {
 
 function nuevaCotizacion(showAlert = true) {
     document.getElementById('form-pax').reset();
+    sincronizarTabsIdioma();
     document.getElementById('tours-body').innerHTML = '';
     document.getElementById('hotels-body').innerHTML = '';
     document.getElementById('precio-adicional').value = 0;
@@ -976,91 +1045,25 @@ function restaurarItinerarioArmado(armado) {
     }
 }
 
-// ===== COTIZACIONES GUARDADAS (pestaña con tabla, búsqueda y paginación) =====
-const COT_PAGE_SIZE = 15;
-const cotState = { term: '', offset: 0, total: 0 };
-let cotSearchDebounce = null;
+// "Cotizaciones Guardadas" (tabla, búsqueda, paginación, abrir/duplicar/ver PDF/eliminar)
+// vive ahora en Gestión de Datos (ver shared/gestion-datos.js) — Abrir/Duplicar/Ver PDF
+// llegan hasta acá por el deep-link ?cotizacion=ID[&ver=pdf] que ya maneja init() más abajo.
 
-async function cargarCotizacionesGuardadas() {
-    const tbody = document.getElementById('cot-table-body');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
-    try {
-        const params = new URLSearchParams({
-            q: cotState.term,
-            limit: COT_PAGE_SIZE,
-            offset: cotState.offset
-        });
-        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`);
-        const { results, total } = await res.json();
-        cotState.total = total;
-        tbody.innerHTML = '';
-        if (results.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
-        } else {
-            results.forEach(cot => tbody.appendChild(buildCotRow(cot)));
-        }
-        const shown = cotState.offset + results.length;
-        document.getElementById('cot-page-info').textContent = total === 0 ? '' : `${cotState.offset + 1}-${shown} de ${total}`;
-        document.getElementById('cot-prev').disabled = cotState.offset === 0;
-        document.getElementById('cot-next').disabled = shown >= total;
-    } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
-    }
-}
-
-function buildCotRow(cot) {
-    const pax = cot.data.pax || {};
-    const tr = document.createElement('tr');
-    tr.className = 'border-t hover:bg-slate-50';
-    tr.innerHTML = `
-        <td class="p-3 font-medium">${escapeHtml(cot.id)}</td>
-        <td class="p-3">${escapeHtml(pax.nombre_pax || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.contacto || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.fecha_cot || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.n_pax || '-')}</td>
-        <td class="p-3 text-right whitespace-nowrap"></td>
-    `;
-    const actionsCell = tr.querySelector('td:last-child');
-
-    const abrirBtn = document.createElement('button');
-    abrirBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    abrirBtn.title = 'Abrir';
-    abrirBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
-    abrirBtn.addEventListener('click', () => abrirCotizacionGuardada(cot.id));
-
-    const dupBtn = document.createElement('button');
-    dupBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    dupBtn.title = 'Duplicar';
-    dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
-    dupBtn.addEventListener('click', () => duplicarCotizacionGuardada(cot.id));
-
-    const pdfBtn = document.createElement('button');
-    pdfBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    pdfBtn.title = 'Ver / Descargar PDF';
-    pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
-    pdfBtn.addEventListener('click', () => verPdfCotizacionGuardada(cot.id, pdfBtn));
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'text-red-500 hover:text-red-700';
-    delBtn.title = 'Eliminar';
-    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    delBtn.addEventListener('click', () => eliminarCotizacionGuardada(cot.id, pax.nombre_pax));
-
-    actionsCell.append(abrirBtn, dupBtn, pdfBtn, delBtn);
-    return tr;
-}
-
-function irATabCotizador() {
-    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-    document.querySelector('.nav-tab[data-tab="cotizador"]').classList.add('active');
-    document.getElementById('cotizador-section').classList.remove('hidden');
+// Las 3 pestañas de arriba (#idioma-tabs) son una capa visual sobre select[name="idioma"],
+// que sigue siendo la única fuente de verdad (lo lee/escribe el resto de este archivo:
+// guardarCotizacion, aplicarPaquete, reusarHistorialCotizacion, cargarCotizacion...).
+// Se llama después de cualquier cambio de su .value hecho a mano, para que la pestaña
+// activa no quede desincronizada.
+function sincronizarTabsIdioma() {
+    const idioma = document.querySelector('select[name="idioma"]').value;
+    document.querySelectorAll('#idioma-tabs .nav-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.idioma === idioma);
+    });
 }
 
 // Hay algo que se perdería si se pisa el formulario ahora mismo (nombre de pasajero, o
 // alguna actividad/hotel ya escritos) — mismo criterio que usan "Nueva cotización" y
-// "Limpiar todo", que sí confirman antes de descartar. Abrir/duplicar/ver PDF de otra
-// cotización guardada hacía exactamente lo mismo (pisar el formulario) sin preguntar.
+// "Limpiar todo", que sí confirman antes de descartar.
 function formularioTieneDatosSinGuardar() {
     const nombrePax = document.querySelector('input[name="nombre_pax"]')?.value.trim();
     if (nombrePax) return true;
@@ -1069,72 +1072,6 @@ function formularioTieneDatosSinGuardar() {
     return hayTour || hayHotel;
 }
 
-async function confirmarSiHayDatosSinGuardar(mensaje) {
-    if (!formularioTieneDatosSinGuardar()) return true;
-    return await confirmAction(mensaje, 'Sí, continuar');
-}
-
-async function abrirCotizacionGuardada(id) {
-    if (!await confirmarSiHayDatosSinGuardar('¿Abrir esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
-    await cargarCotizacion(id);
-    irATabCotizador();
-}
-
-async function duplicarCotizacionGuardada(id) {
-    if (!await confirmarSiHayDatosSinGuardar('¿Duplicar esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
-    try {
-        const res = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        const newId = 'COT-' + Date.now();
-        const copia = { ...data, id: newId, fechaGuardado: new Date().toISOString() };
-        const saveRes = await fetch(`${API_URL}?path=guardar-cotizacion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(copia)
-        });
-        const result = await saveRes.json();
-        if (!result.success) throw new Error(result.error || 'Error desconocido');
-        notifySuccess(`Cotización duplicada con ID: ${newId}`);
-        await cargarCotizacion(newId);
-        irATabCotizador();
-    } catch (e) {
-        notifyError('Error al duplicar: ' + e.message);
-    }
-}
-
-async function verPdfCotizacionGuardada(id, btn) {
-    if (!await confirmarSiHayDatosSinGuardar('¿Ver el PDF de esta cotización? Se perderá lo que no hayas guardado en la que estás editando.')) return;
-    const originalHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    btn.disabled = true;
-    try {
-        await cargarCotizacion(id);
-        await mostrarVistaPreviaPdf(id);
-    } finally {
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
-    }
-}
-
-async function eliminarCotizacionGuardada(id, nombre) {
-    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
-    try {
-        const res = await fetch(`${API_URL}?path=eliminar-cotizacion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        const result = await res.json();
-        if (!result.success) throw new Error(result.error || 'Error desconocido');
-        if (currentCotizacionId === id) currentCotizacionId = null;
-        delete cotizaciones[id];
-        notifySuccess('Cotización eliminada.');
-        cargarCotizacionesGuardadas();
-    } catch (e) {
-        notifyError('Error al eliminar: ' + e.message);
-    }
-}
 
 // Rasteriza un HTML de una página (.pdf-page) a un PDF de una sola página en memoria.
 // Compartido por la página principal de la cotización y la página de Términos y
@@ -1463,13 +1400,13 @@ async function init() {
     await initItinerario(document.querySelector('select[name="idioma"]').value || 'es');
     nuevaCotizacion(false);
 
-    document.querySelectorAll('.nav-tab').forEach(tab => {
+    document.querySelectorAll('#idioma-tabs .nav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
-            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            tab.classList.add('active');
-            document.getElementById(`${tab.dataset.tab}-section`).classList.remove('hidden');
-            if (tab.dataset.tab === 'cotizaciones') cargarCotizacionesGuardadas();
+            const selectIdioma = document.querySelector('select[name="idioma"]');
+            if (selectIdioma.value === tab.dataset.idioma) return;
+            selectIdioma.value = tab.dataset.idioma;
+            selectIdioma.dispatchEvent(new Event('change'));
+            sincronizarTabsIdioma();
         });
     });
 
@@ -1521,35 +1458,14 @@ async function init() {
     document.getElementById('pdf-preview-descargar').addEventListener('click', descargarPdfPreview);
     document.getElementById('pdf-preview-nueva-pestana').addEventListener('click', abrirPdfPreviewNuevaPestana);
 
-    document.getElementById('cot-nueva').addEventListener('click', async () => {
-        if (!await confirmAction('¿Empezar una cotización nueva? Se perderá lo que no hayas guardado en Datos Pax, Actividades, Hoteles e Itinerario.', 'Sí, empezar de nuevo')) return;
-        nuevaCotizacion();
-        irATabCotizador();
-    });
     // Único botón que limpia las 4 secciones a la vez (Datos Pax, Actividades, Hoteles e
-    // Itinerario) — antes solo existía "Nueva Cotización" en Cotizaciones Guardadas, o los
-    // "Limpiar" sueltos de cada sección por separado.
+    // Itinerario). "Nueva Cotización" (antes acá, junto a Cotizaciones Guardadas) ahora es
+    // simplemente navegar a esta misma página sin ?cotizacion= (ver botón homónimo en
+    // Gestión de Datos, shared/gestion-datos.js).
     document.getElementById('limpiar-todo').addEventListener('click', async () => {
         if (!await confirmAction('¿Limpiar todo el formulario? Se borrarán los datos de Pasajero, Actividades, Hoteles e Itinerario de esta cotización.', 'Sí, limpiar todo')) return;
         nuevaCotizacion(false);
         notifySuccess('Formulario limpiado.');
-    });
-    document.getElementById('cot-search').addEventListener('input', (e) => {
-        clearTimeout(cotSearchDebounce);
-        const term = e.target.value.trim();
-        cotSearchDebounce = setTimeout(() => {
-            cotState.term = term;
-            cotState.offset = 0;
-            cargarCotizacionesGuardadas();
-        }, 300);
-    });
-    document.getElementById('cot-prev').addEventListener('click', () => {
-        cotState.offset = Math.max(0, cotState.offset - COT_PAGE_SIZE);
-        cargarCotizacionesGuardadas();
-    });
-    document.getElementById('cot-next').addEventListener('click', () => {
-        cotState.offset += COT_PAGE_SIZE;
-        cargarCotizacionesGuardadas();
     });
     document.getElementById('aplicar-paquete-select').addEventListener('change', (e) => {
         const id = e.target.value;
@@ -1582,15 +1498,32 @@ async function init() {
     setupDragDrop();
     initPaisAutocomplete();
 
-    // Deep link desde fuera del cotizador (ej. el detalle de una agencia en Usuarios):
-    // ?cotizacion=ID abre esa cotización directamente en la pestaña Cotizador.
-    const cotizacionUrlId = new URLSearchParams(window.location.search).get('cotizacion');
+    // Deep link desde fuera del cotizador (Gestión de Datos > Cotizaciones Guardadas, o el
+    // detalle de una agencia en Usuarios): ?cotizacion=ID la abre directo; con &ver=pdf de
+    // paso abre la vista previa del PDF (mismo criterio que antes el botón "Ver PDF" de
+    // Cotizaciones Guardadas, ahora en otra página).
+    const paramsUrl = new URLSearchParams(window.location.search);
+    const cotizacionUrlId = paramsUrl.get('cotizacion');
     if (cotizacionUrlId) {
-        await abrirCotizacionGuardada(cotizacionUrlId);
+        await cargarCotizacion(cotizacionUrlId);
+        if (paramsUrl.get('ver') === 'pdf') await mostrarVistaPreviaPdf(cotizacionUrlId);
         history.replaceState(null, '', window.location.pathname);
     }
 
-    // Mismo criterio que confirmarSiHayDatosSinGuardar(): si hay algo escrito que no se
+    // Deep link desde Gestión de Datos > Paquetes ("Editar"): ?editarPaquete=ID carga ese
+    // paquete en Actividades/Hoteles/Itinerario para editarlo con drag-and-drop (ver
+    // cargarPaqueteParaEditar más arriba).
+    const paqueteEditarId = paramsUrl.get('editarPaquete');
+    if (paqueteEditarId) {
+        await cargarPaqueteParaEditar(paqueteEditarId);
+        history.replaceState(null, '', window.location.pathname);
+    }
+    document.getElementById('paquete-edit-cancelar').addEventListener('click', () => {
+        salirModoEdicionPaquete();
+        nuevaCotizacion(false);
+    });
+
+    // Mismo criterio que formularioTieneDatosSinGuardar(): si hay algo escrito que no se
     // guardó, avisa también al cerrar/recargar la pestaña, no solo al navegar dentro de la app.
     window.addEventListener('beforeunload', (e) => {
         if (!formularioTieneDatosSinGuardar()) return;

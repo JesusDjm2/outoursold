@@ -21,6 +21,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <link rel="icon" type="image/png" href="../shared/favicon-outoors.png?v=<?= filemtime(__DIR__ . '/favicon-outoors.png') ?>">
+    <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png?v=<?= filemtime(__DIR__ . '/apple-touch-icon.png') ?>">
+    <link rel="manifest" href="../shared/site.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -80,6 +82,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </button>
                 <button class="subnav-tab" data-subtab="itinerarios">
                     <i class="fas fa-route mr-1"></i> Itinerarios
+                </button>
+                <button class="subnav-tab" data-subtab="cotizaciones">
+                    <i class="fas fa-folder-open mr-1"></i> Cotizaciones Guardadas
                 </button>
             </div>
             <div id="gestion-resumen" class="text-xs text-slate-500 mb-3"></div>
@@ -509,6 +514,48 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
             </div>
+
+            <!-- Cotizaciones Guardadas: antes pestaña del Cotizador, ahora acá — mismos ids
+                 que usaba (cot-search, cot-nueva, cot-table-body, cot-page-info, cot-prev,
+                 cot-next), ver shared/gestion-datos.js. -->
+            <div id="gestion-cotizaciones" class="subtab-content hidden">
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div class="relative">
+                                <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
+                                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            </div>
+                            <button id="cot-nueva" class="btn btn-primary">
+                                <i class="fas fa-plus-circle mr-2"></i>Nueva Cotización
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full small">
+                            <thead>
+                                <tr>
+                                    <th class="text-left p-3">ID</th>
+                                    <th class="text-left p-3">Nombre PAX</th>
+                                    <th class="text-left p-3">Contacto</th>
+                                    <th class="text-left p-3">Fecha Cot.</th>
+                                    <th class="text-left p-3">N° PAX</th>
+                                    <th class="text-right p-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cot-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
+                        <span id="cot-page-info"></span>
+                        <div class="flex gap-2">
+                            <button id="cot-prev" class="btn border">Anterior</button>
+                            <button id="cot-next" class="btn border">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         </div>
         </div>
@@ -516,7 +563,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
 
     <script>
         window.APP_CONFIG = {
-            currencySymbol: <?= json_encode($currencySymbol) ?>
+            currencySymbol: <?= json_encode($currencySymbol) ?>,
+            monedaCodigo: <?= json_encode($navActive === 'gestion-usd' ? 'usd' : 'pen') ?>
         };
     </script>
     <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">

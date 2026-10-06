@@ -29,6 +29,7 @@ verificarSesion();
 // ===== CONFIGURACIÓN =====
 const API_URL = 'api.php';
 const CURRENCY_SYMBOL = window.APP_CONFIG.currencySymbol;
+const MONEDA_CODIGO = window.APP_CONFIG.monedaCodigo;
 
 const fmt = (v) => {
     const n = Number(v) || 0;
@@ -100,6 +101,7 @@ function irASubtabGestion(subtab) {
     });
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
     if (subtab === 'clasificacion') actualizarConteosItinerarios();
+    if (subtab === 'cotizaciones') cargarCotizacionesGuardadas();
 }
 
 // Acordeones de Datos Pax / Actividades / Hoteles / Itinerario: colapsan/expanden y
@@ -1248,7 +1250,11 @@ function renderPaquetesList() {
                 verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash mr-1"></i>Ocultar' : '<i class="fas fa-eye mr-1"></i>Ver';
             });
             div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
-            div.querySelector('.paquete-editar-btn').addEventListener('click', () => editarPaquete(p));
+            // Editar ahora se hace en el Cotizador (reusa su drag-and-drop de Actividades/
+            // Hoteles/Itinerario) — ver cargarPaqueteParaEditar en shared/cotizador.js.
+            div.querySelector('.paquete-editar-btn').addEventListener('click', () => {
+                window.location.href = `../${MONEDA_CODIGO}/index.php?editarPaquete=${encodeURIComponent(p.id)}`;
+            });
             div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
             container.appendChild(div);
         });
@@ -1426,6 +1432,125 @@ async function handleHotelCsvUpload(event) {
 }
 
 
+// ===== COTIZACIONES GUARDADAS (tabla, búsqueda y paginación) =====
+// Antes pestaña del propio Cotizador (shared/cotizador.js) — "Abrir"/"Duplicar"/"Ver PDF"
+// dependían del formulario de esa página, así que acá navegan de página completa hacia
+// ../{moneda}/index.php, reusando el deep-link ?cotizacion=ID[&ver=pdf] que ya maneja su
+// init(). "Eliminar" y la carga/búsqueda/paginación sí son 100% API, se mueven tal cual.
+const COT_PAGE_SIZE = 15;
+const cotState = { term: '', offset: 0, total: 0 };
+let cotSearchDebounce = null;
+
+async function cargarCotizacionesGuardadas() {
+    const tbody = document.getElementById('cot-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
+    try {
+        const params = new URLSearchParams({
+            q: cotState.term,
+            limit: COT_PAGE_SIZE,
+            offset: cotState.offset
+        });
+        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`);
+        const { results, total } = await res.json();
+        cotState.total = total;
+        tbody.innerHTML = '';
+        if (results.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
+        } else {
+            results.forEach(cot => tbody.appendChild(buildCotRow(cot)));
+        }
+        const shown = cotState.offset + results.length;
+        document.getElementById('cot-page-info').textContent = total === 0 ? '' : `${cotState.offset + 1}-${shown} de ${total}`;
+        document.getElementById('cot-prev').disabled = cotState.offset === 0;
+        document.getElementById('cot-next').disabled = shown >= total;
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
+    }
+}
+
+function buildCotRow(cot) {
+    const pax = cot.data.pax || {};
+    const tr = document.createElement('tr');
+    tr.className = 'border-t hover:bg-slate-50';
+    tr.innerHTML = `
+        <td class="p-3 font-medium">${escapeHtml(cot.id)}</td>
+        <td class="p-3">${escapeHtml(pax.nombre_pax || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.contacto || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.fecha_cot || '-')}</td>
+        <td class="p-3">${escapeHtml(pax.n_pax || '-')}</td>
+        <td class="p-3 text-right whitespace-nowrap"></td>
+    `;
+    const actionsCell = tr.querySelector('td:last-child');
+
+    const abrirBtn = document.createElement('button');
+    abrirBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    abrirBtn.title = 'Abrir';
+    abrirBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
+    abrirBtn.addEventListener('click', () => {
+        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(cot.id)}`;
+    });
+
+    const dupBtn = document.createElement('button');
+    dupBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    dupBtn.title = 'Duplicar';
+    dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
+    dupBtn.addEventListener('click', () => duplicarCotizacionGuardada(cot.id));
+
+    const pdfBtn = document.createElement('button');
+    pdfBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
+    pdfBtn.title = 'Ver / Descargar PDF';
+    pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
+    pdfBtn.addEventListener('click', () => {
+        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(cot.id)}&ver=pdf`;
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-500 hover:text-red-700';
+    delBtn.title = 'Eliminar';
+    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    delBtn.addEventListener('click', () => eliminarCotizacionGuardada(cot.id, pax.nombre_pax));
+
+    actionsCell.append(abrirBtn, dupBtn, pdfBtn, delBtn);
+    return tr;
+}
+
+async function duplicarCotizacionGuardada(id) {
+    try {
+        const res = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        const newId = 'COT-' + Date.now();
+        const copia = { ...data, id: newId, fechaGuardado: new Date().toISOString() };
+        const saveRes = await fetch(`${API_URL}?path=guardar-cotizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(copia)
+        });
+        const result = await saveRes.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(newId)}`;
+    } catch (e) {
+        notifyError('Error al duplicar: ' + e.message);
+    }
+}
+
+async function eliminarCotizacionGuardada(id, nombre) {
+    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-cotizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        notifySuccess('Cotización eliminada.');
+        cargarCotizacionesGuardadas();
+    } catch (e) {
+        notifyError('Error al eliminar: ' + e.message);
+    }
+}
+
 async function init() {
     await cargarDatosIniciales();
     // El armador de itinerario embebido en "Itinerarios" (subir/editar módulos, páginas
@@ -1550,6 +1675,27 @@ async function init() {
             ['hotel-new-nombre', 'hotel-new-distr', 'hotel-new-preg', 'hotel-new-ppromo', 'hotel-new-pconf', 'hotel-new-pctotal'].forEach(id => document.getElementById(id).value = '');
             renderHotelNewDestinoCategoria();
         }
+    });
+
+    document.getElementById('cot-nueva').addEventListener('click', () => {
+        window.location.href = `../${MONEDA_CODIGO}/index.php`;
+    });
+    document.getElementById('cot-search').addEventListener('input', (e) => {
+        clearTimeout(cotSearchDebounce);
+        const term = e.target.value.trim();
+        cotSearchDebounce = setTimeout(() => {
+            cotState.term = term;
+            cotState.offset = 0;
+            cargarCotizacionesGuardadas();
+        }, 300);
+    });
+    document.getElementById('cot-prev').addEventListener('click', () => {
+        cotState.offset = Math.max(0, cotState.offset - COT_PAGE_SIZE);
+        cargarCotizacionesGuardadas();
+    });
+    document.getElementById('cot-next').addEventListener('click', () => {
+        cotState.offset += COT_PAGE_SIZE;
+        cargarCotizacionesGuardadas();
     });
 }
 

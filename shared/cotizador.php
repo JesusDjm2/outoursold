@@ -19,6 +19,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     <link rel="icon" type="image/png" href="../shared/favicon-outoors.png?v=<?= filemtime(__DIR__ . '/favicon-outoors.png') ?>">
+    <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png?v=<?= filemtime(__DIR__ . '/apple-touch-icon.png') ?>">
+    <link rel="manifest" href="../shared/site.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.js"></script>
@@ -67,17 +69,27 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-        <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md">
-            <button class="nav-tab flex-1 rounded-xl font-medium active" data-tab="cotizador">
-                <i class="fas fa-calculator"></i><span>Cotizador</span>
+        <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md" id="idioma-tabs">
+            <button type="button" class="nav-tab flex-1 rounded-xl font-medium active" data-idioma="es">
+                <i class="fas fa-language"></i><span>Español</span>
             </button>
-            <button class="nav-tab flex-1 rounded-xl font-medium" data-tab="cotizaciones">
-                <i class="fas fa-folder-open"></i><span>Cotizaciones Guardadas</span>
+            <button type="button" class="nav-tab flex-1 rounded-xl font-medium" data-idioma="en">
+                <i class="fas fa-language"></i><span>English</span>
+            </button>
+            <button type="button" class="nav-tab flex-1 rounded-xl font-medium" data-idioma="pt">
+                <i class="fas fa-language"></i><span>Português</span>
             </button>
         </div>
         <div id="cotizador-section" class="tab-content">
+            <!-- Aviso de "editando un paquete" (ver cargarPaqueteParaEditar/activarModoEdicionPaquete
+                 en cotizador.js) — oculto salvo cuando se entra vía ?editarPaquete=ID desde
+                 Gestión de Datos > Paquetes. -->
+            <div id="paquete-edit-banner" class="hidden mb-4 p-3 rounded-lg flex items-center justify-between flex-wrap gap-2" style="background:rgba(187,49,53,0.08)">
+                <span class="small"><i class="fas fa-box-archive mr-2"></i>Editando el paquete: <strong id="paquete-edit-nombre"></strong></span>
+                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar edición</button>
+            </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
-                <section class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
+                <section id="datos-pax-section" class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
                         <button type="button" class="accordion-toggle" aria-expanded="true">
                             <i class="fas fa-chevron-down accordion-caret"></i>
@@ -87,7 +99,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                     <div class="accordion-body">
                     <form id="form-pax" class="grid grid-cols-1 gap-2 small">
-                        <div class="field">
+                        <!-- El idioma ahora se elige con las pestañas de arriba (#idioma-tabs)
+                             — este <select> se queda oculto como única fuente de verdad: todo
+                             cotizador.js (guardado, paquetes, itinerario embebido) ya lee/
+                             escribe su .value y escucha su evento change. -->
+                        <div class="field hidden">
                             <select name="idioma" title="Idioma de la cotización / PDF">
                                 <option value="es" selected>Español</option>
                                 <option value="en">English</option>
@@ -124,7 +140,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </form>
                     </div>
                 </section>
-                <section class="lg:col-span-3 space-y-4">
+                <section id="cotizador-main-col" class="lg:col-span-3 space-y-4">
                     <div class="card p-3 accordion-section" data-accordion-key="actividades">
                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
@@ -301,44 +317,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </section>
             </main>
-        </div>
-        <div id="cotizaciones-section" class="tab-content hidden">
-            <div class="card p-6">
-                <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                    <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <div class="relative">
-                            <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
-                            <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                        </div>
-                        <button id="cot-nueva" class="btn btn-primary">
-                            <i class="fas fa-plus-circle mr-2"></i>Nueva Cotización
-                        </button>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full small">
-                        <thead>
-                            <tr>
-                                <th class="text-left p-3">ID</th>
-                                <th class="text-left p-3">Nombre PAX</th>
-                                <th class="text-left p-3">Contacto</th>
-                                <th class="text-left p-3">Fecha Cot.</th>
-                                <th class="text-left p-3">N° PAX</th>
-                                <th class="text-right p-3">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cot-table-body"></tbody>
-                    </table>
-                </div>
-                <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
-                    <span id="cot-page-info"></span>
-                    <div class="flex gap-2">
-                        <button id="cot-prev" class="btn border">Anterior</button>
-                        <button id="cot-next" class="btn border">Siguiente</button>
-                    </div>
-                </div>
-            </div>
         </div>
         </div>
         </div>
