@@ -9,6 +9,18 @@ body {
     min-height: 100vh;
 }
 
+/* Ícono de arrastre de los días del armador — igual al de Actividades/Hoteles en
+   Cotizador (shared/cotizador.css), duplicado acá para que la página standalone de
+   Itinerario (que no carga cotizador.css) también lo tenga. */
+.handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.03), rgba(2, 6, 23, 0.01));
+}
+
 .card {
     border: 1px solid rgba(15, 23, 42, 0.06);
     background: white;

@@ -22,6 +22,8 @@ $heroPosY = resolverHeroPosY($db);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Empresa</title>
     <link rel="icon" type="image/png" href="favicon-outoors.png?v=<?= filemtime(__DIR__ . '/favicon-outoors.png') ?>">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=<?= filemtime(__DIR__ . '/apple-touch-icon.png') ?>">
+    <link rel="manifest" href="site.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

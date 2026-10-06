@@ -19,6 +19,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generador de Itinerarios</title>
     <link rel="icon" type="image/png" href="../shared/favicon-outoors.png?v=<?= filemtime(__DIR__ . '/../shared/favicon-outoors.png') ?>">
+    <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png?v=<?= filemtime(__DIR__ . '/../shared/apple-touch-icon.png') ?>">
+    <link rel="manifest" href="../shared/site.webmanifest">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

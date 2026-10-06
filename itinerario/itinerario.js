@@ -753,7 +753,9 @@ function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedF
         });
     }
 
-    let cellsHtml = `<td class="p-2"><span class="cursor-grab text-slate-400"><i class="fas fa-grip-vertical"></i></span></td>`;
+    // Mismo ícono de arrastre que usan Actividades/Hoteles en el Cotizador (.handle, ver
+    // shared/cotizador.css) — antes este armador usaba un ícono de FontAwesome distinto.
+    let cellsHtml = `<td class="p-2"><div class="handle">≡</div></td>`;
     if (isMainItinerary) {
         cellsHtml += `<td class="p-2"><input type="text" class="w-full text-center day-number bg-slate-100 rounded p-1" readonly></td>`;
     }
