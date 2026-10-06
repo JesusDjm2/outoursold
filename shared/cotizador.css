@@ -40,6 +40,11 @@ body {
 }
 .accordion-section.is-collapsed .accordion-caret { transform: rotate(-90deg); }
 .accordion-section.is-collapsed .accordion-body { display: none; }
+/* Actividades / Hoteles / Itinerario ya no llevan título propio (el encabezado de la
+   tabla hace de título); el nombre solo se muestra, en gris, con la sección colapsada,
+   que es cuando la tabla deja de verse. */
+.accordion-label-collapsed { display: none; font-size: 0.8rem; color: #64748b; }
+.accordion-section.is-collapsed .accordion-label-collapsed { display: inline; }
 /* Encabezados de tabla: gris en vez del negro/bold por defecto del navegador, para que
    pesen menos visualmente que el contenido de las filas — antes solo estaba puesto para
    las tablas de Actividades/Hoteles/Itinerario del Cotizador; se generaliza a TODAS las

@@ -1056,7 +1056,7 @@ function restaurarItinerarioArmado(armado) {
 // activa no quede desincronizada.
 function sincronizarTabsIdioma() {
     const idioma = document.querySelector('select[name="idioma"]').value;
-    document.querySelectorAll('#idioma-tabs .nav-tab').forEach(tab => {
+    document.querySelectorAll('#idioma-tabs .subnav-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.idioma === idioma);
     });
 }
@@ -1400,7 +1400,7 @@ async function init() {
     await initItinerario(document.querySelector('select[name="idioma"]').value || 'es');
     nuevaCotizacion(false);
 
-    document.querySelectorAll('#idioma-tabs .nav-tab').forEach(tab => {
+    document.querySelectorAll('#idioma-tabs .subnav-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const selectIdioma = document.querySelector('select[name="idioma"]');
             if (selectIdioma.value === tab.dataset.idioma) return;

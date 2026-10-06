@@ -69,15 +69,15 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-        <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md" id="idioma-tabs">
-            <button type="button" class="nav-tab flex-1 rounded-xl font-medium active" data-idioma="es">
-                <i class="fas fa-language"></i><span>Español</span>
+        <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="idioma-tabs">
+            <button type="button" class="subnav-tab active" data-idioma="es">
+                <i class="fas fa-language mr-1"></i> Español
             </button>
-            <button type="button" class="nav-tab flex-1 rounded-xl font-medium" data-idioma="en">
-                <i class="fas fa-language"></i><span>English</span>
+            <button type="button" class="subnav-tab" data-idioma="en">
+                <i class="fas fa-language mr-1"></i> English
             </button>
-            <button type="button" class="nav-tab flex-1 rounded-xl font-medium" data-idioma="pt">
-                <i class="fas fa-language"></i><span>Português</span>
+            <button type="button" class="subnav-tab" data-idioma="pt">
+                <i class="fas fa-language mr-1"></i> Português
             </button>
         </div>
         <div id="cotizador-section" class="tab-content">
@@ -145,7 +145,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
-                                <h2 class="text-base font-medium">Actividades</h2>
+                                <span class="accordion-label-collapsed">Actividades</span>
                             </button>
                             <div class="flex items-center gap-2">
                                 <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1">
@@ -189,7 +189,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                          <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
-                                <h2 class="text-base font-medium">Hoteles</h2>
+                                <span class="accordion-label-collapsed">Hoteles</span>
                             </button>
                             <div class="flex items-center gap-2">
                                 <button id="toggle-conf-hoteles" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
@@ -205,7 +205,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <th class="w-8 pl-2">&nbsp;</th>
                                         <th class="w-32">CheckIn</th>
                                         <th class="w-32">CheckOut</th>
-                                        <th class="w-full">Aloj.</th>
+                                        <th class="w-full">Hoteles / Hospedajes</th>
                                         <th class="w-24">Nº Hab.</th>
                                         <th class="w-24">Noches</th>
                                         <th class="w-24" hidden>P.Reg</th>
@@ -228,7 +228,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="flex items-center justify-between mb-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
-                                <h2 class="text-base font-medium">Itinerario</h2>
+                                <span class="accordion-label-collapsed">Itinerario</span>
                             </button>
                         </div>
                         <div class="accordion-body">
@@ -241,18 +241,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <!-- El "aplicar itinerario predeterminado" viejo (solo itinerario) se quitó: el
                              selector "Aplicar paquete..." de Actividades ya cubre itinerario junto con
                              actividades y hoteles (ver #aplicar-paquete-select). -->
-                        <div class="flex items-center gap-2 mb-3 flex-wrap">
-                            <button id="itinerario-historial-btn" type="button" class="px-3 py-1 rounded-md small border" title="Reusar un itinerario ya generado">
-                                <i class="fas fa-clock-rotate-left mr-1"></i>Historial
-                            </button>
-                        </div>
                         <div class="itinerary-table-container">
                             <table class="w-full small">
                                 <thead>
                                     <tr>
                                         <th class="p-2 w-8">&nbsp;</th>
                                         <th class="p-2 text-left w-20">Día</th>
-                                        <th class="p-2 text-left">Tour / Documento</th>
+                                        <th class="p-2 text-left">Itinerarios</th>
                                         <th class="p-2 w-16">Acción</th>
                                     </tr>
                                 </thead>
