@@ -45,6 +45,13 @@ body {
    que es cuando la tabla deja de verse. */
 .accordion-label-collapsed { display: none; font-size: 0.8rem; color: #64748b; }
 .accordion-section.is-collapsed .accordion-label-collapsed { display: inline; }
+/* Modo paquete (crear/editar un paquete predefinido, ver activarModoEdicionPaquete en
+   cotizador.js): se ocultan las opciones que solo tienen sentido en una cotización
+   (Aplicar paquete / Nuevo paquete, Historial, Precios confidenciales) y todo costo
+   (Total Línea, precios confidenciales): un paquete no guarda precios. */
+body.modo-paquete .solo-cotizacion,
+body.modo-paquete .col-confidencial,
+body.modo-paquete .col-costo { display: none !important; }
 /* Encabezados de tabla: gris en vez del negro/bold por defecto del navegador, para que
    pesen menos visualmente que el contenido de las filas — antes solo estaba puesto para
    las tablas de Actividades/Hoteles/Itinerario del Cotizador; se generaliza a TODAS las

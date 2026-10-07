@@ -259,51 +259,42 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </button>
                 </div>
 
+                <!-- Mismo armado que Tours / Hoteles: una sola tarjeta con buscador arriba, caja
+                     gris "Agregar nuevo" y la tabla debajo (mismos ids que lee itinerario.js). -->
                 <div id="itinerario-gestion-modulos" class="itin-panel">
-                    <div class="card p-6 mb-6">
-                        <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nuevo Itinerario (PDF)</h2>
-                        <form id="itinerary-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div class="md:col-span-2">
-                                <label for="itinerary-module-title" class="font-medium text-slate-700">Título del Itinerario</label>
-                                <input type="text" id="itinerary-module-title" placeholder="Ej: Tour Valle Sagrado" class="w-full border rounded p-2 mt-1" required>
-                            </div>
-                            <div>
-                                <label for="itinerary-module-destino" class="font-medium text-slate-700">Destino <span class="text-slate-400 font-normal">(opcional)</span></label>
-                                <select id="itinerary-module-destino" class="w-full border rounded p-2 mt-1">
-                                    <option value="">Sin clasificar</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="itinerary-module-categoria" class="font-medium text-slate-700">Categoría</label>
-                                <select id="itinerary-module-categoria" class="w-full border rounded p-2 mt-1" disabled>
-                                    <option value="">—</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label for="itinerary-module-pdf" class="font-medium text-slate-700">Archivo PDF</label>
-                                <input type="file" id="itinerary-module-pdf" accept=".pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 mt-1" required>
-                            </div>
-                            <button type="button" id="upload-local-module" class="btn btn-primary md:col-span-2">Subir Itinerario</button>
-                        </form>
-                    </div>
-
                     <div class="card p-6">
-                        <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
                             <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Itinerarios Existentes</h2>
-                            <div class="relative">
-                                <input id="itinerario-modulos-search" class="rounded-lg pl-8 pr-3 py-1.5 border text-sm w-64" type="text" placeholder="Buscar itinerario...">
-                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
+                                <div class="relative flex-1 min-w-[160px] sm:flex-none">
+                                    <input id="itinerario-modulos-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar itinerario...">
+                                    <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                </div>
                             </div>
                         </div>
-                        <div class="itinerary-table-container">
+                        <div class="bg-slate-50 border rounded-lg p-3 mb-4">
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo itinerario (PDF)</h3>
+                            <form id="itinerary-upload-form" class="grid grid-cols-12 gap-2 small" onsubmit="return false">
+                                <input type="text" id="itinerary-module-title" placeholder="Título del itinerario (ej. Tour Valle Sagrado)" class="input rounded px-2 py-1 border col-span-12" required>
+                                <select id="itinerary-module-destino" class="input rounded px-2 py-1 border col-span-6 md:col-span-2" title="Destino (opcional)">
+                                    <option value="">Sin clasificar</option>
+                                </select>
+                                <select id="itinerary-module-categoria" class="input rounded px-2 py-1 border col-span-6 md:col-span-2" title="Categoría" disabled>
+                                    <option value="">—</option>
+                                </select>
+                                <input type="file" id="itinerary-module-pdf" accept=".pdf" class="col-span-12 md:col-span-6 text-sm text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-white file:text-slate-700 file:border file:border-slate-300 hover:file:bg-slate-100" title="Archivo PDF" required>
+                                <button type="button" id="upload-local-module" class="btn btn-primary col-span-12 md:col-span-2" title="Subir itinerario"><i class="fas fa-plus"></i></button>
+                            </form>
+                        </div>
+                        <div class="overflow-x-auto">
                             <table class="w-full">
-                                <thead class="bg-slate-50">
+                                <thead>
                                     <tr>
-                                        <th class="text-left p-2">Título</th>
-                                        <th class="text-left p-2">Destino</th>
-                                        <th class="text-left p-2">Categoría</th>
-                                        <th class="text-left p-2">Creado por</th>
-                                        <th class="text-right p-2">Acciones</th>
+                                        <th class="text-left p-3">Título</th>
+                                        <th class="text-left p-3">Destino</th>
+                                        <th class="text-left p-3">Categoría</th>
+                                        <th class="text-left p-3">Creado por</th>
+                                        <th class="text-right p-3">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="itinerario-modulos-table-body"></tbody>
@@ -432,50 +423,15 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
             </div>
 
+            <!-- Paquetes: acá solo se listan (Ver / Editar / Eliminar). Se crean y editan en el
+                 Cotizador (?nuevoPaquete=1 / ?editarPaquete=ID, ver shared/cotizador.js), que ya
+                 tiene el drag-and-drop de Itinerario, Actividades y Hoteles. -->
             <div id="gestion-paquetes" class="subtab-content hidden">
-                <div id="paquetes-sin-tours-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
-                    <span><i class="fas fa-circle-info mr-1"></i>Aún no hay tours en el catálogo. Agrega uno primero para poder incluir actividades en tus paquetes.</span>
-                    <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear tour →</button>
-                </div>
-                <div class="card p-6 mb-6">
-                    <h2 class="text-base font-semibold text-slate-800 mb-1">Nuevo Paquete</h2>
-                    <p class="text-sm text-slate-500 mb-4">Combina Actividades, Hoteles e Itinerario en un solo paquete para aplicarlo completo a una cotización de un clic. Alcanza con que tenga al menos una de las tres partes.</p>
-                    <input id="paquete-nombre" class="input w-full rounded px-3 py-2 border mb-4" type="text" placeholder="Nombre del paquete (ej. Cusco 4 días)">
-
-                    <div class="mb-4">
-                        <h3 class="text-sm font-semibold text-slate-700 mb-2"><i class="fas fa-person-hiking mr-1"></i>Actividades</h3>
-                        <div id="paquete-builder-rows" class="space-y-2 mb-2"></div>
-                        <button id="paquete-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Actividad</button>
-                    </div>
-
-                    <div class="mb-4">
-                        <h3 class="text-sm font-semibold text-slate-700 mb-2"><i class="fas fa-hotel mr-1"></i>Hoteles</h3>
-                        <div id="paquete-hoteles-rows" class="space-y-2 mb-2"></div>
-                        <button id="paquete-hotel-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Hotel</button>
-                    </div>
-
-                    <div class="mb-4">
-                        <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
-                            <h3 class="text-sm font-semibold text-slate-700"><i class="fas fa-route mr-1"></i>Itinerario</h3>
-                            <label class="text-xs text-slate-500 flex items-center gap-2">Idioma del itinerario
-                                <select id="paquete-itin-idioma" class="rounded-md small border px-2 py-1">
-                                    <option value="es">Español</option>
-                                    <option value="en">English</option>
-                                    <option value="pt">Português</option>
-                                </select>
-                            </label>
-                        </div>
-                        <div id="paquete-itin-rows" class="space-y-2 mb-2"></div>
-                        <button id="paquete-itin-add-row" class="btn border small"><i class="fas fa-plus mr-1"></i>Agregar Módulo</button>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                        <button id="paquete-guardar" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Guardar Paquete</button>
-                        <button id="paquete-cancelar-edicion" class="btn border hidden"><i class="fas fa-times mr-1"></i>Cancelar edición</button>
-                    </div>
-                </div>
                 <div class="card p-6">
-                    <h2 class="text-base font-semibold text-slate-800 mb-4">Paquetes Guardados</h2>
+                    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Paquetes Guardados</h2>
+                        <a href="../<?= $navActive === 'gestion-usd' ? 'usd' : 'pen' ?>/index.php?nuevoPaquete=1" class="btn btn-primary small"><i class="fas fa-plus mr-1"></i>Crear paquete en el Cotizador</a>
+                    </div>
                     <div id="paquetes-list" class="space-y-2"></div>
                 </div>
             </div>

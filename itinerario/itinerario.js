@@ -343,13 +343,13 @@ function renderModulosTable() {
 
 function buildModuloRow(it) {
     const tr = document.createElement('tr');
-    tr.className = 'border-b hover:bg-slate-50';
+    tr.className = 'hover:bg-slate-50';
     tr.innerHTML = `
-        <td class="p-2 font-medium text-slate-700">${it.titulo}</td>
-        <td class="p-2"><select class="w-full border rounded p-1 text-xs module-destino-select"></select></td>
-        <td class="p-2"><select class="w-full border rounded p-1 text-xs module-categoria-select" disabled></select></td>
-        <td class="p-2 text-slate-500 text-xs">${it.creado_por_nombre || '—'}</td>
-        <td class="p-2 text-right whitespace-nowrap">
+        <td class="p-3 font-medium">${it.titulo}</td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full module-destino-select"></select></td>
+        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full module-categoria-select" disabled></select></td>
+        <td class="p-3 text-slate-500">${it.creado_por_nombre || '—'}</td>
+        <td class="p-3 text-right whitespace-nowrap">
             <div class="inline-flex flex-col items-center align-middle mr-2">
                 <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 modulo-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
                 ${it.archivo_existe === false ? '<span class="text-[10px] leading-none text-red-500 mt-0.5" title="El archivo no existe en el servidor">roto</span>' : ''}

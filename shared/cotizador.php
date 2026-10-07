@@ -69,24 +69,43 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-        <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="idioma-tabs">
-            <button type="button" class="subnav-tab active" data-idioma="es">
-                <i class="fas fa-language mr-1"></i> Español
-            </button>
-            <button type="button" class="subnav-tab" data-idioma="en">
-                <i class="fas fa-language mr-1"></i> English
-            </button>
-            <button type="button" class="subnav-tab" data-idioma="pt">
-                <i class="fas fa-language mr-1"></i> Português
-            </button>
+        <div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <div class="flex flex-wrap gap-1 bg-white rounded-lg p-1 shadow-md w-fit" id="idioma-tabs">
+                <button type="button" class="subnav-tab active" data-idioma="es">
+                    <i class="fas fa-language mr-1"></i> Español
+                </button>
+                <button type="button" class="subnav-tab" data-idioma="en">
+                    <i class="fas fa-language mr-1"></i> English
+                </button>
+                <button type="button" class="subnav-tab" data-idioma="pt">
+                    <i class="fas fa-language mr-1"></i> Português
+                </button>
+            </div>
+            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en #paquete-aplicado)
+                 o armar uno nuevo (#paquete-nuevo-btn → modo paquete, ver cotizador.js). -->
+            <div id="paquete-toolbar" class="solo-cotizacion flex items-center gap-2 flex-wrap">
+                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs px-2 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
+                    <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
+                </span>
+                <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1 bg-white">
+                    <option value="">Aplicar paquete...</option>
+                </select>
+                <button id="paquete-nuevo-btn" type="button" class="px-3 py-1 rounded-md small border bg-white" title="Armar un paquete predefinido nuevo (Itinerario, Actividades y Hoteles) con su nombre">
+                    <i class="fas fa-plus mr-1"></i>Nuevo paquete
+                </button>
+            </div>
         </div>
         <div id="cotizador-section" class="tab-content">
-            <!-- Aviso de "editando un paquete" (ver cargarPaqueteParaEditar/activarModoEdicionPaquete
-                 en cotizador.js) — oculto salvo cuando se entra vía ?editarPaquete=ID desde
-                 Gestión de Datos > Paquetes. -->
+            <!-- Modo paquete (ver activarModoEdicionPaquete en cotizador.js): se entra con
+                 "Nuevo paquete" / ?nuevoPaquete=1, o editando uno vía ?editarPaquete=ID desde
+                 Gestión de Datos > Paquetes. El nombre se escribe acá y se guarda con
+                 "Guardar paquete" / "Actualizar paquete" (Resumen de Factura). -->
             <div id="paquete-edit-banner" class="hidden mb-4 p-3 rounded-lg flex items-center justify-between flex-wrap gap-2" style="background:rgba(187,49,53,0.08)">
-                <span class="small"><i class="fas fa-box-archive mr-2"></i>Editando el paquete: <strong id="paquete-edit-nombre"></strong></span>
-                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar edición</button>
+                <div class="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                    <span class="small whitespace-nowrap"><i class="fas fa-box-archive mr-2"></i><span id="paquete-edit-modo">Nuevo paquete</span>:</span>
+                    <input id="paquete-edit-nombre" type="text" class="input rounded px-2 py-1 border small flex-1 min-w-[200px] max-w-md bg-white" placeholder="Nombre del paquete (ej. Cusco Clásico 3D/2N)">
+                </div>
+                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar</button>
             </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
                 <section id="datos-pax-section" class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
@@ -141,89 +160,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </section>
                 <section id="cotizador-main-col" class="lg:col-span-3 space-y-4">
-                    <div class="card p-3 accordion-section" data-accordion-key="actividades">
-                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-                            <button type="button" class="accordion-toggle" aria-expanded="true">
-                                <i class="fas fa-chevron-down accordion-caret"></i>
-                                <span class="accordion-label-collapsed">Actividades</span>
-                            </button>
-                            <div class="flex items-center gap-2">
-                                <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1">
-                                    <option value="">Aplicar paquete...</option>
-                                </select>
-                                <button id="historial-tours-btn" type="button" class="px-3 py-1 rounded-md small border" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
-                                    <i class="fas fa-clock-rotate-left mr-1"></i>Historial
-                                </button>
-                                <button id="toggle-conf-tours" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
-                                    <i class="fas fa-eye mr-1"></i>Precios confid.
-                                </button>
-                            </div>
-                        </div>
-                        <div class="accordion-body">
-                        <div class="overflow-x-auto">
-                            <table id="tours-table" class="w-full small">
-                                <thead>
-                                    <tr>
-                                        <th class="w-8 pl-2">&nbsp;</th>
-                                        <th class="w-40">Fecha</th>
-                                        <th class="w-full">Tour / Actividad</th>
-                                        <th class="w-16">Cant.</th>
-                                        <th class="w-24">Distr.</th>
-                                        <th class="w-24" hidden>P.Reg</th>
-                                        <th class="w-24" hidden>P.Promo</th>
-                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
-                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
-                                        <th class="w-28">Total Línea</th>
-                                        <th class="w-12 pr-2">Acc.</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tours-body" class="small"></tbody>
-                            </table>
-                        </div>
-                        <div class="mt-2">
-                            <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
-                        </div>
-                        </div>
-                    </div>
-                    <div class="card p-3 accordion-section" data-accordion-key="hoteles">
-                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-                            <button type="button" class="accordion-toggle" aria-expanded="true">
-                                <i class="fas fa-chevron-down accordion-caret"></i>
-                                <span class="accordion-label-collapsed">Hoteles</span>
-                            </button>
-                            <div class="flex items-center gap-2">
-                                <button id="toggle-conf-hoteles" type="button" class="px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
-                                    <i class="fas fa-eye mr-1"></i>Precios confid.
-                                </button>
-                            </div>
-                        </div>
-                        <div class="accordion-body">
-                        <div class="overflow-x-auto">
-                            <table id="hotels-table" class="w-full small">
-                                <thead>
-                                    <tr>
-                                        <th class="w-8 pl-2">&nbsp;</th>
-                                        <th class="w-32">CheckIn</th>
-                                        <th class="w-32">CheckOut</th>
-                                        <th class="w-full">Hoteles / Hospedajes</th>
-                                        <th class="w-24">Nº Hab.</th>
-                                        <th class="w-24">Noches</th>
-                                        <th class="w-24" hidden>P.Reg</th>
-                                        <th class="w-24" hidden>P.Promo</th>
-                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
-                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
-                                        <th class="w-28">Total Línea</th>
-                                        <th class="w-12 pr-2">Acc.</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="hotels-body" class="small"></tbody>
-                            </table>
-                        </div>
-                        <div class="mt-2">
-                            <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
-                        </div>
-                        </div>
-                    </div>
                     <div class="card p-3 accordion-section" data-accordion-key="itinerario">
                         <div class="flex items-center justify-between mb-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
@@ -239,7 +175,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <input type="text" id="itinerary-passenger" class="hidden">
                         <input type="text" id="itinerary-title" class="hidden">
                         <!-- El "aplicar itinerario predeterminado" viejo (solo itinerario) se quitó: el
-                             selector "Aplicar paquete..." de Actividades ya cubre itinerario junto con
+                             selector "Aplicar paquete..." de arriba ya cubre itinerario junto con
                              actividades y hoteles (ver #aplicar-paquete-select). -->
                         <div class="itinerary-table-container">
                             <table class="w-full small">
@@ -259,7 +195,87 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
                         <div class="flex flex-wrap items-center gap-2 mt-3">
                             <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
-                            <span class="small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
+                            <span class="solo-cotizacion small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="card p-3 accordion-section" data-accordion-key="actividades">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <span class="accordion-label-collapsed">Actividades</span>
+                            </button>
+                            <div class="flex items-center gap-2">
+                                <button id="historial-tours-btn" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
+                                    <i class="fas fa-clock-rotate-left mr-1"></i>Historial
+                                </button>
+                                <button id="toggle-conf-tours" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                    <i class="fas fa-eye mr-1"></i>Precios confid.
+                                </button>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                        <div class="overflow-x-auto">
+                            <table id="tours-table" class="w-full small">
+                                <thead>
+                                    <tr>
+                                        <th class="w-8 pl-2">&nbsp;</th>
+                                        <th class="w-40">Fecha</th>
+                                        <th class="w-full">Tour / Actividad</th>
+                                        <th class="w-16">Cant.</th>
+                                        <th class="w-24">Distr.</th>
+                                        <th class="w-24" hidden>P.Reg</th>
+                                        <th class="w-24" hidden>P.Promo</th>
+                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
+                                        <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
+                                        <th class="w-28 col-costo">Total Línea</th>
+                                        <th class="w-12 pr-2">Acc.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tours-body" class="small"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="card p-3 accordion-section" data-accordion-key="hoteles">
+                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <span class="accordion-label-collapsed">Hoteles</span>
+                            </button>
+                            <div class="flex items-center gap-2">
+                                <button id="toggle-conf-hoteles" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                    <i class="fas fa-eye mr-1"></i>Precios confid.
+                                </button>
+                            </div>
+                        </div>
+                        <div class="accordion-body">
+                        <div class="overflow-x-auto">
+                            <table id="hotels-table" class="w-full small">
+                                <thead>
+                                    <tr>
+                                        <th class="w-8 pl-2">&nbsp;</th>
+                                        <th class="w-32">CheckIn</th>
+                                        <th class="w-32">CheckOut</th>
+                                        <th class="w-full">Hoteles / Hospedajes</th>
+                                        <th class="w-24">Nº Hab.</th>
+                                        <th class="w-24">Noches</th>
+                                        <th class="w-24" hidden>P.Reg</th>
+                                        <th class="w-24" hidden>P.Promo</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>
+                                        <th class="w-32 col-confidencial" title="Uso interno de esta cotización">Precio C. Total</th>
+                                        <th class="w-28 col-costo">Total Línea</th>
+                                        <th class="w-12 pr-2">Acc.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="hotels-body" class="small"></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2">
+                            <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
                         </div>
                         </div>
                     </div>
@@ -268,7 +284,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <h3 class="text-white font-semibold">Resumen de Factura</h3>
                         </div>
                         <div class="p-4 small">
-                            <div class="grid grid-cols-1 md:grid-cols-10 gap-4">
+                            <div class="solo-cotizacion grid grid-cols-1 md:grid-cols-10 gap-4">
                                 <div class="md:col-span-7 flex flex-col">
                                     <label class="block text-slate-700 font-medium mb-1">Notas Adicionales</label>
                                     <div class="rte">

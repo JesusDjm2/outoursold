@@ -50,7 +50,6 @@ let modulosItinTodos = { es: [], en: [], pt: [] };
 let toursFilter = '';
 let hotelsFilter = '';
 let paquetesData = [];
-let paqueteEditandoId = null;
 
 // ===== CARGA DE DATOS =====
 async function cargarDatosIniciales() {
@@ -943,207 +942,9 @@ async function cargarPaquetes() {
     try {
         paquetesData = await fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json());
         renderPaquetesList();
-        renderAplicarPaqueteSelect();
     } catch (e) {
         console.error('Error al cargar paquetes:', e);
     }
-}
-
-function agregarFilaPaquete(data = {}) {
-    const row = document.createElement('div');
-    row.className = 'flex flex-wrap gap-2 items-center paquete-builder-row';
-
-    const tourInput = document.createElement('input');
-    tourInput.type = 'hidden';
-    tourInput.className = 'paquete-row-tour';
-    tourInput.value = data.tour || '';
-
-    const selector = buildTourSelector(data.tour || '', (tourName) => {
-        tourInput.value = tourName;
-    });
-    selector.classList.add('flex-1');
-
-    const cantInput = document.createElement('input');
-    cantInput.className = 'input rounded px-2 py-1 border text-right paquete-row-cant';
-    cantInput.type = 'number';
-    cantInput.min = '1';
-    cantInput.value = data.cant || 1;
-    cantInput.style.width = '80px';
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'text-red-500 small paquete-row-del';
-    delBtn.title = 'Quitar';
-    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    delBtn.addEventListener('click', () => row.remove());
-
-    row.append(selector, tourInput, cantInput, delBtn);
-    document.getElementById('paquete-builder-rows').appendChild(row);
-}
-
-function agregarFilaPaqueteHotel(data = {}) {
-    const row = document.createElement('div');
-    row.className = 'flex flex-wrap gap-2 items-center paquete-hotel-row';
-
-    const hotelInput = document.createElement('input');
-    hotelInput.type = 'hidden';
-    hotelInput.className = 'paquete-hotel-aloj';
-    hotelInput.value = data.aloj || '';
-
-    const selector = buildHotelSelector(data.aloj || '', (alojNombre) => {
-        hotelInput.value = alojNombre;
-    });
-    selector.classList.add('flex-1');
-
-    const numInput = (clase, valor, titulo) => {
-        const input = document.createElement('input');
-        input.className = `input rounded px-2 py-1 border text-right ${clase}`;
-        input.type = 'number';
-        input.min = '1';
-        input.value = valor;
-        input.title = titulo;
-        input.style.width = '80px';
-        return input;
-    };
-    const nhabInput = numInput('paquete-hotel-nhab', data.nhab || 1, 'Nº de habitaciones');
-    const nochesInput = numInput('paquete-hotel-noches', data.noches || 1, 'Noches');
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'text-red-500 small';
-    delBtn.title = 'Quitar';
-    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    delBtn.addEventListener('click', () => row.remove());
-
-    const etiqueta = (texto) => {
-        const span = document.createElement('span');
-        span.className = 'text-xs text-slate-500';
-        span.textContent = texto;
-        return span;
-    };
-    row.append(selector, hotelInput, etiqueta('Hab.'), nhabInput, etiqueta('Noches'), nochesInput, delBtn);
-    document.getElementById('paquete-hoteles-rows').appendChild(row);
-}
-
-// Itinerario del paquete: idioma propio (select #paquete-itin-idioma), y los módulos salen
-// del catálogo de ESE idioma (helpers en itinerario.js) — no del idioma activo de la cotización.
-let paqueteItinIdiomaActual = null;
-
-async function agregarFilaPaqueteItin(filename = '') {
-    const idioma = document.getElementById('paquete-itin-idioma').value;
-    await asegurarIdiomaCargado(idioma);
-    const row = document.createElement('div');
-    row.className = 'flex flex-wrap gap-2 items-center paquete-itin-row';
-
-    const hiddenInput = document.createElement('input');
-    hiddenInput.type = 'hidden';
-    hiddenInput.className = 'paquete-itin-filename';
-    hiddenInput.value = filename;
-
-    const selector = buildSelectorModuloIdioma(idioma, filename, (fn) => { hiddenInput.value = fn; });
-    selector.classList.add('flex-1');
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'text-red-500 small';
-    delBtn.title = 'Quitar';
-    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    delBtn.addEventListener('click', () => row.remove());
-
-    row.append(selector, hiddenInput, delBtn);
-    document.getElementById('paquete-itin-rows').appendChild(row);
-}
-
-function modulosItinPaqueteSeleccionados() {
-    return Array.from(document.querySelectorAll('.paquete-itin-filename')).map(i => i.value).filter(Boolean);
-}
-
-// Los módulos son de un solo idioma: al cambiarlo, los ya elegidos dejarían de existir.
-async function cambiarIdiomaItinPaquete() {
-    const select = document.getElementById('paquete-itin-idioma');
-    const nuevo = select.value;
-    if (nuevo === paqueteItinIdiomaActual) return;
-    if (modulosItinPaqueteSeleccionados().length > 0 &&
-        !await confirmAction('Los módulos elegidos son del idioma anterior. Al cambiar el idioma se quitan. ¿Continuar?', 'Sí, cambiar')) {
-        select.value = paqueteItinIdiomaActual;
-        return;
-    }
-    paqueteItinIdiomaActual = nuevo;
-    document.getElementById('paquete-itin-rows').innerHTML = '';
-    await agregarFilaPaqueteItin();
-}
-
-async function resetPaqueteBuilder() {
-    document.getElementById('paquete-nombre').value = '';
-    document.getElementById('paquete-builder-rows').innerHTML = '';
-    document.getElementById('paquete-hoteles-rows').innerHTML = '';
-    document.getElementById('paquete-itin-rows').innerHTML = '';
-    agregarFilaPaquete();
-    agregarFilaPaqueteHotel();
-    // Por defecto, el itinerario del paquete arranca en español — acá no hay Datos Pax de
-    // una cotización en curso (eso solo existe en Cotizador) del cual tomar el idioma.
-    const idiomaSelect = document.getElementById('paquete-itin-idioma');
-    idiomaSelect.value = 'es';
-    paqueteItinIdiomaActual = idiomaSelect.value;
-    paqueteEditandoId = null;
-    document.getElementById('paquete-cancelar-edicion').classList.add('hidden');
-    await agregarFilaPaqueteItin();
-}
-
-async function guardarPaquete() {
-    const nombre = document.getElementById('paquete-nombre').value.trim();
-    if (!nombre) { notifyError('El nombre del paquete es obligatorio.'); return; }
-    const tours = Array.from(document.querySelectorAll('.paquete-builder-row')).map(row => ({
-        tour: row.querySelector('.paquete-row-tour').value.trim(),
-        cant: row.querySelector('.paquete-row-cant').value
-    })).filter(t => t.tour);
-    const hoteles = Array.from(document.querySelectorAll('.paquete-hotel-row')).map(row => ({
-        aloj: row.querySelector('.paquete-hotel-aloj').value.trim(),
-        nhab: row.querySelector('.paquete-hotel-nhab').value,
-        noches: row.querySelector('.paquete-hotel-noches').value
-    })).filter(h => h.aloj);
-    const modulos = modulosItinPaqueteSeleccionados();
-    if (tours.length === 0 && hoteles.length === 0 && modulos.length === 0) {
-        notifyError('Agrega al menos una actividad, un hotel o un módulo de itinerario al paquete.');
-        return;
-    }
-    try {
-        const payload = {
-            nombre, tours, hoteles,
-            itinerario: modulos.length ? { idioma: document.getElementById('paquete-itin-idioma').value, modulos } : null
-        };
-        if (paqueteEditandoId) payload.id = paqueteEditandoId;
-        const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (!result.success) throw new Error(result.error || 'Error desconocido');
-        notifySuccess(paqueteEditandoId ? 'Paquete actualizado.' : 'Paquete guardado.');
-        resetPaqueteBuilder();
-        await cargarPaquetes();
-    } catch (e) {
-        notifyError('Error al guardar el paquete: ' + e.message);
-    }
-}
-
-async function editarPaquete(paquete) {
-    document.getElementById('paquete-nombre').value = paquete.nombre;
-    document.getElementById('paquete-builder-rows').innerHTML = '';
-    document.getElementById('paquete-hoteles-rows').innerHTML = '';
-    document.getElementById('paquete-itin-rows').innerHTML = '';
-    if (paquete.tours.length) paquete.tours.forEach(t => agregarFilaPaquete(t)); else agregarFilaPaquete();
-    if (paquete.hoteles.length) paquete.hoteles.forEach(h => agregarFilaPaqueteHotel(h)); else agregarFilaPaqueteHotel();
-    const idiomaSelect = document.getElementById('paquete-itin-idioma');
-    idiomaSelect.value = paquete.itinerario?.idioma || 'es';
-    paqueteItinIdiomaActual = idiomaSelect.value;
-    paqueteEditandoId = paquete.id;
-    document.getElementById('paquete-cancelar-edicion').classList.remove('hidden');
-    const modulos = paquete.itinerario?.modulos || [];
-    if (modulos.length) {
-        for (const filename of modulos) await agregarFilaPaqueteItin(filename);
-    } else {
-        await agregarFilaPaqueteItin();
-    }
-    document.getElementById('paquete-nombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function eliminarPaquete(paquete) {
@@ -1157,7 +958,6 @@ async function eliminarPaquete(paquete) {
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         notifySuccess('Paquete eliminado.');
-        if (paqueteEditandoId === paquete.id) resetPaqueteBuilder();
         await cargarPaquetes();
     } catch (e) {
         notifyError('Error al eliminar el paquete: ' + e.message);
@@ -1229,7 +1029,6 @@ function renderPaquetesList() {
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <button class="btn border small paquete-ver-btn" title="Ver el contenido del paquete"><i class="fas fa-eye mr-1"></i>Ver</button>
-                        <button class="btn btn-primary small paquete-aplicar-btn"><i class="fas fa-check mr-1"></i>Aplicar</button>
                         <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
                         <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
                     </div>
@@ -1249,7 +1048,6 @@ function renderPaquetesList() {
                 detalle.classList.toggle('hidden', !abrir);
                 verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash mr-1"></i>Ocultar' : '<i class="fas fa-eye mr-1"></i>Ver';
             });
-            div.querySelector('.paquete-aplicar-btn').addEventListener('click', () => aplicarPaquete(p));
             // Editar ahora se hace en el Cotizador (reusa su drag-and-drop de Actividades/
             // Hoteles/Itinerario) — ver cargarPaqueteParaEditar en shared/cotizador.js.
             div.querySelector('.paquete-editar-btn').addEventListener('click', () => {
@@ -1259,7 +1057,6 @@ function renderPaquetesList() {
             container.appendChild(div);
         });
     }
-    actualizarAvisoDependencia('paquetes-sin-tours-hint', toursData.length === 0, 'tours');
     renderGestionResumen();
 }
 // ===== Exportar catálogo (CSV) =====
@@ -1609,13 +1406,6 @@ async function init() {
         }
     });
 
-    document.getElementById('paquete-add-row').addEventListener('click', () => agregarFilaPaquete());
-    document.getElementById('paquete-hotel-add-row').addEventListener('click', () => agregarFilaPaqueteHotel());
-    document.getElementById('paquete-itin-add-row').addEventListener('click', () => agregarFilaPaqueteItin());
-    document.getElementById('paquete-itin-idioma').addEventListener('change', cambiarIdiomaItinPaquete);
-    document.getElementById('paquete-guardar').addEventListener('click', guardarPaquete);
-    document.getElementById('paquete-cancelar-edicion').addEventListener('click', resetPaqueteBuilder);
-    resetPaqueteBuilder();
 
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);
