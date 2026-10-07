@@ -32,6 +32,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <link rel="stylesheet" href="../shared/sidebar.css?v=<?= filemtime(__DIR__ . '/sidebar.css') ?>">
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/hero.css') ?>">
     <link rel="stylesheet" href="../itinerario/itinerario.css?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.css') ?>">
+    <link rel="stylesheet" href="../shared/catalogo.css?v=<?= filemtime(__DIR__ . '/catalogo.css') ?>">
 </head>
 <body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/sidebar.php'; ?>
@@ -90,18 +91,19 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             <div id="gestion-resumen" class="text-xs text-slate-500 mb-3"></div>
 
             <div id="gestion-tours" class="subtab-content hidden">
-                <div class="card p-6">
-                    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Tours Existentes</h2>
-                        <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
-                            <div class="relative flex-1 min-w-[160px] sm:flex-none">
-                                <input id="tours-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar tour...">
-                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <div class="card cat-card">
+                    <div class="cat-header">
+                        <div>
+                            <h2 class="cat-title">Tours y Actividades</h2>
+                            <p class="cat-subtitle"><span id="tours-count">0</span> en tu catálogo</p>
+                        </div>
+                        <div class="cat-tools">
+                            <div class="cat-search">
+                                <i class="fas fa-search"></i>
+                                <input id="tours-search" type="text" placeholder="Buscar tour...">
                             </div>
                             <div class="relative">
-                                <button type="button" id="tours-download-toggle" class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar CSV">
-                                    <i class="fas fa-download text-xl"></i>
-                                </button>
+                                <button type="button" id="tours-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
                                 <div id="tours-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
                                     <button type="button" id="tours-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
                                         <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
@@ -113,46 +115,62 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     </a>
                                 </div>
                             </div>
-                            <label for="tour-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)">
-                                <i class="fas fa-file-csv text-xl"></i>
-                            </label>
+                            <label for="tour-csv-input" class="cat-icon-btn" title="Importar desde CSV (columnas: Tour, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)"><i class="fas fa-file-csv"></i></label>
                             <input type="file" id="tour-csv-input" accept=".csv" class="hidden">
+                            <button type="button" id="tours-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo tour</button>
                         </div>
                     </div>
-                    <div id="tours-sin-destinos-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
+                    <div id="tours-sin-destinos-hint" class="cat-hint hidden p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
                         <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus tours.</span>
                         <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
                     </div>
-                    <div class="bg-slate-50 border rounded-lg p-3 mb-4">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo tour</h3>
-                        <div class="grid grid-cols-12 gap-2 small">
-                            <input id="tour-new-nombre" class="input rounded px-2 py-1 border col-span-12" type="text" placeholder="Nombre del tour">
-                            <div id="tour-new-destino-categoria" class="col-span-4"></div>
-                            <input id="tour-new-distr" class="input rounded px-2 py-1 border col-span-2" type="text" placeholder="Distribuidor">
-                            <input id="tour-new-preg" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Reg.">
-                            <input id="tour-new-ppromo" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Promo">
-                            <button id="tour-new-add" class="btn btn-primary col-span-2" title="Agregar tour"><i class="fas fa-plus"></i></button>
+                    <div id="tours-nuevo-panel" class="cat-new-panel hidden">
+                        <h3>Nuevo tour</h3>
+                        <div class="cat-form-grid">
+                            <div class="cat-field cat-span-6">
+                                <label for="tour-new-nombre">Nombre</label>
+                                <input id="tour-new-nombre" type="text" placeholder="ej. City Tour Cusco">
+                            </div>
+                            <div class="cat-field cat-span-6">
+                                <label>Destino / Categoría</label>
+                                <div id="tour-new-destino-categoria"></div>
+                            </div>
+                            <div class="cat-field cat-span-4">
+                                <label for="tour-new-distr">Distribuidor</label>
+                                <input id="tour-new-distr" type="text" placeholder="Opcional">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="tour-new-preg">P. Regular</label>
+                                <input id="tour-new-preg" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="tour-new-ppromo">P. Promo</label>
+                                <input id="tour-new-ppromo" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="tour-new-pconf"><i class="fas fa-lock text-[9px] mr-1"></i>P. Confid.</label>
+                                <input id="tour-new-pconf" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="tour-new-pctotal"><i class="fas fa-lock text-[9px] mr-1"></i>P. C. Total</label>
+                                <input id="tour-new-pctotal" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <p class="cat-form-hint"><i class="fas fa-lock mr-1"></i>Los precios confidenciales son de uso interno: nunca se muestran en la cotización salvo que se revelen a propósito.</p>
                         </div>
-                        <div class="grid grid-cols-12 gap-2 small mt-2">
-                            <span class="col-span-12 text-[11px] text-slate-400"><i class="fas fa-lock mr-1"></i>Precios confidenciales (uso interno, nunca se muestran en la cotización salvo que se revelen a propósito)</span>
-                            <input id="tour-new-pconf" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio Confidencial">
-                            <input id="tour-new-pctotal" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio C. Total">
+                        <div class="cat-form-actions">
+                            <button type="button" id="tours-nuevo-cancelar" class="btn border small">Cancelar</button>
+                            <button type="button" id="tour-new-add" class="btn btn-primary small"><i class="fas fa-plus mr-1"></i>Agregar</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
+                    <div class="cat-table-wrap">
+                        <table class="cat-table">
                             <thead>
                                 <tr>
-                                    <th class="text-left p-3">Titulo</th>
-                                    <th class="text-left p-3">Destino</th>
-                                    <th class="text-left p-3">Categoría</th>
-                                    <th class="text-left p-3">Distr.</th>
-                                    <th class="text-left p-3">P. Reg.</th>
-                                    <th class="text-left p-3">P. Promocional</th>
-                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio Conf.</th>
-                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio C. Total</th>
-                                    <th class="text-left p-3">Creado por</th>
-                                    <th class="text-right p-3">Acciones</th>
+                                    <th class="cat-col-name">Tour / Actividad</th>
+                                    <th class="cat-col-clasif">Destino / Categoría</th>
+                                    <th class="cat-col-precio">Precio venta</th>
+                                    <th class="cat-col-precio"><i class="fas fa-lock text-[9px] mr-1"></i>Confidencial</th>
+                                    <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="tours-table-body"></tbody>
@@ -165,18 +183,19 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </div>
 
             <div id="gestion-hoteles" class="subtab-content hidden">
-                <div class="card p-6">
-                    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Hoteles Existentes</h2>
-                        <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
-                            <div class="relative flex-1 min-w-[160px] sm:flex-none">
-                                <input id="hoteles-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar alojamiento...">
-                                <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <div class="card cat-card">
+                    <div class="cat-header">
+                        <div>
+                            <h2 class="cat-title">Hoteles y Hospedajes</h2>
+                            <p class="cat-subtitle"><span id="hoteles-count">0</span> en tu catálogo</p>
+                        </div>
+                        <div class="cat-tools">
+                            <div class="cat-search">
+                                <i class="fas fa-search"></i>
+                                <input id="hoteles-search" type="text" placeholder="Buscar alojamiento...">
                             </div>
                             <div class="relative">
-                                <button type="button" id="hoteles-download-toggle" class="text-slate-400 hover:text-[#e80c13] transition p-2" title="Descargar CSV">
-                                    <i class="fas fa-download text-xl"></i>
-                                </button>
+                                <button type="button" id="hoteles-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
                                 <div id="hoteles-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
                                     <button type="button" id="hoteles-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
                                         <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
@@ -188,46 +207,62 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     </a>
                                 </div>
                             </div>
-                            <label for="hotel-csv-input" class="text-slate-400 hover:text-[#e80c13] transition cursor-pointer p-2" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)">
-                                <i class="fas fa-file-csv text-xl"></i>
-                            </label>
+                            <label for="hotel-csv-input" class="cat-icon-btn" title="Importar desde CSV (columnas: Alojamiento, Distr, P.Reg, P.Promo, Destino, Categoría, Precio Confidencial, Precio C. Total — las últimas 4 opcionales. Acepta separador punto y coma o coma, con o sin fila de encabezado. Compara por nombre: actualiza lo existente y crea lo nuevo, sin borrar el resto de tu catálogo)"><i class="fas fa-file-csv"></i></label>
                             <input type="file" id="hotel-csv-input" accept=".csv" class="hidden">
+                            <button type="button" id="hoteles-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo alojamiento</button>
                         </div>
                     </div>
-                    <div id="hoteles-sin-destinos-hint" class="hidden mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
+                    <div id="hoteles-sin-destinos-hint" class="cat-hint hidden p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
                         <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus alojamientos.</span>
                         <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
                     </div>
-                    <div class="bg-slate-50 border rounded-lg p-3 mb-4">
-                        <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo alojamiento</h3>
-                        <div class="grid grid-cols-12 gap-2 small">
-                            <input id="hotel-new-nombre" class="input rounded px-2 py-1 border col-span-12" type="text" placeholder="Nombre del alojamiento">
-                            <div id="hotel-new-destino-categoria" class="col-span-4"></div>
-                            <input id="hotel-new-distr" class="input rounded px-2 py-1 border col-span-2" type="text" placeholder="Distribuidor">
-                            <input id="hotel-new-preg" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Reg.">
-                            <input id="hotel-new-ppromo" class="input rounded px-2 py-1 border text-right col-span-2" type="number" step="0.01" placeholder="P. Promo">
-                            <button id="hotel-new-add" class="btn btn-primary col-span-2" title="Agregar alojamiento"><i class="fas fa-plus"></i></button>
+                    <div id="hoteles-nuevo-panel" class="cat-new-panel hidden">
+                        <h3>Nuevo alojamiento</h3>
+                        <div class="cat-form-grid">
+                            <div class="cat-field cat-span-6">
+                                <label for="hotel-new-nombre">Nombre</label>
+                                <input id="hotel-new-nombre" type="text" placeholder="ej. Hotel Plaza Cusco">
+                            </div>
+                            <div class="cat-field cat-span-6">
+                                <label>Destino / Categoría</label>
+                                <div id="hotel-new-destino-categoria"></div>
+                            </div>
+                            <div class="cat-field cat-span-4">
+                                <label for="hotel-new-distr">Distribuidor</label>
+                                <input id="hotel-new-distr" type="text" placeholder="Opcional">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="hotel-new-preg">P. Regular</label>
+                                <input id="hotel-new-preg" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="hotel-new-ppromo">P. Promo</label>
+                                <input id="hotel-new-ppromo" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="hotel-new-pconf"><i class="fas fa-lock text-[9px] mr-1"></i>P. Confid.</label>
+                                <input id="hotel-new-pconf" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="cat-field cat-span-2">
+                                <label for="hotel-new-pctotal"><i class="fas fa-lock text-[9px] mr-1"></i>P. C. Total</label>
+                                <input id="hotel-new-pctotal" type="number" step="0.01" placeholder="0.00">
+                            </div>
+                            <p class="cat-form-hint"><i class="fas fa-lock mr-1"></i>Los precios confidenciales son de uso interno: nunca se muestran en la cotización salvo que se revelen a propósito.</p>
                         </div>
-                        <div class="grid grid-cols-12 gap-2 small mt-2">
-                            <span class="col-span-12 text-[11px] text-slate-400"><i class="fas fa-lock mr-1"></i>Precios confidenciales (uso interno, nunca se muestran en la cotización salvo que se revelen a propósito)</span>
-                            <input id="hotel-new-pconf" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio Confidencial">
-                            <input id="hotel-new-pctotal" class="input rounded px-2 py-1 border text-right col-span-6" type="number" step="0.01" placeholder="Precio C. Total">
+                        <div class="cat-form-actions">
+                            <button type="button" id="hoteles-nuevo-cancelar" class="btn border small">Cancelar</button>
+                            <button type="button" id="hotel-new-add" class="btn btn-primary small"><i class="fas fa-plus mr-1"></i>Agregar</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
+                    <div class="cat-table-wrap">
+                        <table class="cat-table">
                             <thead>
                                 <tr>
-                                    <th class="text-left p-3">Alojamiento</th>
-                                    <th class="text-left p-3">Destino</th>
-                                    <th class="text-left p-3">Categoría</th>
-                                    <th class="text-left p-3">Distr.</th>
-                                    <th class="text-left p-3">P. Regular</th>
-                                    <th class="text-left p-3">P. Promo</th>
-                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio Conf.</th>
-                                    <th class="text-left p-3" title="Uso interno, no se muestra en la cotización"><i class="fas fa-lock text-[10px] mr-1"></i>Precio C. Total</th>
-                                    <th class="text-left p-3">Creado por</th>
-                                    <th class="text-right p-3">Acciones</th>
+                                    <th class="cat-col-name">Alojamiento</th>
+                                    <th class="cat-col-clasif">Destino / Categoría</th>
+                                    <th class="cat-col-precio">Precio venta</th>
+                                    <th class="cat-col-precio"><i class="fas fa-lock text-[9px] mr-1"></i>Confidencial</th>
+                                    <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="hotels-table-body"></tbody>
@@ -240,10 +275,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </div>
 
             <!-- Gestión de Itinerario embebida (itinerario/itinerario.js): catálogo de
-                 itinerarios (antes "Módulos") + Páginas Fijas + historial de generados.
+                 itinerarios (antes "Módulos") + Páginas Fijas.
                  Mismos ids que la página standalone de Itinerario (itinerario/index.php),
                  salvo: sin la pestaña "Itinerarios Predeterminados" (cubierta por Paquetes,
-                 arriba) y con clase itin-panel en vez de subtab-content en sus 3 paneles
+                 arriba) y con clase itin-panel en vez de subtab-content en sus paneles
                  internos — evita que el switch de pestañas de ACÁ (irASubtabGestion, en
                  cotizador.js) las tape/oculte por accidente al compartir selector. -->
             <div id="gestion-itinerarios" class="subtab-content hidden">
@@ -254,47 +289,61 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     <button class="subnav-tab" data-subtab="paginas">
                         <i class="fas fa-file-alt mr-1"></i>Páginas Fijas
                     </button>
-                    <button class="subnav-tab" data-subtab="historial">
-                        <i class="fas fa-clock-rotate-left mr-1"></i>Itinerarios Generados
-                    </button>
                 </div>
 
-                <!-- Mismo armado que Tours / Hoteles: una sola tarjeta con buscador arriba, caja
-                     gris "Agregar nuevo" y la tabla debajo (mismos ids que lee itinerario.js). -->
+                <!-- Mismo componente que Tours / Hoteles (shared/catalogo.css); mismos ids que
+                     lee itinerario.js. -->
                 <div id="itinerario-gestion-modulos" class="itin-panel">
-                    <div class="card p-6">
-                        <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                            <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Itinerarios Existentes</h2>
-                            <div class="flex items-center gap-1 flex-wrap flex-1 sm:flex-none justify-end">
-                                <div class="relative flex-1 min-w-[160px] sm:flex-none">
-                                    <input id="itinerario-modulos-search" class="input rounded-lg pl-8 pr-3 py-1.5 border text-sm w-full sm:w-64 md:w-80" type="text" placeholder="Buscar itinerario...">
-                                    <i class="fas fa-search absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <div class="card cat-card">
+                        <div class="cat-header">
+                            <div>
+                                <h2 class="cat-title">Itinerarios</h2>
+                                <p class="cat-subtitle"><span id="itinerario-modulos-count">0</span> en tu catálogo</p>
+                            </div>
+                            <div class="cat-tools">
+                                <div class="cat-search">
+                                    <i class="fas fa-search"></i>
+                                    <input id="itinerario-modulos-search" type="text" placeholder="Buscar itinerario...">
                                 </div>
+                                <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo itinerario</button>
                             </div>
                         </div>
-                        <div class="bg-slate-50 border rounded-lg p-3 mb-4">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Agregar nuevo itinerario (PDF)</h3>
-                            <form id="itinerary-upload-form" class="grid grid-cols-12 gap-2 small" onsubmit="return false">
-                                <input type="text" id="itinerary-module-title" placeholder="Título del itinerario (ej. Tour Valle Sagrado)" class="input rounded px-2 py-1 border col-span-12" required>
-                                <select id="itinerary-module-destino" class="input rounded px-2 py-1 border col-span-6 md:col-span-2" title="Destino (opcional)">
-                                    <option value="">Sin clasificar</option>
-                                </select>
-                                <select id="itinerary-module-categoria" class="input rounded px-2 py-1 border col-span-6 md:col-span-2" title="Categoría" disabled>
-                                    <option value="">—</option>
-                                </select>
-                                <input type="file" id="itinerary-module-pdf" accept=".pdf" class="col-span-12 md:col-span-6 text-sm text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-white file:text-slate-700 file:border file:border-slate-300 hover:file:bg-slate-100" title="Archivo PDF" required>
-                                <button type="button" id="upload-local-module" class="btn btn-primary col-span-12 md:col-span-2" title="Subir itinerario"><i class="fas fa-plus"></i></button>
+                        <div id="itinerarios-nuevo-panel" class="cat-new-panel hidden">
+                            <h3>Nuevo itinerario (PDF)</h3>
+                            <form id="itinerary-upload-form" class="cat-form-grid" onsubmit="return false">
+                                <div class="cat-field cat-span-6">
+                                    <label for="itinerary-module-title">Título</label>
+                                    <input type="text" id="itinerary-module-title" placeholder="ej. Tour Valle Sagrado" required>
+                                </div>
+                                <div class="cat-field cat-span-3">
+                                    <label for="itinerary-module-destino">Destino</label>
+                                    <select id="itinerary-module-destino">
+                                        <option value="">Sin clasificar</option>
+                                    </select>
+                                </div>
+                                <div class="cat-field cat-span-3">
+                                    <label for="itinerary-module-categoria">Categoría</label>
+                                    <select id="itinerary-module-categoria" disabled>
+                                        <option value="">—</option>
+                                    </select>
+                                </div>
+                                <div class="cat-field">
+                                    <label for="itinerary-module-pdf">Archivo PDF</label>
+                                    <input type="file" id="itinerary-module-pdf" accept=".pdf" required>
+                                </div>
                             </form>
+                            <div class="cat-form-actions">
+                                <button type="button" id="itinerarios-nuevo-cancelar" class="btn border small">Cancelar</button>
+                                <button type="button" id="upload-local-module" class="btn btn-primary small"><i class="fas fa-upload mr-1"></i>Subir itinerario</button>
+                            </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full">
+                        <div class="cat-table-wrap">
+                            <table class="cat-table">
                                 <thead>
                                     <tr>
-                                        <th class="text-left p-3">Título</th>
-                                        <th class="text-left p-3">Destino</th>
-                                        <th class="text-left p-3">Categoría</th>
-                                        <th class="text-left p-3">Creado por</th>
-                                        <th class="text-right p-3">Acciones</th>
+                                        <th class="cat-col-name">Itinerario</th>
+                                        <th class="cat-col-clasif">Destino / Categoría</th>
+                                        <th class="cat-actions">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="itinerario-modulos-table-body"></tbody>
@@ -378,47 +427,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
 
                         <button id="save-default-config" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Guardar como predeterminado</button>
-                    </div>
-                </div>
-
-                <div id="itinerario-gestion-historial" class="itin-panel hidden">
-                    <div class="card p-6">
-                        <h2 class="text-base font-semibold text-slate-800 mb-4">Itinerarios Generados</h2>
-                        <div class="flex flex-wrap items-end gap-3 mb-4">
-                            <div>
-                                <label for="historial-filtro-texto" class="block text-xs font-medium text-slate-600 mb-1">Pasajero o título</label>
-                                <input id="historial-filtro-texto" type="text" placeholder="Buscar..." class="rounded-lg px-3 py-1.5 border text-sm w-56">
-                            </div>
-                            <div>
-                                <label for="historial-filtro-agencia" class="block text-xs font-medium text-slate-600 mb-1">Agencia / usuario</label>
-                                <select id="historial-filtro-agencia" class="rounded-lg px-3 py-1.5 border text-sm w-48">
-                                    <option value="">Todos</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="historial-filtro-desde" class="block text-xs font-medium text-slate-600 mb-1">Desde</label>
-                                <input id="historial-filtro-desde" type="date" class="rounded-lg px-3 py-1.5 border text-sm">
-                            </div>
-                            <div>
-                                <label for="historial-filtro-hasta" class="block text-xs font-medium text-slate-600 mb-1">Hasta</label>
-                                <input id="historial-filtro-hasta" type="date" class="rounded-lg px-3 py-1.5 border text-sm">
-                            </div>
-                            <button id="historial-filtro-limpiar" class="btn btn-secondary">Limpiar filtros</button>
-                        </div>
-                        <div class="itinerary-table-container">
-                            <table class="w-full">
-                                <thead class="bg-slate-50">
-                                    <tr>
-                                        <th class="text-left p-2">Pasajero</th>
-                                        <th class="text-left p-2">Título</th>
-                                        <th class="text-left p-2">Generado por</th>
-                                        <th class="text-left p-2">Fecha</th>
-                                        <th class="text-right p-2">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="historial-generados-table-body"></tbody>
-                            </table>
-                        </div>
                     </div>
                 </div>
             </div>

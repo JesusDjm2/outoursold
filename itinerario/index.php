@@ -33,6 +33,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <link rel="stylesheet" href="../shared/sidebar.css?v=<?= filemtime(__DIR__ . '/../shared/sidebar.css') ?>">
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/../shared/hero.css') ?>">
     <link rel="stylesheet" href="../shared/cascade-select.css?v=<?= filemtime(__DIR__ . '/../shared/cascade-select.css') ?>">
+    <link rel="stylesheet" href="../shared/catalogo.css?v=<?= filemtime(__DIR__ . '/../shared/catalogo.css') ?>">
 </head>
 <body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/../shared/sidebar.php'; ?>
@@ -176,14 +177,12 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
                     </div>
                     <div class="itinerary-table-container">
-                        <table class="w-full">
-                            <thead class="bg-slate-50">
+                        <table class="cat-table">
+                            <thead>
                                 <tr>
-                                    <th class="text-left p-2">Título</th>
-                                    <th class="text-left p-2">Destino</th>
-                                    <th class="text-left p-2">Categoría</th>
-                                    <th class="text-left p-2">Creado por</th>
-                                    <th class="text-right p-2">Acciones</th>
+                                    <th class="cat-col-name">Itinerario</th>
+                                    <th class="cat-col-clasif">Destino / Categoría</th>
+                                    <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="itinerario-modulos-table-body"></tbody>
@@ -383,6 +382,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script>window.ME_API_URL = '../shared/mi-empresa-api.php'; window.HERO_ASSET_BASE = '../shared/';</script>
     <script src="../shared/hero-edit.js?v=<?= filemtime(__DIR__ . '/../shared/hero-edit.js') ?>"></script>
     <script src="../shared/cascade-select.js?v=<?= filemtime(__DIR__ . '/../shared/cascade-select.js') ?>"></script>
+    <script src="../shared/catalogo-shared.js?v=<?= filemtime(__DIR__ . '/../shared/catalogo-shared.js') ?>"></script>
     <script src="itinerario.js?v=<?= filemtime(__DIR__ . '/itinerario.js') ?>"></script>
 </body>
 </html>

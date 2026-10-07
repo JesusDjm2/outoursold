@@ -143,6 +143,18 @@ function renderGestionResumen() {
 
 // Aviso accionable cuando falta la data de la que depende la pestaña actual (ej. Tours sin
 // ningún Destino creado todavía) — evita selects vacíos sin explicación.
+// Formulario de alta desplegable de Tours / Hoteles / Itinerarios ("Nuevo ..."): queda
+// abierto tras agregar, para poder cargar varios seguidos; Cancelar lo cierra.
+function initPanelNuevo(toggleId, panelId, cancelarId, focoId) {
+    const panel = document.getElementById(panelId);
+    document.getElementById(toggleId).addEventListener('click', () => {
+        const abrir = panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', !abrir);
+        if (abrir) document.getElementById(focoId).focus();
+    });
+    document.getElementById(cancelarId).addEventListener('click', () => panel.classList.add('hidden'));
+}
+
 function actualizarAvisoDependencia(hintId, faltante, subtabDestino) {
     const hint = document.getElementById(hintId);
     if (!hint) return;
@@ -171,6 +183,7 @@ function actualizarBotonGuardarTours() {
 
 function renderTours() {
     const tbody = document.getElementById('tours-table-body');
+    document.getElementById('tours-count').textContent = toursData.length;
     tbody.innerHTML = '';
     cambiosPendientesTours.clear();
     actualizarBotonGuardarTours();
@@ -178,7 +191,7 @@ function renderTours() {
         .filter(t => t.tour.toLowerCase().includes(toursFilter))
         .sort((a, b) => a.tour.localeCompare(b.tour));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-3 text-center text-slate-400">${toursFilter ? 'Sin resultados.' : 'Sin tours registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${toursFilter ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes tours. Usa «Nuevo tour» para agregar el primero.'}</td></tr>`;
     } else {
         visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
     }
@@ -186,24 +199,70 @@ function renderTours() {
     renderGestionResumen();
 }
 
-function buildTourRow(t) {
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `
-        <td class="p-3 font-medium">${escapeHtml(t.tour)}</td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-destino"></select></td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full tour-row-categoria" disabled></select></td>
-        <td class="p-3">${escapeHtml(t.distr || '')}</td>
-        <td class="p-3">${fmt(t.preg)}</td>
-        <td class="p-3">${fmt(t.ppromo)}</td>
-        <td class="p-3">${fmt(t.pconf)}</td>
-        <td class="p-3">${fmt(t.pctotal)}</td>
-        <td class="p-3 text-slate-500">${escapeHtml(t.creado_por_nombre || '—')}</td>
-        <td class="p-3 text-right whitespace-nowrap">
-            <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
-            <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
+// Fila de Tours / Hoteles (shared/catalogo.css): nombre con el distribuidor debajo,
+// Destino/Categoría editables en el lugar, precio de venta (promo, con el regular debajo),
+// confidenciales agrupados y Acciones fija a la derecha — 5 columnas en vez de 10, para que
+// Editar/Eliminar no queden fuera de la pantalla.
+function filaCatalogoHtml(nombre, item, destinoClass, categoriaClass) {
+    return `
+        <td class="cat-col-name">
+            <div class="cat-name">${escapeHtml(nombre)}</div>
+            <div class="cat-meta">${item.distr ? `<i class="fas fa-truck-field mr-1"></i>${escapeHtml(item.distr)}` : 'Sin distribuidor'}</div>
+        </td>
+        <td class="cat-col-clasif">
+            <div class="cat-clasif">
+                <select class="${destinoClass}" title="Destino"></select>
+                <select class="${categoriaClass}" title="Categoría" disabled></select>
+            </div>
+        </td>
+        <td class="cat-col-precio">
+            <div class="cat-price">
+                <span class="cat-price-main">${fmt(item.ppromo)}</span>
+                <span class="cat-price-sub">Regular ${fmt(item.preg)}</span>
+            </div>
+        </td>
+        <td class="cat-col-precio">
+            <div class="cat-price cat-conf">
+                <span>${fmt(item.pconf)}</span>
+                <span class="cat-price-sub">C. Total ${fmt(item.pctotal)}</span>
+            </div>
+        </td>
+        <td class="cat-actions">
+            <div class="cat-actions-inner">
+                <button type="button" class="cat-icon-btn" title="Editar"><i class="fas fa-pen"></i></button>
+                <button type="button" class="cat-icon-btn is-danger" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </div>
         </td>
     `;
+}
+
+// Misma fila en modo edición. El orden de los <input> importa: quien la usa los lee por
+// posición (nombre, distribuidor, P.Reg, P.Promo, P.Conf, P.C.Total).
+function filaCatalogoEdicionHtml(nombre, item) {
+    const num = (valor, etiqueta) => `
+        <div class="cat-input-row"><span>${etiqueta}</span><input class="cat-input text-right" type="number" step="0.01" min="0" value="${valor || 0}"></div>`;
+    return `
+        <td class="cat-col-name">
+            <div class="cat-input-stack">
+                <input class="cat-input" type="text" placeholder="Nombre" value="${escapeHtml(nombre)}">
+                <input class="cat-input" type="text" placeholder="Distribuidor" value="${escapeHtml(item.distr || '')}">
+            </div>
+        </td>
+        <td class="cat-col-clasif destino-categoria-cell"></td>
+        <td class="cat-col-precio"><div class="cat-input-stack">${num(item.preg, 'Reg.')}${num(item.ppromo, 'Promo')}</div></td>
+        <td class="cat-col-precio"><div class="cat-input-stack">${num(item.pconf, 'Conf.')}${num(item.pctotal, 'C.Tot.')}</div></td>
+        <td class="cat-actions">
+            <div class="cat-actions-inner">
+                <button type="button" class="cat-icon-btn is-ok" title="Guardar"><i class="fas fa-check"></i></button>
+                <button type="button" class="cat-icon-btn" title="Cancelar"><i class="fas fa-times"></i></button>
+            </div>
+        </td>
+    `;
+}
+
+function buildTourRow(t) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = filaCatalogoHtml(t.tour, t, 'tour-row-destino', 'tour-row-categoria');
     const destinoSel = tr.querySelector('.tour-row-destino');
     const categoriaSel = tr.querySelector('.tour-row-categoria');
     llenarSelectDestino(destinoSel, t.destino_id);
@@ -258,20 +317,8 @@ function buildDestinoCategoriaSelector(categoriasDataset, destinoId, categoriaId
 
 function buildTourEditRow(t) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(t.tour)}"></td>
-        <td class="p-2 destino-categoria-cell" colspan="2"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(t.distr || '')}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.preg}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.ppromo}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.pconf || 0}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${t.pctotal || 0}"></td>
-        <td class="p-2 text-slate-500">${escapeHtml(t.creado_por_nombre || '—')}</td>
-        <td class="p-2 text-right whitespace-nowrap">
-            <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
-            <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
-        </td>
-    `;
+    tr.className = 'is-editing';
+    tr.innerHTML = filaCatalogoEdicionHtml(t.tour, t);
     const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasData, t.destino_id, t.categoria_id);
     tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
     const [tourI, distrI, pregI, ppromoI, pconfI, pctotalI] = tr.querySelectorAll('input');
@@ -805,6 +852,7 @@ function actualizarBotonGuardarHoteles() {
 
 function renderHotels() {
     const tbody = document.getElementById('hotels-table-body');
+    document.getElementById('hoteles-count').textContent = hotelsData.length;
     tbody.innerHTML = '';
     cambiosPendientesHoteles.clear();
     actualizarBotonGuardarHoteles();
@@ -812,7 +860,7 @@ function renderHotels() {
         .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
         .sort((a, b) => a.aloj.localeCompare(b.aloj));
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-3 text-center text-slate-400">${hotelsFilter ? 'Sin resultados.' : 'Sin hoteles registrados.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${hotelsFilter ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes alojamientos. Usa «Nuevo alojamiento» para agregar el primero.'}</td></tr>`;
     } else {
         visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
     }
@@ -822,22 +870,7 @@ function renderHotels() {
 
 function buildHotelRow(h) {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50';
-    tr.innerHTML = `
-        <td class="p-3 font-medium">${escapeHtml(h.aloj)}</td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-destino"></select></td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full hotel-row-categoria" disabled></select></td>
-        <td class="p-3">${escapeHtml(h.distr || '')}</td>
-        <td class="p-3">${fmt(h.preg)}</td>
-        <td class="p-3">${fmt(h.ppromo)}</td>
-        <td class="p-3">${fmt(h.pconf)}</td>
-        <td class="p-3">${fmt(h.pctotal)}</td>
-        <td class="p-3 text-slate-500">${escapeHtml(h.creado_por_nombre || '—')}</td>
-        <td class="p-3 text-right whitespace-nowrap">
-            <button class="text-slate-500 hover:text-slate-700 mr-2" title="Editar"><i class="fas fa-pen"></i></button>
-            <button class="text-red-500 hover:text-red-700" title="Eliminar"><i class="fas fa-trash"></i></button>
-        </td>
-    `;
+    tr.innerHTML = filaCatalogoHtml(h.aloj, h, 'hotel-row-destino', 'hotel-row-categoria');
     const destinoSel = tr.querySelector('.hotel-row-destino');
     const categoriaSel = tr.querySelector('.hotel-row-categoria');
     llenarSelectDestino(destinoSel, h.destino_id);
@@ -859,20 +892,8 @@ function buildHotelRow(h) {
 
 function buildHotelEditRow(h) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(h.aloj)}"></td>
-        <td class="p-2 destino-categoria-cell" colspan="2"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border" type="text" value="${escapeHtml(h.distr || '')}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.preg}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.ppromo}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.pconf || 0}"></td>
-        <td class="p-2"><input class="input w-full rounded px-2 py-1 border text-right" type="number" step="0.01" min="0" value="${h.pctotal || 0}"></td>
-        <td class="p-2 text-slate-500">${escapeHtml(h.creado_por_nombre || '—')}</td>
-        <td class="p-2 text-right whitespace-nowrap">
-            <button class="text-emerald-600 hover:text-emerald-800 mr-2" title="Guardar"><i class="fas fa-check"></i></button>
-            <button class="text-slate-400 hover:text-slate-600" title="Cancelar"><i class="fas fa-times"></i></button>
-        </td>
-    `;
+    tr.className = 'is-editing';
+    tr.innerHTML = filaCatalogoEdicionHtml(h.aloj, h);
     const destinoCategoriaSelector = buildDestinoCategoriaSelector(categoriasHotelesData, h.destino_id, h.categoria_id);
     tr.querySelector('.destino-categoria-cell').appendChild(destinoCategoriaSelector);
     const [alojI, distrI, pregI, ppromoI, pconfI, pctotalI] = tr.querySelectorAll('input');
@@ -1406,6 +1427,10 @@ async function init() {
         }
     });
 
+
+    initPanelNuevo('tours-nuevo-toggle', 'tours-nuevo-panel', 'tours-nuevo-cancelar', 'tour-new-nombre');
+    initPanelNuevo('hoteles-nuevo-toggle', 'hoteles-nuevo-panel', 'hoteles-nuevo-cancelar', 'hotel-new-nombre');
+    initPanelNuevo('itinerarios-nuevo-toggle', 'itinerarios-nuevo-panel', 'itinerarios-nuevo-cancelar', 'itinerary-module-title');
 
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);

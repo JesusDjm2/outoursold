@@ -334,8 +334,10 @@ function renderModulosTable() {
     tbody.innerHTML = '';
     modulosCambiosPendientes.clear();
     actualizarBotonGuardarModulos();
+    const contador = document.getElementById('itinerario-modulos-count');
+    if (contador) contador.textContent = modulosActivos().length;
     if (visibles.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-400 text-sm">No hay módulos en esta vista.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes itinerarios en este idioma. Usa «Nuevo itinerario» para subir el primero.'}</td></tr>`;
         return;
     }
     visibles.forEach(it => tbody.appendChild(buildModuloRow(it)));
@@ -343,19 +345,25 @@ function renderModulosTable() {
 
 function buildModuloRow(it) {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-slate-50';
+    // Mismo componente que las tablas de Tours/Hoteles de Gestión de Datos (shared/catalogo.css).
+    const roto = it.archivo_existe === false;
     tr.innerHTML = `
-        <td class="p-3 font-medium">${it.titulo}</td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full module-destino-select"></select></td>
-        <td class="p-3"><select class="input rounded px-2 py-1 border text-xs w-full module-categoria-select" disabled></select></td>
-        <td class="p-3 text-slate-500">${it.creado_por_nombre || '—'}</td>
-        <td class="p-3 text-right whitespace-nowrap">
-            <div class="inline-flex flex-col items-center align-middle mr-2">
-                <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800 modulo-ver-btn" title="Ver PDF"><i class="fas fa-eye"></i></a>
-                ${it.archivo_existe === false ? '<span class="text-[10px] leading-none text-red-500 mt-0.5" title="El archivo no existe en el servidor">roto</span>' : ''}
+        <td class="cat-col-name">
+            <div class="cat-name">${escapeHtml(it.titulo)}</div>
+            <div class="cat-meta"><i class="fas fa-file-pdf mr-1"></i>${escapeHtml(it.filename)}${roto ? ' <span class="cat-badge is-danger ml-1" title="El archivo no existe en el servidor">PDF no encontrado</span>' : ''}</div>
+        </td>
+        <td class="cat-col-clasif">
+            <div class="cat-clasif">
+                <select class="module-destino-select" title="Destino"></select>
+                <select class="module-categoria-select" title="Categoría" disabled></select>
             </div>
-            <button class="text-slate-500 hover:text-slate-700 mr-2 modulo-editar-btn" title="Editar título"><i class="fas fa-pen"></i></button>
-            <button class="text-red-500 hover:text-red-700 modulo-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+        </td>
+        <td class="cat-actions">
+            <div class="cat-actions-inner">
+                <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="cat-icon-btn is-view modulo-ver-btn${roto ? ' is-disabled' : ''}" title="Ver PDF"><i class="fas fa-eye"></i></a>
+                <button type="button" class="cat-icon-btn modulo-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
+                <button type="button" class="cat-icon-btn is-danger modulo-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+            </div>
         </td>
     `;
     const destinoSel = tr.querySelector('.module-destino-select');
@@ -380,15 +388,23 @@ function buildModuloRow(it) {
 
 function buildModuloEditRow(it) {
     const tr = document.createElement('tr');
-    tr.className = 'border-b hover:bg-slate-50';
+    tr.className = 'is-editing';
     tr.innerHTML = `
-        <td class="p-2"><input type="text" class="w-full border rounded p-1 text-sm modulo-titulo-input" value="${it.titulo}"></td>
-        <td class="p-2"><select class="w-full border rounded p-1 text-xs module-destino-select"></select></td>
-        <td class="p-2"><select class="w-full border rounded p-1 text-xs module-categoria-select" disabled></select></td>
-        <td class="p-2 text-slate-500 text-xs">${it.creado_por_nombre || '—'}</td>
-        <td class="p-2 text-right whitespace-nowrap">
-            <button class="text-emerald-600 hover:text-emerald-800 mr-2 modulo-guardar-btn" title="Guardar"><i class="fas fa-check"></i></button>
-            <button class="text-slate-400 hover:text-slate-600 modulo-cancelar-btn" title="Cancelar"><i class="fas fa-times"></i></button>
+        <td class="cat-col-name">
+            <input type="text" class="cat-input modulo-titulo-input" placeholder="Título" value="${escapeHtml(it.titulo)}">
+            <div class="cat-meta"><i class="fas fa-file-pdf mr-1"></i>${escapeHtml(it.filename)}</div>
+        </td>
+        <td class="cat-col-clasif">
+            <div class="cat-clasif">
+                <select class="module-destino-select" title="Destino"></select>
+                <select class="module-categoria-select" title="Categoría" disabled></select>
+            </div>
+        </td>
+        <td class="cat-actions">
+            <div class="cat-actions-inner">
+                <button type="button" class="cat-icon-btn is-ok modulo-guardar-btn" title="Guardar"><i class="fas fa-check"></i></button>
+                <button type="button" class="cat-icon-btn modulo-cancelar-btn" title="Cancelar"><i class="fas fa-times"></i></button>
+            </div>
         </td>
     `;
     const tituloInput = tr.querySelector('.modulo-titulo-input');
