@@ -58,13 +58,14 @@ let paisesData = []; // {id, nombre, codigo_telefono} — catálogo global (shar
 let cotizaciones = {};
 let currentCotizacionId = null;
 let paquetesData = [];
-// Modo paquete (ver activarModoEdicionPaquete): true mientras se arma un paquete nuevo
-// ("Nuevo paquete" / ?nuevoPaquete=1) o se edita uno (?editarPaquete=ID, con
-// paqueteEditandoId = su id). Oculta Datos Pax / "Guardar" (cotización), que no aplican a
-// un paquete, y el nombre se escribe en el aviso de arriba (#paquete-edit-nombre).
+// Edición de un paquete predefinido (ver activarModoEdicionPaquete): true mientras se
+// edita uno en esta misma vista, con Datos Pax / Resumen deshabilitados. Crear uno nuevo
+// no usa este modo: es la cotización normal + "Guardar como paquete".
 let modoPaquete = false;
 let paqueteEditandoId = null;
-// Nombre del paquete aplicado a la cotización en pantalla (chip #paquete-aplicado).
+let paqueteEditandoNombre = '';
+// Paquete aplicado a la cotización en pantalla (chip #paquete-aplicado, con su lápiz).
+let paqueteAplicadoId = null;
 let paqueteAplicadoNombre = '';
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
@@ -288,6 +289,7 @@ async function aplicarPaquete(paquete) {
     }
 
     calcularResumen();
+    paqueteAplicadoId = paquete.id;
     paqueteAplicadoNombre = paquete.nombre;
     renderPaqueteAplicado();
     if (cambioIdioma) {
@@ -772,8 +774,8 @@ function calcularResumen() {
 // Guarda el Itinerario/Actividades/Hoteles que ya tiene armados la vista como un paquete
 // predefinido reutilizable (único lugar donde se crean/editan paquetes: Gestión de Datos >
 // Paquetes solo los lista). Sin fechas/cin-cout/precios ni datos de pasajero: un paquete es
-// una plantilla reutilizable, no una cotización concreta. En modo paquete el nombre sale
-// del aviso de arriba (#paquete-edit-nombre); desde una cotización normal se pide aparte.
+// una plantilla reutilizable, no una cotización concreta. El nombre se pide al guardar
+// (precargado con el actual cuando se está editando uno).
 async function guardarComoPaquete() {
     const tours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
         .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value }))
@@ -782,24 +784,12 @@ async function guardarComoPaquete() {
         .map(tr => ({ aloj: tr.querySelector('.hotel-name').value, nhab: tr.querySelector('.nhab').value, noches: tr.querySelector('.noches').value }))
         .filter(h => h.aloj);
     const modulos = Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean);
-    let nombre;
-    if (modoPaquete) {
-        const nombreInput = document.getElementById('paquete-edit-nombre');
-        nombre = nombreInput.value.trim();
-        if (!nombre) {
-            notifyWarning('Escribe el nombre del paquete antes de guardarlo.');
-            nombreInput.focus();
-            return;
-        }
-    }
     if (!tours.length && !hoteles.length && !modulos.length) {
         notifyWarning('Agrega al menos un itinerario, una actividad o un hotel antes de guardar el paquete.');
         return;
     }
-    if (!modoPaquete) {
-        nombre = (await promptText('Nombre del paquete', 'ej. Cusco Clásico 3D/2N', ''))?.trim();
-        if (!nombre) return;
-    }
+    const nombre = (await promptText('Nombre del paquete', 'ej. Cusco Clásico 3D/2N', paqueteEditandoNombre))?.trim();
+    if (!nombre) return;
     try {
         const payload = {
             nombre, tours, hoteles,
@@ -814,7 +804,7 @@ async function guardarComoPaquete() {
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         const eraEdicion = !!paqueteEditandoId;
-        if (modoPaquete) {
+        if (eraEdicion) {
             salirModoEdicionPaquete();
             nuevaCotizacion(false);
         }
@@ -828,7 +818,8 @@ async function guardarComoPaquete() {
 }
 
 // ===== Editar un paquete predefinido en esta misma vista (reusa el drag-and-drop de
-// Itinerario/Actividades/Hoteles) — entra vía ?editarPaquete=ID, ver init() más abajo. =====
+// Itinerario/Actividades/Hoteles). Se entra con el lápiz del paquete aplicado o vía
+// ?editarPaquete=ID (Gestión de Datos > Paquetes), ver init() más abajo. =====
 async function cargarPaqueteParaEditar(id) {
     const paquete = paquetesData.find(p => String(p.id) === String(id));
     if (!paquete) {
@@ -857,38 +848,41 @@ async function cargarPaqueteParaEditar(id) {
     activarModoEdicionPaquete(paquete);
 }
 
-// Entra en modo paquete: con `paquete` edita ese (nombre precargado, "Actualizar
-// paquete"); sin él arma uno nuevo a partir de lo que ya haya en pantalla.
-function activarModoEdicionPaquete(paquete = null) {
+// Campos de la cotización que no aplican a un paquete: quedan a la vista pero
+// deshabilitados mientras se edita uno (Datos Pax, notas y montos del Resumen).
+function camposSoloCotizacion() {
+    return [
+        ...document.querySelectorAll('#form-pax input, #form-pax select'),
+        document.getElementById('precio-adicional'),
+        document.getElementById('descuento-especial'),
+        document.getElementById('porcentaje_reserva')
+    ];
+}
+
+function activarModoEdicionPaquete(paquete) {
     modoPaquete = true;
-    paqueteEditandoId = paquete ? paquete.id : null;
-    document.getElementById('paquete-edit-modo').textContent = paquete ? 'Editando el paquete' : 'Nuevo paquete';
-    const nombreInput = document.getElementById('paquete-edit-nombre');
-    nombreInput.value = paquete ? paquete.nombre : '';
+    paqueteEditandoId = paquete.id;
+    paqueteEditandoNombre = paquete.nombre;
+    document.getElementById('paquete-edit-nombre').textContent = paquete.nombre;
     document.getElementById('paquete-edit-banner').classList.remove('hidden');
     document.body.classList.add('modo-paquete');
-    document.getElementById('datos-pax-section').classList.add('hidden');
-    const mainCol = document.getElementById('cotizador-main-col');
-    mainCol.classList.remove('lg:col-span-3');
-    mainCol.classList.add('lg:col-span-4');
-    document.getElementById('guardar-cotizacion').classList.add('hidden');
-    document.getElementById('guardar-como-paquete').innerHTML = paquete
-        ? '<i class="fas fa-box-archive mr-2"></i>Actualizar paquete'
-        : '<i class="fas fa-box-archive mr-2"></i>Guardar paquete';
-    if (!paquete) nombreInput.focus();
+    camposSoloCotizacion().forEach(el => { el.disabled = true; });
+    document.getElementById('notas_cotizacion').setAttribute('contenteditable', 'false');
+    document.getElementById('guardar-cotizacion').disabled = true;
+    document.getElementById('guardar-como-paquete').innerHTML = '<i class="fas fa-box-archive mr-2"></i>Actualizar paquete';
 }
 
 function salirModoEdicionPaquete() {
     modoPaquete = false;
     paqueteEditandoId = null;
-    document.getElementById('paquete-edit-nombre').value = '';
+    paqueteEditandoNombre = '';
     document.getElementById('paquete-edit-banner').classList.add('hidden');
     document.body.classList.remove('modo-paquete');
-    document.getElementById('datos-pax-section').classList.remove('hidden');
-    const mainCol = document.getElementById('cotizador-main-col');
-    mainCol.classList.remove('lg:col-span-4');
-    mainCol.classList.add('lg:col-span-3');
-    document.getElementById('guardar-cotizacion').classList.remove('hidden');
+    // Quien llama sigue con nuevaCotizacion(), que vuelve a dejar Departamento
+    // deshabilitado hasta elegir país (llenarDepartamentosSelect).
+    camposSoloCotizacion().forEach(el => { el.disabled = false; });
+    document.getElementById('notas_cotizacion').setAttribute('contenteditable', 'true');
+    document.getElementById('guardar-cotizacion').disabled = false;
     document.getElementById('guardar-como-paquete').innerHTML = '<i class="fas fa-box-archive mr-2"></i>Guardar como paquete';
 }
 
@@ -1042,6 +1036,7 @@ function nuevaCotizacion(showAlert = true) {
     document.getElementById('hotels-body').appendChild(createHotelRow());
     llenarDepartamentosSelect(null, null);
     limpiarItinerarioArmado();
+    paqueteAplicadoId = null;
     paqueteAplicadoNombre = '';
     renderPaqueteAplicado();
     calcularResumen();
@@ -1553,18 +1548,20 @@ async function init() {
         await cargarPaqueteParaEditar(paqueteEditarId);
         history.replaceState(null, '', window.location.pathname);
     }
-    // "Crear paquete en el Cotizador" (Gestión de Datos > Paquetes): ?nuevoPaquete=1.
-    if (paramsUrl.get('nuevoPaquete')) {
-        activarModoEdicionPaquete();
-        history.replaceState(null, '', window.location.pathname);
-    }
-    document.getElementById('paquete-nuevo-btn').addEventListener('click', () => activarModoEdicionPaquete());
-    // Cancelar una edición descarta lo cargado del paquete; cancelar uno nuevo solo sale
-    // del modo y deja lo armado en pantalla (puede venir de una cotización en curso).
+    // Lápiz del paquete aplicado: lo edita acá mismo. Reemplaza la vista por el paquete,
+    // así que si la cotización tiene datos sin guardar se confirma antes.
+    document.getElementById('paquete-aplicado-editar').addEventListener('click', async () => {
+        if (!paqueteAplicadoId) return;
+        if (formularioTieneDatosSinGuardar() && !await confirmAction(
+            `Para editar el paquete "${paqueteAplicadoNombre}" se descartará la cotización que tienes en pantalla. ¿Continuar?`,
+            'Sí, editar paquete'
+        )) return;
+        await cargarPaqueteParaEditar(paqueteAplicadoId);
+    });
+    // Cancelar la edición descarta lo cargado del paquete y vuelve a una cotización nueva.
     document.getElementById('paquete-edit-cancelar').addEventListener('click', () => {
-        const eraEdicion = !!paqueteEditandoId;
         salirModoEdicionPaquete();
-        if (eraEdicion) nuevaCotizacion(false);
+        nuevaCotizacion(false);
     });
 
     // Mismo criterio que formularioTieneDatosSinGuardar(): si hay algo escrito que no se

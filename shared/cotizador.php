@@ -81,31 +81,27 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     <i class="fas fa-language mr-1"></i> Português
                 </button>
             </div>
-            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en #paquete-aplicado)
-                 o armar uno nuevo (#paquete-nuevo-btn → modo paquete, ver cotizador.js). -->
+            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en #paquete-aplicado,
+                 con un lápiz para editarlo ahí mismo). Uno nuevo se crea armando la cotización
+                 normal y usando "Guardar como paquete" (pide el nombre al guardar). -->
             <div id="paquete-toolbar" class="solo-cotizacion flex items-center gap-2 flex-wrap">
-                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs px-2 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
+                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
                     <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
+                    <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
                 </span>
                 <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1 bg-white">
                     <option value="">Aplicar paquete...</option>
                 </select>
-                <button id="paquete-nuevo-btn" type="button" class="px-3 py-1 rounded-md small border bg-white" title="Armar un paquete predefinido nuevo (Itinerario, Actividades y Hoteles) con su nombre">
-                    <i class="fas fa-plus mr-1"></i>Nuevo paquete
-                </button>
             </div>
         </div>
         <div id="cotizador-section" class="tab-content">
-            <!-- Modo paquete (ver activarModoEdicionPaquete en cotizador.js): se entra con
-                 "Nuevo paquete" / ?nuevoPaquete=1, o editando uno vía ?editarPaquete=ID desde
-                 Gestión de Datos > Paquetes. El nombre se escribe acá y se guarda con
-                 "Guardar paquete" / "Actualizar paquete" (Resumen de Factura). -->
+            <!-- Edición de un paquete predefinido (ver activarModoEdicionPaquete en cotizador.js):
+                 misma vista del Cotizador, con Datos Pax y Resumen de Factura deshabilitados. Se
+                 entra con el lápiz del paquete aplicado o vía ?editarPaquete=ID desde Gestión de
+                 Datos > Paquetes; "Actualizar paquete" pide confirmar el nombre al guardar. -->
             <div id="paquete-edit-banner" class="hidden mb-4 p-3 rounded-lg flex items-center justify-between flex-wrap gap-2" style="background:rgba(187,49,53,0.08)">
-                <div class="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                    <span class="small whitespace-nowrap"><i class="fas fa-box-archive mr-2"></i><span id="paquete-edit-modo">Nuevo paquete</span>:</span>
-                    <input id="paquete-edit-nombre" type="text" class="input rounded px-2 py-1 border small flex-1 min-w-[200px] max-w-md bg-white" placeholder="Nombre del paquete (ej. Cusco Clásico 3D/2N)">
-                </div>
-                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar</button>
+                <span class="small"><i class="fas fa-box-archive mr-2"></i>Editando el paquete predefinido: <strong id="paquete-edit-nombre"></strong></span>
+                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar edición</button>
             </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
                 <section id="datos-pax-section" class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
@@ -284,7 +280,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <h3 class="text-white font-semibold">Resumen de Factura</h3>
                         </div>
                         <div class="p-4 small">
-                            <div class="solo-cotizacion grid grid-cols-1 md:grid-cols-10 gap-4">
+                            <div id="resumen-campos" class="grid grid-cols-1 md:grid-cols-10 gap-4">
                                 <div class="md:col-span-7 flex flex-col">
                                     <label class="block text-slate-700 font-medium mb-1">Notas Adicionales</label>
                                     <div class="rte">
@@ -298,7 +294,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <div id="notas_cotizacion" class="rte-editor flex-1" contenteditable="true" data-placeholder="Cualquier nota para el cliente..."></div>
                                     </div>
                                 </div>
-                                <div class="md:col-span-3">
+                                <div class="md:col-span-3 col-costo">
                                     <div class="grid grid-cols-2 gap-2 items-center">
                                         <div class="text-slate-600">P.V. Regular</div>
                                         <div class="text-right font-semibold" id="pv-regular"><?= htmlspecialchars($currencySymbol) ?>0.00</div>

@@ -45,13 +45,17 @@ body {
    que es cuando la tabla deja de verse. */
 .accordion-label-collapsed { display: none; font-size: 0.8rem; color: #64748b; }
 .accordion-section.is-collapsed .accordion-label-collapsed { display: inline; }
-/* Modo paquete (crear/editar un paquete predefinido, ver activarModoEdicionPaquete en
-   cotizador.js): se ocultan las opciones que solo tienen sentido en una cotización
-   (Aplicar paquete / Nuevo paquete, Historial, Precios confidenciales) y todo costo
-   (Total Línea, precios confidenciales): un paquete no guarda precios. */
+/* Edición de un paquete predefinido (ver activarModoEdicionPaquete en cotizador.js): misma
+   vista del Cotizador. Datos Pax y Resumen de Factura quedan visibles pero deshabilitados;
+   se ocultan las opciones que solo tienen sentido en una cotización (Aplicar paquete,
+   Historial, Precios confidenciales) y todo costo (Total Línea, totales del Resumen): un
+   paquete no guarda precios. */
 body.modo-paquete .solo-cotizacion,
 body.modo-paquete .col-confidencial,
 body.modo-paquete .col-costo { display: none !important; }
+body.modo-paquete #datos-pax-section,
+body.modo-paquete #resumen-campos { opacity: 0.5; pointer-events: none; user-select: none; }
+body.modo-paquete #guardar-cotizacion { opacity: 0.5; cursor: not-allowed; }
 /* Encabezados de tabla: gris en vez del negro/bold por defecto del navegador, para que
    pesen menos visualmente que el contenido de las filas — antes solo estaba puesto para
    las tablas de Actividades/Hoteles/Itinerario del Cotizador; se generaliza a TODAS las

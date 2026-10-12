@@ -432,13 +432,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </div>
 
             <!-- Paquetes: acá solo se listan (Ver / Editar / Eliminar). Se crean y editan en el
-                 Cotizador (?nuevoPaquete=1 / ?editarPaquete=ID, ver shared/cotizador.js), que ya
+                 Cotizador ("Guardar como paquete" / ?editarPaquete=ID, ver shared/cotizador.js), que ya
                  tiene el drag-and-drop de Itinerario, Actividades y Hoteles. -->
             <div id="gestion-paquetes" class="subtab-content hidden">
                 <div class="card p-6">
                     <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
                         <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Paquetes Guardados</h2>
-                        <a href="../<?= $navActive === 'gestion-usd' ? 'usd' : 'pen' ?>/index.php?nuevoPaquete=1" class="btn btn-primary small"><i class="fas fa-plus mr-1"></i>Crear paquete en el Cotizador</a>
+                        <a href="../<?= $navActive === 'gestion-usd' ? 'usd' : 'pen' ?>/index.php" class="btn btn-primary small" title="Arma Itinerario, Actividades y Hoteles en el Cotizador y usa «Guardar como paquete»"><i class="fas fa-plus mr-1"></i>Crear paquete en el Cotizador</a>
                     </div>
                     <div id="paquetes-list" class="space-y-2"></div>
                 </div>

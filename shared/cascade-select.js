@@ -37,10 +37,12 @@ function crearHelpersClasificacion(getItems, getCategorias, keys, getDestinos) {
     const resolverDestinos = getDestinos || (() => destinosData);
     const destinoValDe = (item) => item.destino_id != null ? String(item.destino_id) : SIN_DESTINO_VAL;
     const categoriaValDe = (item) => item.categoria_id != null ? String(item.categoria_id) : SIN_CATEGORIA_VAL;
+    // "Sin clasificar" / "Sin categoría" siempre al final, después de los reales.
     const getDestinoOpciones = () => {
-        const opciones = resolverDestinos().map(d => ({ value: String(d.id), label: d.nombre }));
+        const opciones = resolverDestinos().map(d => ({ value: String(d.id), label: d.nombre }))
+            .sort((a, b) => a.label.localeCompare(b.label));
         if (getItems().some(item => item.destino_id == null)) opciones.push({ value: SIN_DESTINO_VAL, label: SIN_DESTINO_LABEL });
-        return opciones.sort((a, b) => a.label.localeCompare(b.label));
+        return opciones;
     };
     const getCategoriaOpciones = (destinoVal) => {
         if (!destinoVal) return [];
@@ -51,11 +53,12 @@ function crearHelpersClasificacion(getItems, getCategorias, keys, getDestinos) {
         const destinoId = Number(destinoVal);
         const opciones = getCategorias()
             .filter(c => c.destino_id === destinoId)
-            .map(c => ({ value: String(c.id), label: c.nombre }));
+            .map(c => ({ value: String(c.id), label: c.nombre }))
+            .sort((a, b) => a.label.localeCompare(b.label));
         if (getItems().some(item => item.destino_id === destinoId && item.categoria_id == null)) {
             opciones.push({ value: SIN_CATEGORIA_VAL, label: SIN_CATEGORIA_LABEL });
         }
-        return opciones.sort((a, b) => a.label.localeCompare(b.label));
+        return opciones;
     };
     const getItemsFiltrados = (destinoVal, categoriaVal) => getItems()
         .filter(item => destinoValDe(item) === destinoVal && categoriaValDe(item) === categoriaVal)
@@ -159,15 +162,20 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
     }
 
     // Los ítems sin categoría ya no viven detrás de una carpeta "Sin categoría" aparte —
-    // aparecen de frente como hijos del destino, al mismo nivel que las carpetas de
-    // categoría reales (mismo criterio para Actividades, Hoteles e Itinerarios, al
-    // compartir este selector).
+    // aparecen de frente como hijos del destino, DESPUÉS de las carpetas de categoría
+    // (primero las categorías, al final lo que aún no tiene categoría asignada). Mismo
+    // criterio para Actividades, Hoteles e Itinerarios, al compartir este selector.
     function llenarCategorias(children, destinoVal) {
         const opciones = helpers.getCategoriaOpciones(destinoVal).filter(o => o.value !== SIN_CATEGORIA_VAL);
         const itemsSinCategoria = helpers.getItemsFiltrados(destinoVal, SIN_CATEGORIA_VAL);
         children.innerHTML = (opciones.length === 0 && itemsSinCategoria.length === 0)
             ? `<div class="cascade-empty">Sin categorías.</div>`
             : '';
+        opciones.forEach(o => {
+            children.appendChild(crearNodo(o.label, {
+                onOpen: (itemChildren) => llenarItems(itemChildren, destinoVal, o.value)
+            }));
+        });
         itemsSinCategoria.forEach(item => {
             const leaf = crearNodo(item[labelKey], {
                 leaf: true,
@@ -175,11 +183,6 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
             });
             if (item[valueKey] === currentValue) leaf.classList.add('is-selected');
             children.appendChild(leaf);
-        });
-        opciones.forEach(o => {
-            children.appendChild(crearNodo(o.label, {
-                onOpen: (itemChildren) => llenarItems(itemChildren, destinoVal, o.value)
-            }));
         });
     }
 
