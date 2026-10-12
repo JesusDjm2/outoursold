@@ -505,6 +505,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     <th class="text-left p-3">Contacto</th>
                                     <th class="text-left p-3">Fecha Cot.</th>
                                     <th class="text-left p-3">N° PAX</th>
+                                    <th class="text-left p-3">Paquete</th>
                                     <th class="text-right p-3">Acciones</th>
                                 </tr>
                             </thead>

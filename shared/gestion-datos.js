@@ -1261,7 +1261,7 @@ let cotSearchDebounce = null;
 
 async function cargarCotizacionesGuardadas() {
     const tbody = document.getElementById('cot-table-body');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
     try {
         const params = new URLSearchParams({
             q: cotState.term,
@@ -1273,7 +1273,7 @@ async function cargarCotizacionesGuardadas() {
         cotState.total = total;
         tbody.innerHTML = '';
         if (results.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
         } else {
             results.forEach(cot => tbody.appendChild(buildCotRow(cot)));
         }
@@ -1282,7 +1282,7 @@ async function cargarCotizacionesGuardadas() {
         document.getElementById('cot-prev').disabled = cotState.offset === 0;
         document.getElementById('cot-next').disabled = shown >= total;
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
     }
 }
 
@@ -1296,6 +1296,9 @@ function buildCotRow(cot) {
         <td class="p-3">${escapeHtml(pax.contacto || '-')}</td>
         <td class="p-3">${escapeHtml(pax.fecha_cot || '-')}</td>
         <td class="p-3">${escapeHtml(pax.n_pax || '-')}</td>
+        <td class="p-3">${cot.data.paquete?.nombre
+            ? `<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)"><i class="fas fa-box-archive"></i>${escapeHtml(cot.data.paquete.nombre)}</span>`
+            : '<span class="text-slate-400">—</span>'}</td>
         <td class="p-3 text-right whitespace-nowrap"></td>
     `;
     const actionsCell = tr.querySelector('td:last-child');

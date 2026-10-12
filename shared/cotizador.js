@@ -304,6 +304,10 @@ function renderPaqueteAplicado() {
     document.getElementById('paquete-aplicado-nombre').textContent = paqueteAplicadoNombre;
     chip.classList.toggle('hidden', !paqueteAplicadoNombre);
     chip.classList.toggle('inline-flex', !!paqueteAplicadoNombre);
+    // El lápiz solo si el paquete todavía existe (una cotización guardada puede venir de
+    // un paquete que después se eliminó).
+    const existe = paquetesData.some(p => String(p.id) === String(paqueteAplicadoId));
+    document.getElementById('paquete-aplicado-editar').classList.toggle('hidden', !existe);
 }
 
 // ===== Historial de Cotizaciones guardadas (traer TODAS sus actividades a la vista actual) =====
@@ -939,7 +943,11 @@ async function guardarCotizacion() {
             pasajero: document.getElementById('itinerary-passenger').value,
             titulo: document.getElementById('itinerary-title').value,
             modulos: Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean)
-        }
+        },
+        // Paquete predefinido con el que se armó (si se aplicó uno): se guarda dentro del
+        // mismo JSON de la cotización, para volver a mostrarlo al reabrirla y listarlo en
+        // Gestión de Datos > Cotizaciones Guardadas.
+        paquete: paqueteAplicadoId ? { id: paqueteAplicadoId, nombre: paqueteAplicadoNombre } : null
     };
     // Antes se podía guardar el formulario vacío (un clic accidental en "Guardar" dejaba
     // una cotización basura, ID "-", nombre "-") — se exige al menos el nombre del
@@ -1010,6 +1018,14 @@ async function cargarCotizacion(id) {
         document.getElementById('notas_cotizacion').innerHTML = data.notas;
         document.getElementById('porcentaje_reserva').value = data.porcentaje_reserva || 30;
         restaurarItinerarioArmado(data.itinerarioArmado);
+        // Paquete con el que se armó (solo cotizaciones guardadas desde que se registra).
+        // Se muestra con el nombre guardado aunque el paquete se haya renombrado o borrado
+        // después; el lápiz solo lo edita si todavía existe.
+        if (data.paquete?.nombre) {
+            paqueteAplicadoId = data.paquete.id;
+            paqueteAplicadoNombre = data.paquete.nombre;
+            renderPaqueteAplicado();
+        }
         calcularResumen();
         cotizaciones[id] = data;
         currentCotizacionId = id;
