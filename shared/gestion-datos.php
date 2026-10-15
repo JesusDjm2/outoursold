@@ -402,18 +402,69 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             </div>
 
             <div id="gestion-itinerarios" class="hidden">
+                <!-- Por idioma: primero Páginas Fijas, después Itinerarios. Ambos se suben en lote
+                     (varios PDF a la vez; el título sale del nombre del archivo, ver
+                     initSubidaMasiva en itinerario.js). -->
                 <div class="flex gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-gestion-subtabs">
-                    <button class="subnav-tab active" data-subtab="modulos">
-                        <i class="fas fa-file-pdf mr-1"></i>Itinerarios
-                    </button>
-                    <button class="subnav-tab" data-subtab="paginas">
+                    <button class="subnav-tab active" data-subtab="paginas">
                         <i class="fas fa-file-alt mr-1"></i>Páginas Fijas
                     </button>
+                    <button class="subnav-tab" data-subtab="modulos">
+                        <i class="fas fa-file-pdf mr-1"></i>Itinerarios
+                    </button>
+                </div>
+
+                <!-- Páginas Fijas: subida en lote + tablero para arrastrar cada página a
+                     Presentación (inicio del PDF) o Cierre (final), en el orden en que quedan.
+                     Se guarda solo al soltar (api.php?path=guardar-config de este idioma). -->
+                <div id="itinerario-gestion-paginas" class="itin-panel">
+                    <div class="card cat-card">
+                        <div class="cat-header">
+                            <div>
+                                <h2 class="cat-title">Páginas Fijas</h2>
+                                <p class="cat-subtitle"><span id="paginas-fijas-count">0 páginas</span> · arrástralas a Presentación o Cierre</p>
+                            </div>
+                            <div class="cat-tools">
+                                <button type="button" id="paginas-nuevo-toggle" class="cat-new-btn"><i class="fas fa-upload"></i>Subir PDFs</button>
+                            </div>
+                        </div>
+                        <div id="paginas-nuevo-panel" class="cat-new-panel hidden">
+                            <h3>Subir páginas fijas (PDF)</h3>
+                            <label class="pdf-drop" for="paginas-pdf-input">
+                                <i class="fas fa-file-arrow-up"></i>
+                                <span><strong>Elige o arrastra aquí</strong> uno o varios PDF</span>
+                                <small>El título de cada página será el nombre del archivo (los guiones pasan a espacios).</small>
+                                <input type="file" id="paginas-pdf-input" accept=".pdf,application/pdf" multiple class="hidden">
+                            </label>
+                            <div id="paginas-subida-lista" class="subida-lista"></div>
+                            <div class="cat-form-actions">
+                                <button type="button" id="paginas-nuevo-cancelar" class="btn border small">Cancelar</button>
+                                <button type="button" id="paginas-subir-btn" class="btn btn-primary small" disabled><i class="fas fa-upload mr-1"></i>Subir</button>
+                            </div>
+                        </div>
+                        <div class="pf-board">
+                            <div class="pf-zona" data-zona="sin">
+                                <div class="pf-zona-head"><i class="fas fa-inbox"></i>Sin asignar <span class="conteo-badge" data-conteo="sin">0</span></div>
+                                <p class="pf-zona-hint">Recién subidas o que no van en el itinerario.</p>
+                                <div class="pf-lista" id="pf-zona-sin"></div>
+                            </div>
+                            <div class="pf-zona" data-zona="start">
+                                <div class="pf-zona-head"><i class="fas fa-flag"></i>Páginas de Presentación <span class="conteo-badge" data-conteo="start">0</span></div>
+                                <p class="pf-zona-hint">Van al inicio del PDF, en este orden.</p>
+                                <div class="pf-lista" id="pf-zona-start"></div>
+                            </div>
+                            <div class="pf-zona" data-zona="end">
+                                <div class="pf-zona-head"><i class="fas fa-flag-checkered"></i>Páginas de Cierre <span class="conteo-badge" data-conteo="end">0</span></div>
+                                <p class="pf-zona-hint">Van al final del PDF, en este orden.</p>
+                                <div class="pf-lista" id="pf-zona-end"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Mismo componente que Tours / Hoteles (shared/catalogo.css); mismos ids que
                      lee itinerario.js. -->
-                <div id="itinerario-gestion-modulos" class="itin-panel">
+                <div id="itinerario-gestion-modulos" class="itin-panel hidden">
                     <div class="card cat-card">
                         <div class="cat-header">
                             <div>
@@ -425,36 +476,35 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                     <i class="fas fa-search"></i>
                                     <input id="itinerario-modulos-search" type="text" placeholder="Buscar itinerario...">
                                 </div>
-                                <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo itinerario</button>
+                                <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-upload"></i>Subir PDFs</button>
                             </div>
                         </div>
                         <div id="itinerarios-nuevo-panel" class="cat-new-panel hidden">
-                            <h3>Nuevo itinerario (PDF)</h3>
-                            <form id="itinerary-upload-form" class="cat-form-grid" onsubmit="return false">
+                            <h3>Subir itinerarios (PDF)</h3>
+                            <label class="pdf-drop" for="itinerary-module-pdf">
+                                <i class="fas fa-file-arrow-up"></i>
+                                <span><strong>Elige o arrastra aquí</strong> uno o varios PDF</span>
+                                <small>El título de cada itinerario será el nombre del archivo (los guiones pasan a espacios).</small>
+                                <input type="file" id="itinerary-module-pdf" accept=".pdf,application/pdf" multiple class="hidden">
+                            </label>
+                            <div id="itinerarios-subida-lista" class="subida-lista"></div>
+                            <form id="itinerary-upload-form" class="cat-form-grid mt-3" onsubmit="return false">
                                 <div class="cat-field cat-span-6">
-                                    <label for="itinerary-module-title">Título</label>
-                                    <input type="text" id="itinerary-module-title" placeholder="ej. Tour Valle Sagrado" required>
-                                </div>
-                                <div class="cat-field cat-span-3">
-                                    <label for="itinerary-module-destino">Destino</label>
+                                    <label for="itinerary-module-destino">Destino <span class="normal-case font-normal">(para todos los de este lote, opcional)</span></label>
                                     <select id="itinerary-module-destino">
                                         <option value="">Sin clasificar</option>
                                     </select>
                                 </div>
-                                <div class="cat-field cat-span-3">
+                                <div class="cat-field cat-span-6">
                                     <label for="itinerary-module-categoria">Categoría</label>
                                     <select id="itinerary-module-categoria" disabled>
                                         <option value="">—</option>
                                     </select>
                                 </div>
-                                <div class="cat-field">
-                                    <label for="itinerary-module-pdf">Archivo PDF</label>
-                                    <input type="file" id="itinerary-module-pdf" accept=".pdf" required>
-                                </div>
                             </form>
                             <div class="cat-form-actions">
                                 <button type="button" id="itinerarios-nuevo-cancelar" class="btn border small">Cancelar</button>
-                                <button type="button" id="upload-local-module" class="btn btn-primary small"><i class="fas fa-upload mr-1"></i>Subir itinerario</button>
+                                <button type="button" id="upload-local-module" class="btn btn-primary small" disabled><i class="fas fa-upload mr-1"></i>Subir</button>
                             </div>
                         </div>
                         <div class="cat-table-wrap">
@@ -473,81 +523,6 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                     <button id="modulos-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
                         <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="modulos-guardar-count">0</span>)
                     </button>
-                </div>
-
-                <div id="itinerario-gestion-paginas" class="itin-panel hidden">
-                    <div class="card p-6 mb-6">
-                        <h2 class="text-base font-semibold text-slate-800 mb-4">Subir Nueva Página Fija</h2>
-                        <p class="text-sm text-slate-500 mb-4">Documentos que no se clasifican por destino ni categoría — siempre van al inicio o cierre del itinerario (portada, legalidad, términos, etc.).</p>
-                        <form id="pagina-fija-upload-form" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div class="md:col-span-2">
-                                <label for="pagina-fija-titulo" class="font-medium text-slate-700">Título</label>
-                                <input type="text" id="pagina-fija-titulo" placeholder="Ej: Portada" class="w-full border rounded p-2 mt-1" required>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label for="pagina-fija-pdf" class="font-medium text-slate-700">Archivo PDF</label>
-                                <input type="file" id="pagina-fija-pdf" accept=".pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 mt-1" required>
-                            </div>
-                            <button type="button" id="upload-pagina-fija" class="btn btn-primary md:col-span-2">Subir Página Fija</button>
-                        </form>
-                    </div>
-
-                    <div class="card p-6 mb-6">
-                        <h2 class="text-base font-semibold text-slate-800 mb-4">Páginas Fijas Existentes</h2>
-                        <div class="itinerary-table-container">
-                            <table class="w-full">
-                                <thead class="bg-slate-50">
-                                    <tr>
-                                        <th class="text-left p-2">Título</th>
-                                        <th class="text-left p-2">Archivo</th>
-                                        <th class="text-left p-2">Creado por</th>
-                                        <th class="text-right p-2">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="paginas-fijas-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="card p-4">
-                        <h2 class="text-base font-semibold text-slate-800 mb-4">Configuración de Páginas Fijas</h2>
-
-                        <div class="mb-6">
-                            <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Presentación</h3>
-                            <div class="itinerary-table-container">
-                                <table class="w-full">
-                                    <thead class="bg-slate-50">
-                                        <tr>
-                                            <th class="p-2 w-8">&nbsp;</th>
-                                            <th class="p-2 text-left">Documento</th>
-                                            <th class="p-2 w-16">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="start-builder-body"></tbody>
-                                </table>
-                            </div>
-                            <button id="add-start-row" class="btn btn-secondary mt-2">+ Añadir Fila</button>
-                        </div>
-
-                        <div class="mb-6">
-                            <h3 class="text-sm font-semibold text-slate-700 mb-2">Páginas de Cierre</h3>
-                            <div class="itinerary-table-container">
-                                <table class="w-full">
-                                    <thead class="bg-slate-50">
-                                        <tr>
-                                            <th class="p-2 w-8">&nbsp;</th>
-                                            <th class="p-2 text-left">Documento</th>
-                                            <th class="p-2 w-16">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="end-builder-body"></tbody>
-                                </table>
-                            </div>
-                            <button id="add-end-row" class="btn btn-secondary mt-2">+ Añadir Fila</button>
-                        </div>
-
-                        <button id="save-default-config" class="btn btn-primary"><i class="fas fa-save mr-2"></i>Guardar como predeterminado</button>
-                    </div>
                 </div>
             </div>
         </div>

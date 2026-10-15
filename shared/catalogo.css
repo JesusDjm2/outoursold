@@ -205,3 +205,71 @@
 #itin-grupos-tabs .grupo-tab-pendiente:not(.active) { color: #b45309; }
 #itin-grupos-tabs .grupo-tab-pendiente:not(.active) .conteo-badge { background: #fef3c7; color: #b45309; }
 .destino-grupo-select { background: #fff; max-width: 130px; }
+
+/* Subida en lote de PDFs (Itinerarios > Páginas Fijas / Itinerarios, ver initSubidaMasiva
+   en itinerario.js): zona para elegir o arrastrar archivos + lista con el título propuesto
+   de cada uno, editable antes de subir. */
+.pdf-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 22px 16px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #fff;
+    color: #475569;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.pdf-drop > i { font-size: 1.6rem; color: var(--accent-1); }
+.pdf-drop small { color: #94a3b8; font-size: 0.75rem; }
+.pdf-drop:hover, .pdf-drop.is-over { border-color: var(--accent-1); background: rgba(187, 49, 53, 0.04); }
+.subida-lista { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.subida-lista:empty { display: none; }
+.subida-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+.subida-titulo { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; }
+.subida-archivo { font-size: 0.72rem; color: #94a3b8; max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tablero de Páginas Fijas: Sin asignar / Presentación / Cierre (arrastrar y soltar). */
+.pf-board { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 20px; }
+@media (min-width: 1024px) { .pf-board { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pf-zona { display: flex; flex-direction: column; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; min-width: 0; }
+.pf-zona[data-zona="start"] { border-top: 3px solid var(--accent-1); }
+.pf-zona[data-zona="end"] { border-top: 3px solid var(--accent-2); }
+.pf-zona-head { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+.pf-zona-head .conteo-badge { margin-left: auto; }
+.pf-zona-hint { font-size: 0.72rem; color: #94a3b8; margin: 2px 0 10px; }
+.pf-lista { display: flex; flex-direction: column; gap: 8px; min-height: 90px; flex: 1; border-radius: 8px; transition: background 0.15s; }
+.pf-lista.is-over { background: rgba(187, 49, 53, 0.06); outline: 2px dashed rgba(187, 49, 53, 0.35); outline-offset: 2px; }
+.pf-vacio { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 80px; border: 2px dashed #e2e8f0; border-radius: 8px; color: #cbd5e1; font-size: 0.8rem; }
+.pf-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 6px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: grab;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.pf-card:active { cursor: grabbing; }
+.pf-card.is-dragging { opacity: 0.45; }
+.pf-grip { color: #cbd5e1; font-size: 0.8rem; }
+.pf-titulo { font-size: 0.85rem; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-archivo { font-size: 0.7rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-acciones { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+.pf-acciones .cat-icon-btn { width: 28px; height: 28px; font-size: 0.75rem; }
+.pf-mover { font-size: 0.7rem; padding: 2px 4px; border: 1px solid #e2e8f0; border-radius: 6px; margin-right: 2px; max-width: 96px; background: #fff; }
+.pf-card.is-fuera { background: #fafafa; border-style: dashed; }
+.pf-badge-fuera { background: #f1f5f9; color: #64748b; }

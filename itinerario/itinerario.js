@@ -456,7 +456,9 @@ document.getElementById('itinerario-modulos-search')?.addEventListener('input', 
     renderModulosTable();
 });
 
-document.getElementById('upload-local-module')?.addEventListener('click', () => {
+// Alta de a uno: solo en la página standalone de Itinerario — Gestión de Datos usa la subida
+// en lote (initSubidaMasiva, más abajo).
+if (!document.getElementById('itinerarios-subida-lista')) document.getElementById('upload-local-module')?.addEventListener('click', () => {
     const titleInput = document.getElementById('itinerary-module-title');
     const fileInput = document.getElementById('itinerary-module-pdf');
     const destinoSel = document.getElementById('itinerary-module-destino');
@@ -537,6 +539,7 @@ async function handleItineraryDelete(id) {
 // Independiente del catálogo de Módulos: no se clasifican por destino/categoría, tienen
 // su propio CRUD, y son la fuente de la que eligen los selectores de inicio/cierre más abajo.
 function renderPaginasFijasTable() {
+    renderTableroPaginasFijas();
     const tbody = document.getElementById('paginas-fijas-table-body');
     if (!tbody) return; // no existe en Cotizador — Páginas Fijas vive en Gestión de Datos
     const visibles = paginasFijasActivas();
@@ -689,6 +692,295 @@ async function handlePaginaFijaDelete(p) {
 
     renderPaginasFijasTable();
     loadFixedSections();
+}
+
+// ===== Subida en lote de PDFs (Gestión de Datos > Itinerarios > Páginas Fijas / Itinerarios) =====
+// Se eligen (o arrastran) varios PDF a la vez; cada uno aparece en una lista con su título
+// ya propuesto a partir del nombre del archivo (editable antes de subir) y se suben uno por
+// uno al idioma activo. Si alguno falla, los demás siguen y al final se avisa cuáles.
+
+// Título a partir del nombre del archivo: sin la extensión .pdf y con cada guion (o guion
+// bajo) convertido en un espacio. Todo lo demás se respeta tal cual: espacios existentes,
+// mayúsculas/minúsculas, tildes y caracteres especiales.
+function tituloDesdeArchivo(nombreArchivo) {
+    return nombreArchivo.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ').trim();
+}
+
+function initSubidaMasiva({ inputId, listaId, botonId, cancelarId, sustantivo, alSubir }) {
+    const input = document.getElementById(inputId);
+    const lista = document.getElementById(listaId);
+    const boton = document.getElementById(botonId);
+    if (!input || !lista || !boton) return;
+    const dropZone = input.closest('.pdf-drop');
+    let pendientes = []; // [{ file, titulo }]
+
+    const actualizarBoton = () => {
+        boton.disabled = pendientes.length === 0;
+        boton.innerHTML = `<i class="fas fa-upload mr-1"></i>Subir${pendientes.length ? ` ${pendientes.length} ${sustantivo[pendientes.length === 1 ? 0 : 1]}` : ''}`;
+    };
+    const render = () => {
+        lista.innerHTML = '';
+        pendientes.forEach((item, i) => {
+            const fila = document.createElement('div');
+            fila.className = 'subida-item';
+            fila.innerHTML = `
+                <i class="fas fa-file-pdf text-red-500"></i>
+                <input type="text" class="subida-titulo" title="Título (puedes corregirlo antes de subir)">
+                <span class="subida-archivo"></span>
+                <button type="button" class="cat-icon-btn is-danger" title="Quitar de la lista"><i class="fas fa-times"></i></button>
+            `;
+            const tituloInput = fila.querySelector('.subida-titulo');
+            tituloInput.value = item.titulo;
+            tituloInput.addEventListener('input', () => { item.titulo = tituloInput.value; });
+            fila.querySelector('.subida-archivo').textContent = item.file.name;
+            fila.querySelector('button').addEventListener('click', () => { pendientes.splice(i, 1); render(); });
+            lista.appendChild(fila);
+        });
+        actualizarBoton();
+    };
+    const agregar = (files) => {
+        const pdfs = Array.from(files).filter(f => /\.pdf$/i.test(f.name));
+        const descartados = files.length - pdfs.length;
+        pdfs.forEach(file => {
+            if (pendientes.some(p => p.file.name === file.name && p.file.size === file.size)) return;
+            pendientes.push({ file, titulo: tituloDesdeArchivo(file.name) });
+        });
+        if (descartados) notifyWarning(`${descartados} archivo${descartados === 1 ? '' : 's'} no ${descartados === 1 ? 'es' : 'son'} PDF y no se agregó.`);
+        render();
+    };
+    const reset = () => { pendientes = []; input.value = ''; render(); };
+
+    input.addEventListener('change', () => { agregar(input.files); input.value = ''; });
+    if (dropZone) {
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add('is-over'); }));
+        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('is-over')));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); agregar(e.dataTransfer.files); });
+    }
+    document.getElementById(cancelarId)?.addEventListener('click', reset);
+
+    boton.addEventListener('click', async () => {
+        const vacios = pendientes.filter(p => !p.titulo.trim());
+        if (vacios.length) { notifyWarning('Todos los archivos necesitan un título.'); return; }
+        const total = pendientes.length;
+        const fallidos = [];
+        boton.disabled = true;
+        for (let i = 0; i < total; i++) {
+            const item = pendientes[i];
+            boton.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>Subiendo ${i + 1} de ${total}...`;
+            try {
+                const formData = new FormData();
+                formData.append('pdf', item.file);
+                formData.append('idioma', idiomaActivo);
+                const subida = await fetch(`${ITINERARIO_API_BASE}upload.php`, { method: 'POST', body: formData }).then(r => r.json());
+                if (!subida.success) throw new Error(subida.error || 'Error al subir el archivo.');
+                const registro = await alSubir(item.titulo.trim(), subida.filename);
+                if (!registro.success) throw new Error(registro.error || 'Error al registrar el archivo.');
+            } catch (e) {
+                fallidos.push({ item, error: e.message });
+            }
+        }
+        await cargarIdioma(idiomaActivo);
+        renderTodoIdioma();
+        const ok = total - fallidos.length;
+        // Quedan en la lista solo los que fallaron, para reintentar.
+        pendientes = fallidos.map(f => f.item);
+        render();
+        if (fallidos.length) {
+            notifyError(`Se subieron ${ok} de ${total}. Fallaron: ${fallidos.map(f => `${f.item.file.name} (${f.error})`).join('; ')}`);
+        } else {
+            notifySuccess(`Se ${ok === 1 ? 'subió' : 'subieron'} ${ok} ${sustantivo[ok === 1 ? 0 : 1]}.`);
+        }
+    });
+    render();
+}
+
+if (document.getElementById('itinerarios-subida-lista')) {
+    initSubidaMasiva({
+        inputId: 'itinerary-module-pdf',
+        listaId: 'itinerarios-subida-lista',
+        botonId: 'upload-local-module',
+        cancelarId: 'itinerarios-nuevo-cancelar',
+        sustantivo: ['itinerario', 'itinerarios'],
+        alSubir: (titulo, filename) => fetch(`${ITINERARIO_API_BASE}api.php?path=crear-modulo&idioma=${idiomaActivo}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                titulo, filename,
+                destino_id: document.getElementById('itinerary-module-destino').value || null,
+                categoria_id: document.getElementById('itinerary-module-categoria').value || null
+            })
+        }).then(r => r.json())
+    });
+}
+if (document.getElementById('paginas-subida-lista')) {
+    initSubidaMasiva({
+        inputId: 'paginas-pdf-input',
+        listaId: 'paginas-subida-lista',
+        botonId: 'paginas-subir-btn',
+        cancelarId: 'paginas-nuevo-cancelar',
+        sustantivo: ['página', 'páginas'],
+        alSubir: (titulo, filename) => fetch(`${ITINERARIO_API_BASE}api.php?path=crear-pagina-fija&idioma=${idiomaActivo}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ titulo, filename })
+        }).then(r => r.json())
+    });
+}
+
+// ===== Tablero de Páginas Fijas: Sin asignar / Presentación / Cierre =====
+// Cada página fija se arrastra a la zona donde va; dentro de Presentación y Cierre el
+// orden de arriba a abajo es el orden en el PDF. Se guarda al soltar, en la misma config
+// por idioma de siempre (startFiles / endFiles, ver guardar-config en api.php). En
+// pantallas táctiles, el selector de cada tarjeta hace lo mismo sin arrastrar.
+const PF_ZONAS = ['sin', 'start', 'end'];
+let pfArrastrando = null;
+
+function renderTableroPaginasFijas() {
+    const zonas = Object.fromEntries(PF_ZONAS.map(z => [z, document.getElementById(`pf-zona-${z}`)]));
+    if (!zonas.sin) return;
+    const paginas = paginasFijasActivas();
+    const porArchivo = new Map(paginas.map(p => [p.filename, p]));
+    // La config de Presentación/Cierre es una sola por idioma, pero cada usuario solo ve
+    // SUS páginas fijas: lo que la config trae y no está en este catálogo (de otro usuario,
+    // o ya borrado) se muestra igual, marcado, para que guardar no lo pierda sin querer.
+    [...fixedStartFilesActivos(), ...fixedEndFilesActivos()].forEach(f => {
+        if (!porArchivo.has(f)) porArchivo.set(f, { filename: f, titulo: f.replace(/.pdf$/i, ''), fueraDeCatalogo: true });
+    });
+    const start = fixedStartFilesActivos().filter(f => porArchivo.has(f));
+    const end = fixedEndFilesActivos().filter(f => porArchivo.has(f) && !start.includes(f));
+    const asignadas = new Set([...start, ...end]);
+    const sin = paginas.filter(p => !asignadas.has(p.filename)).map(p => p.filename).sort((a, b) => porArchivo.get(a).titulo.localeCompare(porArchivo.get(b).titulo));
+    const contenido = { sin, start, end };
+
+    PF_ZONAS.forEach(z => {
+        zonas[z].innerHTML = '';
+        contenido[z].forEach(f => zonas[z].appendChild(buildTarjetaPaginaFija(porArchivo.get(f), z)));
+        if (!contenido[z].length) {
+            zonas[z].innerHTML = `<div class="pf-vacio">${z === 'sin' ? 'Nada pendiente' : 'Arrastra páginas aquí'}</div>`;
+        }
+        document.querySelector(`.pf-zona [data-conteo="${z}"]`).textContent = contenido[z].length;
+    });
+    const n = paginas.length;
+    const contador = document.getElementById('paginas-fijas-count');
+    if (contador) contador.textContent = `${n} página${n === 1 ? '' : 's'}`;
+}
+
+function buildTarjetaPaginaFija(p, zona) {
+    const card = document.createElement('div');
+    card.className = 'pf-card';
+    card.draggable = true;
+    card.dataset.filename = p.filename;
+    const roto = p.archivo_existe === false;
+    card.classList.toggle('is-fuera', !!p.fueraDeCatalogo);
+    card.innerHTML = `
+        <i class="fas fa-grip-vertical pf-grip"></i>
+        <div class="min-w-0 flex-1">
+            <div class="pf-titulo"></div>
+            <div class="pf-archivo"><i class="fas fa-file-pdf mr-1"></i><span></span>${roto ? ' <span class="cat-badge is-danger ml-1">PDF no encontrado</span>' : ''}${p.fueraDeCatalogo ? ' <span class="cat-badge pf-badge-fuera ml-1" title="Está en la configuración de este idioma pero no en tu catálogo de páginas fijas (de otro usuario o ya eliminada). Se conserva al guardar; pásala a Sin asignar para quitarla.">fuera de tu catálogo</span>' : ''}</div>
+        </div>
+        <div class="pf-acciones">
+            <select class="pf-mover" title="Mover a">
+                <option value="sin">Sin asignar</option>
+                <option value="start">Presentación</option>
+                <option value="end">Cierre</option>
+            </select>
+            <a class="cat-icon-btn is-view${roto ? ' is-disabled' : ''}" target="_blank" rel="noopener" title="Ver PDF"><i class="fas fa-eye"></i></a>
+            <button type="button" class="cat-icon-btn pf-renombrar" title="Cambiar título"><i class="fas fa-pen"></i></button>
+            <label class="cat-icon-btn" title="Reemplazar el PDF"><i class="fas fa-arrows-rotate"></i><input type="file" accept=".pdf,application/pdf" class="hidden"></label>
+            <button type="button" class="cat-icon-btn is-danger pf-eliminar" title="Eliminar"><i class="fas fa-trash"></i></button>
+        </div>
+    `;
+    card.querySelector('.pf-titulo').textContent = p.titulo;
+    card.querySelector('.pf-archivo span').textContent = p.filename;
+    card.querySelector('a').href = `${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(p.filename)}`;
+    const mover = card.querySelector('.pf-mover');
+    mover.value = zona;
+    mover.addEventListener('change', () => {
+        const destino = document.getElementById(`pf-zona-${mover.value}`);
+        destino.querySelector('.pf-vacio')?.remove();
+        destino.appendChild(card);
+        guardarTableroPaginasFijas();
+    });
+    // Las de fuera del catálogo solo se pueden mover (o quitar pasándolas a Sin asignar).
+    if (p.fueraDeCatalogo) {
+        card.querySelectorAll('.pf-renombrar, label.cat-icon-btn, .pf-eliminar').forEach(el => el.remove());
+        card.querySelector('.pf-mover option[value="sin"]').textContent = 'Quitar';
+    }
+    card.querySelector('.pf-renombrar')?.addEventListener('click', async () => {
+        const nuevo = (await promptText('Título de la página fija', '', p.titulo))?.trim();
+        if (nuevo && nuevo !== p.titulo) guardarPaginaFija(p, nuevo, null);
+    });
+    card.querySelector('label input')?.addEventListener('change', (e) => {
+        if (e.target.files[0]) guardarPaginaFija(p, p.titulo, e.target.files[0]);
+    });
+    card.querySelector('.pf-eliminar')?.addEventListener('click', () => handlePaginaFijaDelete(p));
+    card.addEventListener('dragstart', (e) => {
+        pfArrastrando = card;
+        card.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', p.filename);
+    });
+    card.addEventListener('dragend', () => {
+        card.classList.remove('is-dragging');
+        document.querySelectorAll('.pf-lista.is-over').forEach(l => l.classList.remove('is-over'));
+        pfArrastrando = null;
+    });
+    return card;
+}
+
+// Tarjeta antes de la cual soltar, según la altura del puntero dentro de la zona.
+function pfTarjetaSiguiente(lista, y) {
+    const tarjetas = [...lista.querySelectorAll('.pf-card:not(.is-dragging)')];
+    return tarjetas.find(t => {
+        const r = t.getBoundingClientRect();
+        return y < r.top + r.height / 2;
+    }) || null;
+}
+
+function initTableroPaginasFijas() {
+    PF_ZONAS.forEach(z => {
+        const lista = document.getElementById(`pf-zona-${z}`);
+        if (!lista) return;
+        lista.addEventListener('dragover', (e) => {
+            if (!pfArrastrando) return;
+            e.preventDefault();
+            lista.classList.add('is-over');
+            lista.querySelector('.pf-vacio')?.remove();
+            const siguiente = pfTarjetaSiguiente(lista, e.clientY);
+            if (siguiente) lista.insertBefore(pfArrastrando, siguiente); else lista.appendChild(pfArrastrando);
+        });
+        lista.addEventListener('dragleave', (e) => {
+            if (!lista.contains(e.relatedTarget)) lista.classList.remove('is-over');
+        });
+        lista.addEventListener('drop', (e) => {
+            e.preventDefault();
+            lista.classList.remove('is-over');
+            guardarTableroPaginasFijas();
+        });
+    });
+}
+initTableroPaginasFijas();
+
+async function guardarTableroPaginasFijas() {
+    const leer = (z) => [...document.querySelectorAll(`#pf-zona-${z} .pf-card`)].map(c => c.dataset.filename);
+    const startFiles = leer('start');
+    const endFiles = leer('end');
+    try {
+        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-config&idioma=${idiomaActivo}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ startFiles, endFiles })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        if (idiomaCache[idiomaActivo]) {
+            idiomaCache[idiomaActivo].fixedStartFiles = startFiles;
+            idiomaCache[idiomaActivo].fixedEndFiles = endFiles;
+        }
+    } catch (e) {
+        notifyError('No se pudo guardar el orden de las páginas fijas: ' + e.message);
+    }
+    renderTableroPaginasFijas();
 }
 
 // ===== Páginas Fijas: config de inicio/cierre (Presentación / Cierre) =====
@@ -1242,9 +1534,17 @@ async function handleGenerateItinerary() {
         pdfDoc.registerFontkit(fontkit);
 
         const getFiles = selector => Array.from(document.querySelectorAll(selector)).map(s => s.value).filter(Boolean);
-        const startFiles = getFiles('#start-builder-body .module-filename');
+        // Presentación / Cierre: del armador de esas secciones si está en la página
+        // (standalone); si no (Cotizador), de la config guardada para este idioma
+        // (Gestión de Datos > Itinerarios > Páginas Fijas). Antes se leían solo del DOM, así
+        // que desde el Cotizador nunca se incluían.
+        const startFiles = document.getElementById('start-builder-body')
+            ? getFiles('#start-builder-body .module-filename')
+            : fixedStartFilesActivos().slice();
         const bodyFiles = getFiles('#itinerary-builder-body .module-filename');
-        const endFiles = getFiles('#end-builder-body .module-filename');
+        const endFiles = document.getElementById('end-builder-body')
+            ? getFiles('#end-builder-body .module-filename')
+            : fixedEndFilesActivos().slice();
 
         const allFilesToProcess = [
             ...startFiles.map(filename => ({ filename, type: 'start' })),

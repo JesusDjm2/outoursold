@@ -50,6 +50,24 @@ $carpetasValidas = ['generados'];
 $carpeta = $_POST['carpeta'] ?? '';
 $subcarpeta = in_array($carpeta, $carpetasValidas, true) ? $carpeta . '/' : '';
 
+// Nombre en disco seguro: api.php solo acepta [A-Za-z0-9 _-.] (validarNombreArchivoPdf),
+// así que un PDF como "Términos y Condiciones.pdf" quedaba subido pero no se podía
+// registrar. Se quitan tildes (é → e, ñ → n, ç → c...) y cualquier otro carácter fuera de
+// esa lista pasa a "_". El TÍTULO que se muestra no sale de acá: lo arma el cliente desde
+// el nombre original, con sus tildes y caracteres especiales intactos.
+$base = pathinfo($fileName, PATHINFO_FILENAME);
+$base = strtr($base, [
+    'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ã' => 'A', 'Ä' => 'A',
+    'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+    'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i', 'Í' => 'I', 'Ì' => 'I', 'Î' => 'I', 'Ï' => 'I',
+    'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'Ó' => 'O', 'Ò' => 'O', 'Ô' => 'O', 'Õ' => 'O', 'Ö' => 'O',
+    'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'Ú' => 'U', 'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U',
+    'ñ' => 'n', 'Ñ' => 'N', 'ç' => 'c', 'Ç' => 'C'
+]);
+$base = trim(preg_replace('/[^A-Za-z0-9 _\-]/', '_', $base));
+if ($base === '') $base = 'documento';
+$fileName = $base . '.pdf';
+
 $uploadDir = __DIR__ . '/uploads/' . $idioma . '/' . $subcarpeta;
 if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0775, true);

@@ -172,7 +172,7 @@ function initPanelNuevo(toggleId, panelId, cancelarId, focoId) {
     document.getElementById(toggleId).addEventListener('click', () => {
         const abrir = panel.classList.contains('hidden');
         panel.classList.toggle('hidden', !abrir);
-        if (abrir) document.getElementById(focoId).focus();
+        if (abrir && focoId) document.getElementById(focoId)?.focus();
     });
     document.getElementById(cancelarId).addEventListener('click', () => panel.classList.add('hidden'));
 }
@@ -1572,7 +1572,8 @@ async function init() {
 
     initPanelNuevo('tours-nuevo-toggle', 'tours-nuevo-panel', 'tours-nuevo-cancelar', 'tour-new-nombre');
     initPanelNuevo('hoteles-nuevo-toggle', 'hoteles-nuevo-panel', 'hoteles-nuevo-cancelar', 'hotel-new-nombre');
-    initPanelNuevo('itinerarios-nuevo-toggle', 'itinerarios-nuevo-panel', 'itinerarios-nuevo-cancelar', 'itinerary-module-title');
+    initPanelNuevo('itinerarios-nuevo-toggle', 'itinerarios-nuevo-panel', 'itinerarios-nuevo-cancelar', null);
+    initPanelNuevo('paginas-nuevo-toggle', 'paginas-nuevo-panel', 'paginas-nuevo-cancelar', null);
 
     document.getElementById('tour-csv-input').addEventListener('change', handleTourCsvUpload);
     document.getElementById('hotel-csv-input').addEventListener('change', handleHotelCsvUpload);
