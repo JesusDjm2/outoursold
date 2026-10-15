@@ -840,7 +840,7 @@ async function cargarPaqueteParaEditar(id) {
     hotelsBody.innerHTML = '';
     (paquete.hoteles.length ? paquete.hoteles : [{}]).forEach(h => hotelsBody.appendChild(createHotelRow(h)));
 
-    const idioma = paquete.itinerario?.idioma || 'es';
+    const idioma = paquete.itinerario?.idioma || 'en';
     document.querySelector('select[name="idioma"]').value = idioma;
     sincronizarTabsIdioma();
     await activarIdioma(idioma);
@@ -1443,7 +1443,7 @@ async function init() {
     // este mismo archivo) arranca con el idioma que ya trae Datos Pax, en vez del 'en'
     // fijo de la página standalone — y de ahí en más lo sigue en vivo (ver el listener
     // del <select name="idioma"> más abajo).
-    await initItinerario(document.querySelector('select[name="idioma"]').value || 'es');
+    await initItinerario(document.querySelector('select[name="idioma"]').value || 'en');
     nuevaCotizacion(false);
 
     document.querySelectorAll('#idioma-tabs .subnav-tab').forEach(tab => {

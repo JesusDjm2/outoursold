@@ -69,30 +69,17 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-        <div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
-            <div class="flex flex-wrap gap-1 bg-white rounded-lg p-1 shadow-md w-fit" id="idioma-tabs">
-                <button type="button" class="subnav-tab active" data-idioma="es">
-                    <i class="fas fa-language mr-1"></i> Español
-                </button>
-                <button type="button" class="subnav-tab" data-idioma="en">
-                    <i class="fas fa-language mr-1"></i> English
-                </button>
-                <button type="button" class="subnav-tab" data-idioma="pt">
-                    <i class="fas fa-language mr-1"></i> Português
-                </button>
-            </div>
-            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en #paquete-aplicado,
-                 con un lápiz para editarlo ahí mismo). Uno nuevo se crea armando la cotización
-                 normal y usando "Guardar como paquete" (pide el nombre al guardar). -->
-            <div id="paquete-toolbar" class="solo-cotizacion flex items-center gap-2 flex-wrap">
-                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
-                    <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
-                    <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
-                </span>
-                <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1 bg-white">
-                    <option value="">Aplicar paquete...</option>
-                </select>
-            </div>
+        <!-- Inglés primero: es el idioma por defecto de una cotización nueva. -->
+        <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="idioma-tabs">
+            <button type="button" class="subnav-tab active" data-idioma="en">
+                <i class="fas fa-language mr-1"></i> English
+            </button>
+            <button type="button" class="subnav-tab" data-idioma="es">
+                <i class="fas fa-language mr-1"></i> Español
+            </button>
+            <button type="button" class="subnav-tab" data-idioma="pt">
+                <i class="fas fa-language mr-1"></i> Português
+            </button>
         </div>
         <div id="cotizador-section" class="tab-content">
             <!-- Edición de un paquete predefinido (ver activarModoEdicionPaquete en cotizador.js):
@@ -120,8 +107,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              escribe su .value y escucha su evento change. -->
                         <div class="field hidden">
                             <select name="idioma" title="Idioma de la cotización / PDF">
-                                <option value="es" selected>Español</option>
-                                <option value="en">English</option>
+                                <option value="en" selected>English</option>
+                                <option value="es">Español</option>
                                 <option value="pt">Português</option>
                             </select>
                         </div>
@@ -157,11 +144,24 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </section>
                 <section id="cotizador-main-col" class="lg:col-span-3 space-y-4">
                     <div class="card p-3 accordion-section" data-accordion-key="itinerario">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
                                 <span class="accordion-label-collapsed">Itinerario</span>
                             </button>
+                            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en
+                                 #paquete-aplicado, con un lápiz para editarlo ahí mismo). Uno nuevo
+                                 se crea armando la cotización normal y usando "Guardar como paquete"
+                                 (pide el nombre al guardar). -->
+                            <div id="paquete-toolbar" class="solo-cotizacion flex items-center gap-2 flex-wrap justify-end">
+                                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
+                                    <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
+                                    <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
+                                </span>
+                                <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1 bg-white">
+                                    <option value="">Aplicar paquete...</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="accordion-body">
                         <!-- Pasajero y título ya quedan ligados a la cotización (Nombre PAX y un título

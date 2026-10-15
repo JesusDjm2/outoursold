@@ -42,29 +42,60 @@ let hotelsData = [];
 let destinosData = [];
 let categoriasData = [];
 let categoriasHotelesData = [];
-let destinoSeleccionadoId = null;
-let categoriaTipoActivo = 'tours';
+// Grupos padre de los destinos (Con pernocte / Sin pernocte, migración 032).
+let gruposDestinoData = [];
+const GRUPO_SIN_ASIGNAR = 'sin-asignar';
+
+// Destinos y Categorías se gestiona en dos lugares, cada uno con su propio estado y DOM:
+//  - moneda: Gestión USD / PEN > Destinos y Categorías (categorías de Actividades y Hoteles,
+//    todos los destinos).
+//  - itin: Itinerarios > Destinos y Categorías (categorías de Itinerarios, con los destinos
+//    separados por grupo: Con pernocte / Sin pernocte / Sin asignar).
+// Los destinos son los mismos (tabla compartida); cambia qué se ve y qué categorías.
+const CLASIF_CTX = {
+    moneda: {
+        ids: { destinos: 'destinos-table-body', categorias: 'categorias-table-body', sinDestino: 'categorias-sin-destino', tableWrap: 'categorias-table-wrap', actual: 'categorias-destino-actual' },
+        tipoTabsSelector: '.categoria-tipo-tab',
+        tipos: ['tours', 'hoteles'],
+        tipoActivo: 'tours',
+        destinoSeleccionadoId: null,
+        filtro: () => true,
+        conGrupos: false
+    },
+    itin: {
+        ids: { destinos: 'itin-destinos-table-body', categorias: 'itin-categorias-table-body', sinDestino: 'itin-categorias-sin-destino', tableWrap: 'itin-categorias-table-wrap', actual: 'itin-categorias-destino-actual' },
+        tipoTabsSelector: null,
+        tipos: ['itinerarios'],
+        tipoActivo: 'itinerarios',
+        destinoSeleccionadoId: null,
+        grupoActivo: '1',
+        filtro: (d) => CLASIF_CTX.itin.grupoActivo === GRUPO_SIN_ASIGNAR ? d.grupo_id == null : String(d.grupo_id) === CLASIF_CTX.itin.grupoActivo,
+        conGrupos: true
+    }
+};
 // Módulos de itinerario de los 3 idiomas, solo para contar por destino/categoría en
 // Destinos y Categorías (los cataloga itinerario.js, uno por idioma).
 let modulosItinTodos = { es: [], en: [], pt: [] };
 let toursFilter = '';
 let hotelsFilter = '';
-let paquetesData = [];
 
 // ===== CARGA DE DATOS =====
 async function cargarDatosIniciales() {
     try {
-        const [toursRes, hotelesRes, paquetesRes, destinosRes, categoriasRes, categoriasHotelesRes] = await Promise.all([
+        const [toursRes, hotelesRes, destinosRes, categoriasRes, categoriasHotelesRes, gruposRes] = await Promise.all([
             fetch(`${API_URL}?path=tours`).then(r => r.json()),
             fetch(`${API_URL}?path=hoteles`).then(r => r.json()),
-            fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json()),
             fetch(`${API_URL}?path=destinos`).then(r => r.json()),
             fetch(`${API_URL}?path=categorias`).then(r => r.json()),
-            fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json())
+            fetch(`${API_URL}?path=categorias-hoteles`).then(r => r.json()),
+            fetch(`${API_URL}?path=grupos-destino`).then(r => r.json())
         ]);
+        gruposDestinoData = Array.isArray(gruposRes) ? gruposRes : [];
+        // Si quedan destinos sin grupo, Itinerarios > Destinos y Categorías abre en "Sin
+        // asignar" para que lo primero que se vea sea lo que falta clasificar.
+        if (destinosRes.some(d => d.grupo_id == null)) CLASIF_CTX.itin.grupoActivo = GRUPO_SIN_ASIGNAR;
         toursData = toursRes;
         hotelsData = hotelesRes;
-        paquetesData = paquetesRes;
         destinosData = destinosRes;
         categoriasData = categoriasRes;
         categoriasHotelesData = categoriasHotelesRes;
@@ -73,31 +104,23 @@ async function cargarDatosIniciales() {
         renderDestinos();
         renderTourNewDestinoCategoria();
         renderHotelNewDestinoCategoria();
-        renderPaquetesList();
     } catch (error) {
         console.error('Error al cargar datos:', error);
         notifyError('Error al conectar con el servidor. Revisa tu conexión.');
     }
 }
 
-// Cambia de subpestaña dentro de Gestión de Datos (Destinos y Categorías / Paquetes /
-// Tours / Hoteles / Itinerarios) — misma lógica que el click en un .subnav-tab, reutilizada
-// por los avisos de "falta X" y por los enlaces cruzados Destino/Categoría de las tablas.
-// "Itinerarios" (#gestion-itinerarios) trae anidado su PROPIO grupo de sub-pestañas
-// (#itinerario-gestion-subtabs, manejado enteramente por itinerario.js, con las mismas
-// clases .subnav-tab) — se excluye explícitamente para no pisarlo: sin esto, cualquier
-// clic acá le quitaría el "active" a sus botones internos, y un clic allá ocultaría estos
-// paneles de más (ver el mismo cuidado del lado de itinerario.js, con .itin-panel).
+// Cambia de subpestaña dentro de Gestión USD / PEN (Destinos y Categorías / Tours /
+// Hoteles / Cotizaciones Guardadas) — misma lógica que el click en un .subnav-tab,
+// reutilizada por los avisos de "falta X". Itinerarios y Paquetes predefinidos ya no son
+// subpestañas: son vistas propias (pestañas superiores, ?vista=...), fuera de
+// #gestion-section.
 function irASubtabGestion(subtab) {
     const contenedor = document.getElementById('gestion-section');
-    const wrapperItin = document.getElementById('gestion-itinerarios');
-    const esInternoItin = (el) => el !== wrapperItin && wrapperItin.contains(el);
-    contenedor.querySelectorAll('.subnav-tab').forEach(t => {
-        if (!esInternoItin(t)) t.classList.toggle('active', t.dataset.subtab === subtab);
+    contenedor.querySelectorAll(':scope > div > .subnav-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.subtab === subtab);
     });
-    contenedor.querySelectorAll('.subtab-content').forEach(c => {
-        if (!esInternoItin(c)) c.classList.add('hidden');
-    });
+    contenedor.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
     if (subtab === 'clasificacion') actualizarConteosItinerarios();
     if (subtab === 'cotizaciones') cargarCotizacionesGuardadas();
@@ -136,8 +159,7 @@ function renderGestionResumen() {
         pl(destinosData.length, 'destino', 'destinos'),
         pl(nCategorias, 'categoría', 'categorías'),
         pl(toursData.length, 'tour', 'tours'),
-        pl(hotelsData.length, 'hotel', 'hoteles'),
-        pl(paquetesData.length, 'paquete', 'paquetes')
+        pl(hotelsData.length, 'hotel', 'hoteles')
     ].join(' · ');
 }
 
@@ -376,27 +398,84 @@ async function refrescarTours() {
 }
 
 // ===== RENDER TABLAS (gestión) — CRUD de destinos y categorías =====
-// Categoría vive anidada bajo un Destino: elegir un destino en la tabla superior
-// carga (y permite gestionar) sus categorías en la tabla inferior.
+// Categoría vive anidada bajo un Destino: elegir un destino en la lista de la izquierda
+// carga (y permite gestionar) sus categorías a la derecha. Se dibujan los dos contextos
+// (ver CLASIF_CTX): el de Gestión USD/PEN y el de Itinerarios.
 function renderDestinos() {
-    if (destinoSeleccionadoId && !destinosData.some(d => d.id === destinoSeleccionadoId)) {
-        destinoSeleccionadoId = null;
+    Object.values(CLASIF_CTX).forEach(renderDestinosCtx);
+    renderGruposTabs();
+    renderGestionResumen();
+}
+
+function renderDestinosCtx(ctx) {
+    const listEl = document.getElementById(ctx.ids.destinos);
+    if (!listEl) return;
+    const visibles = destinosData.filter(ctx.filtro).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    if (ctx.destinoSeleccionadoId && !visibles.some(d => d.id === ctx.destinoSeleccionadoId)) {
+        ctx.destinoSeleccionadoId = null;
     }
-    const visibles = [...destinosData].sort((a, b) => a.nombre.localeCompare(b.nombre));
     // Autoselecciona el primer destino para que el panel de Categorías nunca se vea vacío
     // esperando un clic que no es obvio — solo hay que "elegir un destino" si de verdad no hay ninguno.
-    if (destinoSeleccionadoId == null && visibles.length > 0) {
-        destinoSeleccionadoId = visibles[0].id;
+    if (ctx.destinoSeleccionadoId == null && visibles.length > 0) {
+        ctx.destinoSeleccionadoId = visibles[0].id;
     }
-    const listEl = document.getElementById('destinos-table-body');
     listEl.innerHTML = '';
     if (visibles.length === 0) {
-        listEl.innerHTML = '<p class="p-3 text-center text-slate-400 text-sm">Sin destinos registrados.</p>';
+        const vacio = ctx.conGrupos && ctx.grupoActivo === GRUPO_SIN_ASIGNAR
+            ? 'Todos tus destinos ya tienen grupo asignado.'
+            : 'Sin destinos registrados.';
+        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">${vacio}</p>`;
     } else {
-        visibles.forEach(d => listEl.appendChild(buildDestinoRow(d)));
+        visibles.forEach(d => listEl.appendChild(buildDestinoRow(ctx, d)));
     }
-    renderCategorias();
-    renderGestionResumen();
+    renderCategorias(ctx);
+}
+
+// Subpestañas Con pernocte / Sin pernocte / Sin asignar (Itinerarios > Destinos y
+// Categorías), con cuántos destinos tiene cada una. "Sin asignar" solo aparece mientras
+// queden destinos sin grupo (o si es la que está abierta).
+function renderGruposTabs() {
+    const cont = document.getElementById('itin-grupos-tabs');
+    if (!cont) return;
+    const ctx = CLASIF_CTX.itin;
+    const sinAsignar = destinosData.filter(d => d.grupo_id == null).length;
+    const tabs = [
+        ...gruposDestinoData.map(g => ({ valor: String(g.id), label: g.nombre, n: destinosData.filter(d => String(d.grupo_id) === String(g.id)).length, icono: g.clave === 'con_pernocte' ? 'fa-bed' : 'fa-sun' })),
+        { valor: GRUPO_SIN_ASIGNAR, label: 'Sin asignar', n: sinAsignar, icono: 'fa-circle-question' }
+    ].filter(t => t.valor !== GRUPO_SIN_ASIGNAR || t.n > 0 || ctx.grupoActivo === GRUPO_SIN_ASIGNAR);
+    cont.innerHTML = '';
+    tabs.forEach(t => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `subnav-tab${ctx.grupoActivo === t.valor ? ' active' : ''}${t.valor === GRUPO_SIN_ASIGNAR && t.n > 0 ? ' grupo-tab-pendiente' : ''}`;
+        btn.innerHTML = `<i class="fas ${t.icono} mr-1"></i>${escapeHtml(t.label)}<span class="conteo-badge">${t.n}</span>`;
+        btn.addEventListener('click', () => {
+            ctx.grupoActivo = t.valor;
+            ctx.destinoSeleccionadoId = null;
+            renderDestinos();
+        });
+        cont.appendChild(btn);
+    });
+    const nuevo = document.getElementById('itin-destino-new-wrap');
+    // En "Sin asignar" no se crean destinos: se crean directo en su grupo.
+    if (nuevo) nuevo.classList.toggle('hidden', ctx.grupoActivo === GRUPO_SIN_ASIGNAR);
+}
+
+async function asignarGrupoDestino(d, grupoId) {
+    try {
+        const res = await fetch(`${API_URL}?path=asignar-grupo-destino`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: d.id, grupo_id: grupoId || null })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        const grupo = gruposDestinoData.find(g => String(g.id) === String(grupoId));
+        notifySuccess(`"${d.nombre}" ${grupo ? `pasó a ${grupo.nombre}` : 'quedó sin asignar'}.`);
+        await refrescarDestinosCategorias();
+    } catch (e) {
+        notifyError('Error al cambiar el grupo del destino: ' + e.message);
+    }
 }
 
 const IDIOMAS_ITIN = ['es', 'en', 'pt'];
@@ -471,22 +550,38 @@ function chipConteo(icono, titulo, n, desglose) {
     return `<span class="conteo-chip${n === 0 ? ' is-cero' : ''}" title="${titulo}${desglose ? ' — ' + desglose : ''}"><i class="fas ${icono}"></i>${n}</span>`;
 }
 
-// Cuántas actividades, hoteles e itinerarios (módulos) tiene ya este destino, y cuántas
-// categorías — para ver de un vistazo dónde hay contenido y dónde falta clasificar.
-function resumenDestino(destinoId) {
-    const chips = Object.values(CATEGORIA_TIPOS).map(t => {
+// Cuántos elementos de los tipos de este contexto (actividades y hoteles, o itinerarios)
+// tiene ya este destino, y cuántas categorías — para ver de un vistazo dónde hay contenido
+// y dónde falta clasificar.
+function resumenDestino(ctx, destinoId) {
+    const tipos = ctx.tipos.map(k => CATEGORIA_TIPOS[k]);
+    const chips = tipos.map(t => {
         const c = t.items(enDestino(destinoId));
         return chipConteo(t.icono, t.label, c.total, c.desglose);
     }).join('');
-    const nCategorias = Object.values(CATEGORIA_TIPOS).reduce((n, t) => n + t.getDataset().filter(c => c.destino_id === destinoId).length, 0);
+    const nCategorias = tipos.reduce((n, t) => n + t.getDataset().filter(c => c.destino_id === destinoId).length, 0);
     return { chips, categorias: nCategorias === 0 ? 'Sin categorías' : `${nCategorias} categoría${nCategorias === 1 ? '' : 's'}` };
 }
 
-function buildDestinoRow(d) {
+// Selector de grupo (Con pernocte / Sin pernocte / Sin asignar) de un destino — solo en
+// Itinerarios > Destinos y Categorías. En "Sin asignar" es la acción principal.
+function selectorGrupoDestino(d) {
+    const sel = document.createElement('select');
+    sel.className = 'destino-grupo-select rounded-md border px-1.5 py-0.5 text-xs';
+    sel.title = 'Grupo del destino';
+    sel.appendChild(new Option(d.grupo_id == null ? 'Asignar grupo…' : 'Sin asignar', ''));
+    gruposDestinoData.forEach(g => sel.appendChild(new Option(g.nombre, String(g.id))));
+    sel.value = d.grupo_id == null ? '' : String(d.grupo_id);
+    sel.addEventListener('click', (e) => e.stopPropagation());
+    sel.addEventListener('change', () => asignarGrupoDestino(d, sel.value || null));
+    return sel;
+}
+
+function buildDestinoRow(ctx, d) {
     const div = document.createElement('div');
-    div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === destinoSeleccionadoId ? 'active' : ''}`;
+    div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === ctx.destinoSeleccionadoId ? 'active' : ''}`;
     div.title = 'Ver categorías de este destino';
-    const resumen = resumenDestino(d.id);
+    const resumen = resumenDestino(ctx, d.id);
     div.innerHTML = `
         <div class="min-w-0">
             <div class="flex items-center gap-1.5">
@@ -494,24 +589,25 @@ function buildDestinoRow(d) {
                 <span class="destino-nombre font-medium truncate">${escapeHtml(d.nombre)}</span>
             </div>
             <div class="pl-4 mt-1 flex flex-wrap gap-1">${resumen.chips}</div>
-            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias} · ${escapeHtml(d.creado_por_nombre || '—')}</div>
+            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias}</div>
         </div>
-        <div class="flex items-center gap-1 shrink-0">
+        <div class="flex items-center gap-1 shrink-0 destino-acciones">
             <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
             <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
         </div>
     `;
+    if (ctx.conGrupos) div.querySelector('.destino-acciones').prepend(selectorGrupoDestino(d));
     div.addEventListener('click', () => {
-        destinoSeleccionadoId = d.id;
-        renderDestinos();
+        ctx.destinoSeleccionadoId = d.id;
+        renderDestinosCtx(ctx);
     });
     const [editBtn, delBtn] = div.querySelectorAll('button');
-    editBtn.addEventListener('click', (e) => { e.stopPropagation(); div.replaceWith(buildDestinoEditRow(d)); });
+    editBtn.addEventListener('click', (e) => { e.stopPropagation(); div.replaceWith(buildDestinoEditRow(ctx, d)); });
     delBtn.addEventListener('click', (e) => { e.stopPropagation(); eliminarDestino(d); });
     return div;
 }
 
-function buildDestinoEditRow(d) {
+function buildDestinoEditRow(ctx, d) {
     const div = document.createElement('div');
     div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
     div.innerHTML = `
@@ -522,7 +618,7 @@ function buildDestinoEditRow(d) {
     const nombreI = div.querySelector('input');
     const [saveBtn, cancelBtn] = div.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarDestino({ id: d.id, nombre: nombreI.value.trim() }));
-    cancelBtn.addEventListener('click', () => div.replaceWith(buildDestinoRow(d)));
+    cancelBtn.addEventListener('click', () => div.replaceWith(buildDestinoRow(ctx, d)));
     return div;
 }
 
@@ -548,12 +644,14 @@ async function guardarDestino(payload) {
 async function eliminarDestino(d) {
     const nTours = toursData.filter(t => t.destino_id === d.id).length;
     const nHoteles = hotelsData.filter(h => h.destino_id === d.id).length;
+    const nItin = contarModulosItin(enDestino(d.id)).total;
     let mensaje = `¿Eliminar el destino "${d.nombre}"?`;
-    if (nTours || nHoteles) {
+    if (nTours || nHoteles || nItin) {
         const partes = [];
         if (nTours) partes.push(`${nTours} tour${nTours === 1 ? '' : 's'}`);
         if (nHoteles) partes.push(`${nHoteles} hotel${nHoteles === 1 ? '' : 'es'}`);
-        mensaje += ` Quedarían ${partes.join(' y ')} sin destino asignado.`;
+        if (nItin) partes.push(`${nItin} itinerario${nItin === 1 ? '' : 's'}`);
+        mensaje += ` Quedarían ${partes.join(', ')} sin destino asignado.`;
     }
     mensaje += ' Esta acción no se puede deshacer.';
     if (!await confirmAction(mensaje, 'Sí, eliminar')) return;
@@ -566,7 +664,7 @@ async function eliminarDestino(d) {
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         notifySuccess('Destino eliminado.');
-        if (destinoSeleccionadoId === d.id) destinoSeleccionadoId = null;
+        Object.values(CLASIF_CTX).forEach(ctx => { if (ctx.destinoSeleccionadoId === d.id) ctx.destinoSeleccionadoId = null; });
         await refrescarDestinosCategorias();
     } catch (e) {
         notifyError('Error al eliminar el destino: ' + e.message);
@@ -574,19 +672,20 @@ async function eliminarDestino(d) {
 }
 
 // Categorías de Actividades, Hoteles e Itinerarios son catálogos separados (evita mezclar
-// "City Tour" con "Hotel Boutique"), pero comparten Destino y la misma UI de gestión — un
-// interruptor cambia cuál de los tres catálogos se está viendo/editando para el destino
-// seleccionado (ver CATEGORIA_TIPOS más arriba).
-function renderCategorias() {
-    const listEl = document.getElementById('categorias-table-body');
-    const sinDestino = document.getElementById('categorias-sin-destino');
-    const tableWrap = document.getElementById('categorias-table-wrap');
-    const destino = destinosData.find(d => d.id === destinoSeleccionadoId);
-    document.getElementById('categorias-destino-actual').textContent = destino ? `· ${destino.nombre}` : '';
+// "City Tour" con "Hotel Boutique"), pero comparten Destino y la misma UI de gestión. En
+// Gestión USD/PEN un interruptor cambia entre Actividades y Hoteles; en Itinerarios solo
+// están las de Itinerarios (ver CLASIF_CTX y CATEGORIA_TIPOS más arriba).
+function renderCategorias(ctx) {
+    const listEl = document.getElementById(ctx.ids.categorias);
+    const sinDestino = document.getElementById(ctx.ids.sinDestino);
+    const tableWrap = document.getElementById(ctx.ids.tableWrap);
+    if (!listEl) return;
+    const destino = destinosData.find(d => d.id === ctx.destinoSeleccionadoId);
+    document.getElementById(ctx.ids.actual).textContent = destino ? `· ${destino.nombre}` : '';
     // Cada pestaña muestra cuántos elementos de ese tipo tiene el destino elegido.
-    document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
+    if (ctx.tipoTabsSelector) document.querySelectorAll(ctx.tipoTabsSelector).forEach(btn => {
         const t = CATEGORIA_TIPOS[btn.dataset.categoriaTipo];
-        btn.classList.toggle('active', btn.dataset.categoriaTipo === categoriaTipoActivo);
+        btn.classList.toggle('active', btn.dataset.categoriaTipo === ctx.tipoActivo);
         const badge = destino ? `<span class="conteo-badge" title="${t.items(enDestino(destino.id)).desglose || ''}">${t.items(enDestino(destino.id)).total}</span>` : '';
         btn.innerHTML = `${t.label}${badge}`;
     });
@@ -599,14 +698,14 @@ function renderCategorias() {
     sinDestino.classList.add('hidden');
     tableWrap.classList.remove('hidden');
     listEl.innerHTML = '';
-    const tipo = categoriaTipoActivo;
+    const tipo = ctx.tipoActivo;
     const visibles = CATEGORIA_TIPOS[tipo].getDataset()
-        .filter(c => c.destino_id === destinoSeleccionadoId)
+        .filter(c => c.destino_id === ctx.destinoSeleccionadoId)
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
     if (visibles.length === 0) {
         listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${destino.nombre}" todavía.</p>`;
     } else {
-        visibles.forEach(c => listEl.appendChild(buildCategoriaRow(tipo, c)));
+        visibles.forEach(c => listEl.appendChild(buildCategoriaRow(ctx, tipo, c)));
     }
 }
 
@@ -721,7 +820,7 @@ function construirPanelAsignaciones(tipo, c) {
     return panel;
 }
 
-function buildCategoriaRow(tipo, c) {
+function buildCategoriaRow(ctx, tipo, c) {
     const t = CATEGORIA_TIPOS[tipo];
     const clave = `${tipo}:${c.id}`;
     const abierta = categoriasExpandidas.has(clave);
@@ -743,16 +842,16 @@ function buildCategoriaRow(tipo, c) {
     `;
     div.querySelector('.categoria-ver-btn').addEventListener('click', () => {
         if (categoriasExpandidas.has(clave)) categoriasExpandidas.delete(clave); else categoriasExpandidas.add(clave);
-        renderCategorias();
+        renderCategorias(ctx);
     });
-    div.querySelector('.categoria-editar-btn').addEventListener('click', () => wrapper.replaceWith(buildCategoriaEditRow(tipo, c)));
+    div.querySelector('.categoria-editar-btn').addEventListener('click', () => wrapper.replaceWith(buildCategoriaEditRow(ctx, tipo, c)));
     div.querySelector('.categoria-eliminar-btn').addEventListener('click', () => eliminarCategoria(tipo, c));
     wrapper.appendChild(div);
     if (abierta) wrapper.appendChild(construirPanelAsignaciones(tipo, c));
     return wrapper;
 }
 
-function buildCategoriaEditRow(tipo, c) {
+function buildCategoriaEditRow(ctx, tipo, c) {
     const div = document.createElement('div');
     div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
     div.innerHTML = `
@@ -763,7 +862,7 @@ function buildCategoriaEditRow(tipo, c) {
     const nombreI = div.querySelector('input');
     const [saveBtn, cancelBtn] = div.querySelectorAll('button');
     saveBtn.addEventListener('click', () => guardarCategoria(tipo, { id: c.id, destino_id: c.destino_id, nombre: nombreI.value.trim() }));
-    cancelBtn.addEventListener('click', () => div.replaceWith(buildCategoriaRow(tipo, c)));
+    cancelBtn.addEventListener('click', () => div.replaceWith(buildCategoriaRow(ctx, tipo, c)));
     return div;
 }
 
@@ -958,20 +1057,39 @@ function renderHotelNewDestinoCategoria() {
     container.appendChild(buildDestinoCategoriaSelector(categoriasHotelesData, null, null));
 }
 
-// ===== PAQUETES DE TOURS (combos reutilizables para Data Tours) =====
+// ===== PAQUETES PREDEFINIDOS (vista propia, ?vista=paquetes) =====
+// Los paquetes son por moneda (usan los tours/hoteles de ese catálogo), así que esta vista
+// lista USD y PEN juntos: cada moneda trae sus paquetes y su catálogo de tours/hoteles
+// (para avisar de elementos que ya no existen) desde la API de SU carpeta (../usd/api.php,
+// ../pen/api.php). Acá solo se ven / eliminan; se crean y editan en el Cotizador.
+const MONEDAS_PAQUETES = ['usd', 'pen'];
+const paquetesPorMoneda = {
+    usd: { paquetes: [], tours: [], hoteles: [] },
+    pen: { paquetes: [], tours: [], hoteles: [] }
+};
+const apiDeMoneda = (moneda) => `../${moneda}/api.php`;
+
 async function cargarPaquetes() {
-    try {
-        paquetesData = await fetch(`${API_URL}?path=paquetes-tours`).then(r => r.json());
-        renderPaquetesList();
-    } catch (e) {
-        console.error('Error al cargar paquetes:', e);
-    }
+    await Promise.all(MONEDAS_PAQUETES.map(async (moneda) => {
+        try {
+            const api = apiDeMoneda(moneda);
+            const [paquetes, tours, hoteles] = await Promise.all([
+                fetch(`${api}?path=paquetes-tours`).then(r => r.json()),
+                fetch(`${api}?path=tours`).then(r => r.json()),
+                fetch(`${api}?path=hoteles`).then(r => r.json())
+            ]);
+            paquetesPorMoneda[moneda] = { paquetes, tours, hoteles };
+        } catch (e) {
+            console.error(`Error al cargar paquetes ${moneda}:`, e);
+        }
+        renderPaquetesList(moneda);
+    }));
 }
 
-async function eliminarPaquete(paquete) {
-    if (!await confirmAction(`¿Eliminar el paquete "${paquete.nombre}"? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
+async function eliminarPaquete(paquete, moneda) {
+    if (!await confirmAction(`¿Eliminar el paquete "${paquete.nombre}" (${moneda.toUpperCase()})? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
     try {
-        const res = await fetch(`${API_URL}?path=eliminar-paquete-tour`, {
+        const res = await fetch(`${apiDeMoneda(moneda)}?path=eliminar-paquete-tour`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: paquete.id })
@@ -990,95 +1108,98 @@ const NOMBRES_IDIOMA = { es: 'Español', en: 'English', pt: 'Português' };
 // Detalle desplegable de un paquete ("Ver"): qué trae exactamente en cada parte. El
 // itinerario necesita el catálogo de módulos de SU idioma para mostrar títulos en vez de
 // nombres de archivo, así que se arma bajo demanda al abrirlo.
-async function construirDetallePaquete(p) {
+async function construirDetallePaquete(p, moneda) {
+    const { tours: toursMoneda, hoteles: hotelesMoneda } = paquetesPorMoneda[moneda];
     const seccion = (icono, titulo, itemsHtml) => `
         <div>
             <div class="text-xs font-semibold text-slate-600 mb-1"><i class="fas ${icono} mr-1"></i>${titulo}</div>
             <ul class="text-sm text-slate-700 space-y-0.5">${itemsHtml}</ul>
         </div>`;
     const partes = [];
-    if (p.tours.length) {
-        partes.push(seccion('fa-person-hiking', `Actividades (${p.tours.length})`, p.tours.map((t, i) => {
-            const existe = toursData.some(td => td.tour === t.tour);
-            return `<li><span class="text-slate-400 mr-1">${i + 1}.</span>${escapeHtml(t.tour)} <span class="text-slate-400">x${t.cant}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
-        }).join('')));
-    }
-    if (p.hoteles.length) {
-        partes.push(seccion('fa-hotel', `Hoteles (${p.hoteles.length})`, p.hoteles.map(h => {
-            const existe = hotelsData.some(hd => hd.aloj === h.aloj);
-            return `<li>${escapeHtml(h.aloj)} <span class="text-slate-400">· ${h.nhab} hab. · ${h.noches} noche${h.noches === 1 ? '' : 's'}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
-        }).join('')));
-    }
     if (p.itinerario?.modulos?.length) {
         const { idioma, modulos } = p.itinerario;
         await asegurarIdiomaCargado(idioma);
         const vigentes = new Set((idiomaCache[idioma]?.modules || []).map(m => m.filename));
         partes.push(seccion('fa-route', `Itinerario · ${NOMBRES_IDIOMA[idioma] || idioma} (${modulos.length} día${modulos.length === 1 ? '' : 's'})`, modulos.map((fn, i) => `<li><span class="text-slate-400 mr-1">Día ${i + 1}:</span>${escapeHtml(tituloModuloDeIdioma(idioma, fn))}${vigentes.has(fn) ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`).join('')));
     }
+    if (p.tours.length) {
+        partes.push(seccion('fa-person-hiking', `Actividades (${p.tours.length})`, p.tours.map((t, i) => {
+            const existe = toursMoneda.some(td => td.tour === t.tour);
+            return `<li><span class="text-slate-400 mr-1">${i + 1}.</span>${escapeHtml(t.tour)} <span class="text-slate-400">x${t.cant}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+        }).join('')));
+    }
+    if (p.hoteles.length) {
+        partes.push(seccion('fa-hotel', `Hoteles (${p.hoteles.length})`, p.hoteles.map(h => {
+            const existe = hotelesMoneda.some(hd => hd.aloj === h.aloj);
+            return `<li>${escapeHtml(h.aloj)} <span class="text-slate-400">· ${h.nhab} hab. · ${h.noches} noche${h.noches === 1 ? '' : 's'}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+        }).join('')));
+    }
     return partes.join('') || '<p class="text-slate-400 text-sm">Paquete vacío.</p>';
 }
 
-function renderPaquetesList() {
-    const container = document.getElementById('paquetes-list');
+function renderPaquetesList(moneda) {
+    const { paquetes, tours: toursMoneda, hoteles: hotelesMoneda } = paquetesPorMoneda[moneda];
+    const container = document.getElementById(`paquetes-list-${moneda}`);
+    if (!container) return;
+    document.getElementById(`paquetes-count-${moneda}`).textContent = `${paquetes.length} paquete${paquetes.length === 1 ? '' : 's'}`;
     container.innerHTML = '';
-    if (paquetesData.length === 0) {
-        container.innerHTML = '<p class="text-slate-400 text-sm">Sin paquetes guardados.</p>';
-    } else {
-        paquetesData.forEach(p => {
-            const chip = (icono, texto) => `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"><i class="fas ${icono} mr-1"></i>${texto}</span>`;
-            const chips = [];
-            if (p.tours.length) chips.push(chip('fa-person-hiking', `${p.tours.length} actividad${p.tours.length === 1 ? '' : 'es'}`));
-            if (p.hoteles.length) chips.push(chip('fa-hotel', `${p.hoteles.length} hotel${p.hoteles.length === 1 ? '' : 'es'}`));
-            if (p.itinerario?.modulos?.length) chips.push(chip('fa-route', `Itinerario ${NOMBRES_IDIOMA[p.itinerario.idioma] || ''} · ${p.itinerario.modulos.length} día${p.itinerario.modulos.length === 1 ? '' : 's'}`));
-            // Un paquete puede quedar referenciando tours/hoteles que ya se borraron del
-            // catálogo (o se les cambió el nombre) — avisarlo acá evita aplicar filas rotas.
-            const faltantes = [
-                ...p.tours.filter(t => !toursData.some(td => td.tour === t.tour)).map(t => t.tour),
-                ...p.hoteles.filter(h => !hotelsData.some(hd => hd.aloj === h.aloj)).map(h => h.aloj)
-            ];
-            const avisoHtml = faltantes.length
-                ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} elemento${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${escapeHtml(faltantes.join(', '))}</div>`
-                : '';
-            const div = document.createElement('div');
-            div.className = 'p-3 border rounded-lg';
-            div.innerHTML = `
-                <div class="flex items-center justify-between gap-3 flex-wrap">
-                    <div class="min-w-0">
-                        <div class="font-medium">${escapeHtml(p.nombre)}</div>
-                        <div class="flex flex-wrap gap-1 mt-1">${chips.join('')}</div>
-                        ${avisoHtml}
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button class="btn border small paquete-ver-btn" title="Ver el contenido del paquete"><i class="fas fa-eye mr-1"></i>Ver</button>
-                        <button class="text-slate-500 hover:text-slate-700 paquete-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
-                        <button class="text-red-500 hover:text-red-700 paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-                <div class="paquete-detalle hidden mt-3 pt-3 border-t grid grid-cols-1 md:grid-cols-3 gap-4"></div>
-            `;
-            const detalle = div.querySelector('.paquete-detalle');
-            const verBtn = div.querySelector('.paquete-ver-btn');
-            verBtn.addEventListener('click', async () => {
-                const abrir = detalle.classList.contains('hidden');
-                if (abrir && !detalle.dataset.cargado) {
-                    detalle.innerHTML = '<p class="text-slate-400 text-sm">Cargando...</p>';
-                    detalle.classList.remove('hidden');
-                    detalle.innerHTML = await construirDetallePaquete(p);
-                    detalle.dataset.cargado = '1';
-                }
-                detalle.classList.toggle('hidden', !abrir);
-                verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash mr-1"></i>Ocultar' : '<i class="fas fa-eye mr-1"></i>Ver';
-            });
-            // Editar ahora se hace en el Cotizador (reusa su drag-and-drop de Actividades/
-            // Hoteles/Itinerario) — ver cargarPaqueteParaEditar en shared/cotizador.js.
-            div.querySelector('.paquete-editar-btn').addEventListener('click', () => {
-                window.location.href = `../${MONEDA_CODIGO}/index.php?editarPaquete=${encodeURIComponent(p.id)}`;
-            });
-            div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p));
-            container.appendChild(div);
-        });
+    if (paquetes.length === 0) {
+        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-4">Aún no hay paquetes en ${moneda.toUpperCase()}. Arma uno en el Cotizador ${moneda.toUpperCase()} y usa «Guardar como paquete».</p>`;
+        return;
     }
-    renderGestionResumen();
+    paquetes.forEach(p => {
+        const chip = (icono, texto) => `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"><i class="fas ${icono} mr-1"></i>${texto}</span>`;
+        const chips = [];
+        if (p.itinerario?.modulos?.length) chips.push(chip('fa-route', `Itinerario ${NOMBRES_IDIOMA[p.itinerario.idioma] || ''} · ${p.itinerario.modulos.length} día${p.itinerario.modulos.length === 1 ? '' : 's'}`));
+        if (p.tours.length) chips.push(chip('fa-person-hiking', `${p.tours.length} actividad${p.tours.length === 1 ? '' : 'es'}`));
+        if (p.hoteles.length) chips.push(chip('fa-hotel', `${p.hoteles.length} hotel${p.hoteles.length === 1 ? '' : 'es'}`));
+        // Un paquete puede quedar referenciando tours/hoteles que ya se borraron del
+        // catálogo (o se les cambió el nombre) — avisarlo acá evita aplicar filas rotas.
+        const faltantes = [
+            ...p.tours.filter(t => !toursMoneda.some(td => td.tour === t.tour)).map(t => t.tour),
+            ...p.hoteles.filter(h => !hotelesMoneda.some(hd => hd.aloj === h.aloj)).map(h => h.aloj)
+        ];
+        const avisoHtml = faltantes.length
+            ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} elemento${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${escapeHtml(faltantes.join(', '))}</div>`
+            : '';
+        const div = document.createElement('div');
+        div.className = 'p-3 border rounded-lg';
+        div.innerHTML = `
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <div class="min-w-0">
+                    <div class="font-medium">${escapeHtml(p.nombre)}</div>
+                    <div class="flex flex-wrap gap-1 mt-1">${chips.join('')}</div>
+                    ${avisoHtml}
+                </div>
+                <div class="cat-actions-inner shrink-0">
+                    <button type="button" class="cat-icon-btn is-view paquete-ver-btn" title="Ver el contenido del paquete"><i class="fas fa-eye"></i></button>
+                    <button type="button" class="cat-icon-btn paquete-editar-btn" title="Editar en el Cotizador ${moneda.toUpperCase()}"><i class="fas fa-pen"></i></button>
+                    <button type="button" class="cat-icon-btn is-danger paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div class="paquete-detalle hidden mt-3 pt-3 border-t grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+        `;
+        const detalle = div.querySelector('.paquete-detalle');
+        const verBtn = div.querySelector('.paquete-ver-btn');
+        verBtn.addEventListener('click', async () => {
+            const abrir = detalle.classList.contains('hidden');
+            if (abrir && !detalle.dataset.cargado) {
+                detalle.innerHTML = '<p class="text-slate-400 text-sm">Cargando...</p>';
+                detalle.classList.remove('hidden');
+                detalle.innerHTML = await construirDetallePaquete(p, moneda);
+                detalle.dataset.cargado = '1';
+            }
+            detalle.classList.toggle('hidden', !abrir);
+            verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+        // Editar se hace en el Cotizador de SU moneda (reusa su drag-and-drop) — ver
+        // cargarPaqueteParaEditar en shared/cotizador.js.
+        div.querySelector('.paquete-editar-btn').addEventListener('click', () => {
+            window.location.href = `../${moneda}/index.php?editarPaquete=${encodeURIComponent(p.id)}`;
+        });
+        div.querySelector('.paquete-eliminar-btn').addEventListener('click', () => eliminarPaquete(p, moneda));
+        container.appendChild(div);
+    });
 }
 // ===== Exportar catálogo (CSV) =====
 // Genera un CSV con TU catálogo actual de tours/hoteles, mismo formato que acepta la
@@ -1372,13 +1493,31 @@ async function eliminarCotizacionGuardada(id, nombre) {
     }
 }
 
+// Vista Itinerarios: la fila de arriba tiene "Destinos y Categorías" (#itin-clasificacion) y
+// los 3 idiomas (.idioma-tab, que además cambian el idioma activo en itinerario.js) — cada
+// idioma muestra su catálogo de itinerarios y páginas fijas (#gestion-itinerarios).
+function initPestanasItinerarios() {
+    const fila = document.getElementById('itinerario-idioma-tabs');
+    if (!fila) return;
+    const clasificacion = document.getElementById('itin-clasificacion');
+    const catalogo = document.getElementById('gestion-itinerarios');
+    fila.querySelectorAll('.subnav-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            fila.querySelectorAll('.subnav-tab').forEach(b => b.classList.toggle('active', b === btn));
+            const esClasificacion = btn.dataset.itinVista === 'clasificacion';
+            clasificacion.classList.toggle('hidden', !esClasificacion);
+            catalogo.classList.toggle('hidden', esClasificacion);
+            if (esClasificacion) actualizarConteosItinerarios();
+        });
+    });
+}
+
 async function init() {
     await cargarDatosIniciales();
-    // El armador de itinerario embebido en "Itinerarios" (subir/editar módulos, páginas
-    // fijas, historial de generados) no tiene un idioma propio elegido por el usuario acá
-    // (no hay Datos Pax en esta página) — arranca en 'es' fijo, igual que la página
-    // standalone de Itinerario.
-    await initItinerario('es');
+    // Vista "Itinerarios": arranca en inglés (mismo idioma por defecto que el Cotizador);
+    // las pestañas .idioma-tab de esa vista cambian de idioma (las maneja itinerario.js).
+    await initItinerario('en');
+    if (window.APP_CONFIG.vista === 'paquetes') cargarPaquetes();
     actualizarConteosItinerarios();
 
     document.querySelectorAll('#gestion-section > div > .subnav-tab').forEach(tab => {
@@ -1465,16 +1604,34 @@ async function init() {
         if (ok) document.getElementById('destino-new-nombre').value = '';
     });
     document.getElementById('categoria-new-add').addEventListener('click', async () => {
-        if (!destinoSeleccionadoId) { notifyError('Selecciona un destino primero.'); return; }
-        const ok = await guardarCategoria(categoriaTipoActivo, { destino_id: destinoSeleccionadoId, nombre: document.getElementById('categoria-new-nombre').value.trim() });
+        const ctx = CLASIF_CTX.moneda;
+        if (!ctx.destinoSeleccionadoId) { notifyError('Selecciona un destino primero.'); return; }
+        const ok = await guardarCategoria(ctx.tipoActivo, { destino_id: ctx.destinoSeleccionadoId, nombre: document.getElementById('categoria-new-nombre').value.trim() });
         if (ok) document.getElementById('categoria-new-nombre').value = '';
     });
     document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-            categoriaTipoActivo = btn.dataset.categoriaTipo;
-            renderCategorias();
+            CLASIF_CTX.moneda.tipoActivo = btn.dataset.categoriaTipo;
+            renderCategorias(CLASIF_CTX.moneda);
         });
     });
+    // Itinerarios > Destinos y Categorías: el destino nuevo nace en el grupo abierto (Con /
+    // Sin pernocte); las categorías son las de Itinerarios.
+    document.getElementById('itin-destino-new-add').addEventListener('click', async () => {
+        const grupo = CLASIF_CTX.itin.grupoActivo;
+        const ok = await guardarDestino({
+            nombre: document.getElementById('itin-destino-new-nombre').value.trim(),
+            grupo_id: grupo === GRUPO_SIN_ASIGNAR ? null : Number(grupo)
+        });
+        if (ok) document.getElementById('itin-destino-new-nombre').value = '';
+    });
+    document.getElementById('itin-categoria-new-add').addEventListener('click', async () => {
+        const ctx = CLASIF_CTX.itin;
+        if (!ctx.destinoSeleccionadoId) { notifyError('Selecciona un destino primero.'); return; }
+        const ok = await guardarCategoria('itinerarios', { destino_id: ctx.destinoSeleccionadoId, nombre: document.getElementById('itin-categoria-new-nombre').value.trim() });
+        if (ok) document.getElementById('itin-categoria-new-nombre').value = '';
+    });
+    initPestanasItinerarios();
     document.getElementById('hotel-new-add').addEventListener('click', async () => {
         const destinoCategoriaContainer = document.getElementById('hotel-new-destino-categoria');
         const destinoSel = destinoCategoriaContainer.querySelector('.sel-destino-tour');

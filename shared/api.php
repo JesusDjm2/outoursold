@@ -40,6 +40,21 @@ function normalizarNumeroCsv($valor) {
     return $valor;
 }
 
+// grupo_id de destino tal como llega del cliente: null/'' = "Sin asignar"; si viene un id,
+// debe existir en grupos_destino. Devuelve el id (int) o null; false si es inválido (ya
+// respondió el error HTTP y el caller debe hacer `break`).
+function grupoDestinoValido($db, $grupoId) {
+    if ($grupoId === null || $grupoId === '') return null;
+    $stmt = $db->prepare("SELECT id FROM grupos_destino WHERE id = ?");
+    $stmt->execute([(int) $grupoId]);
+    if (!$stmt->fetch()) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Grupo de destino no válido.']);
+        return false;
+    }
+    return (int) $grupoId;
+}
+
 try {
     switch ($path) {
         case 'tours':
@@ -83,7 +98,7 @@ try {
             // Acotado a TU propio catálogo (admin incluido) — ver el de todas las agencias
             // mezclado es cosa de Comparativo/Catálogo por agencia, no de este selector.
             $stmt = $db->prepare(
-                "SELECT d.id, d.nombre, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
+                "SELECT d.id, d.nombre, d.grupo_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM destinos d
                  LEFT JOIN usuarios u ON u.id = d.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
@@ -113,10 +128,40 @@ try {
                 $stmt->execute([$nombreDestino, $data['id']]);
                 echo json_encode(['success' => true, 'id' => $data['id']]);
             } else {
-                $stmt = $db->prepare("INSERT INTO destinos (nombre, creado_por) VALUES (?, ?)");
-                $stmt->execute([$nombreDestino, $_SESSION['user_id']]);
+                // Un destino nuevo puede nacer ya dentro de un grupo (Con / Sin pernocte), si se
+                // crea desde esa subpestaña de Itinerarios > Destinos y Categorías.
+                $grupoId = grupoDestinoValido($db, $data['grupo_id'] ?? null);
+                if ($grupoId === false) break;
+                $stmt = $db->prepare("INSERT INTO destinos (nombre, grupo_id, creado_por) VALUES (?, ?, ?)");
+                $stmt->execute([$nombreDestino, $grupoId, $_SESSION['user_id']]);
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
             }
+            break;
+
+        // Catálogo fijo de grupos de destino (migración 032): Con pernocte / Sin pernocte.
+        case 'grupos-destino':
+            echo json_encode($db->query("SELECT id, clave, nombre FROM grupos_destino ORDER BY orden")->fetchAll());
+            break;
+
+        // Mueve un destino propio a un grupo, o lo deja "Sin asignar" (grupo_id null).
+        case 'asignar-grupo-destino':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (empty($data['id'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID requerido']);
+                break;
+            }
+            if (!verificarDueno($db, 'destinos', $data['id'])) break;
+            $grupoId = grupoDestinoValido($db, $data['grupo_id'] ?? null);
+            if ($grupoId === false) break;
+            $stmt = $db->prepare("UPDATE destinos SET grupo_id = ? WHERE id = ?");
+            $stmt->execute([$grupoId, $data['id']]);
+            echo json_encode(['success' => true]);
             break;
 
         case 'eliminar-destino':

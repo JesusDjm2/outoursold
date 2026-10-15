@@ -1,9 +1,10 @@
 <?php
 // shared/gestion-datos.php
-// Gestión de Datos (Destinos y Categorías, Paquetes, Tours, Hoteles, Itinerarios), antes
-// una pestaña embebida en Cotizador — ahora su propia vista, con botón propio en el menú
-// lateral. El caller (pen/gestion.php o usd/gestion.php) debe definir antes de incluir
-// este archivo: $pageTitle, $currencySymbol, $navActive.
+// Gestión de Datos. Pestañas superiores: Gestión USD / PEN (Destinos y Categorías, Tours,
+// Hoteles, Cotizaciones Guardadas de esa moneda), Itinerarios (por idioma) y Paquetes
+// predefinidos (USD y PEN juntos) — estas dos últimas vía ?vista=. El caller
+// (pen/gestion.php o usd/gestion.php) debe definir antes de incluir este archivo:
+// $pageTitle, $currencySymbol, $navActive.
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/agencia-helpers.php';
 $navRoot = '../';
@@ -13,6 +14,10 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 $heroPosY = resolverHeroPosY($db);
 $accentColorStyle = resolverAccentColorStyle($db);
 $logoUrl = resolverLogoUrl($db, $navShared);
+// Pestañas superiores: "moneda" (Gestión USD / PEN, con sus subpestañas) o las vistas que
+// no dependen de la moneda de la página: Itinerarios (por idioma) y Paquetes predefinidos
+// (USD y PEN juntos).
+$vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_GET['vista'] : 'moneda';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -59,30 +64,26 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             <div class="filter-tabs-bar">
                 <div class="max-w-7xl mx-auto px-4 md:px-6">
                     <div class="filter-tabs">
-                        <a href="../usd/gestion.php" class="filter-tab <?= $navActive === 'gestion-usd' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión USD</a>
-                        <a href="../pen/gestion.php" class="filter-tab <?= $navActive === 'gestion-pen' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión PEN</a>
+                        <a href="../usd/gestion.php" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-usd' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión USD</a>
+                        <a href="../pen/gestion.php" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-pen' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión PEN</a>
+                        <a href="gestion.php?vista=itinerarios" class="filter-tab <?= $vista === 'itinerarios' ? 'active' : '' ?>"><i class="fas fa-route"></i>Itinerarios</a>
+                        <a href="gestion.php?vista=paquetes" class="filter-tab <?= $vista === 'paquetes' ? 'active' : '' ?>"><i class="fas fa-box-archive"></i>Paquetes predefinidos</a>
                     </div>
                 </div>
             </div>
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-        <div id="gestion-section">
+        <div id="gestion-section" class="<?= $vista === 'moneda' ? '' : 'hidden' ?>">
             <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit">
                 <button class="subnav-tab active" data-subtab="clasificacion">
                     <i class="fas fa-tags mr-1"></i> Destinos y Categorías
-                </button>
-                <button class="subnav-tab" data-subtab="paquetes">
-                    <i class="fas fa-box-open mr-1"></i> Paquetes
                 </button>
                 <button class="subnav-tab" data-subtab="tours">
                     <i class="fas fa-map-marked-alt mr-1"></i> Tours
                 </button>
                 <button class="subnav-tab" data-subtab="hoteles">
                     <i class="fas fa-hotel mr-1"></i> Hoteles
-                </button>
-                <button class="subnav-tab" data-subtab="itinerarios">
-                    <i class="fas fa-route mr-1"></i> Itinerarios
                 </button>
                 <button class="subnav-tab" data-subtab="cotizaciones">
                     <i class="fas fa-folder-open mr-1"></i> Cotizaciones Guardadas
@@ -274,14 +275,133 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </button>
             </div>
 
-            <!-- Gestión de Itinerario embebida (itinerario/itinerario.js): catálogo de
-                 itinerarios (antes "Módulos") + Páginas Fijas.
-                 Mismos ids que la página standalone de Itinerario (itinerario/index.php),
-                 salvo: sin la pestaña "Itinerarios Predeterminados" (cubierta por Paquetes,
-                 arriba) y con clase itin-panel en vez de subtab-content en sus paneles
-                 internos — evita que el switch de pestañas de ACÁ (irASubtabGestion, en
-                 cotizador.js) las tape/oculte por accidente al compartir selector. -->
-            <div id="gestion-itinerarios" class="subtab-content hidden">
+            <div id="gestion-clasificacion" class="subtab-content">
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
+                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántas actividades y hoteles tiene; elige uno a la izquierda para ver y gestionar sus categorías. Las categorías de itinerarios y los grupos Con / Sin pernocte se gestionan en la pestaña <a href="gestion.php?vista=itinerarios" class="underline">Itinerarios</a>.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <div class="md:col-span-4 border rounded-lg p-3">
+                            <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
+                            <div class="flex gap-2 mb-3">
+                                <input id="destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
+                                <button id="destino-new-add" class="btn btn-primary px-3" title="Agregar destino"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <div id="destinos-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
+                        </div>
+                        <div class="md:col-span-8 border rounded-lg p-3">
+                            <div class="flex items-center gap-3 mb-3 flex-wrap">
+                                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
+                                <div class="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 sm:ml-auto">
+                                    <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Actividades</button>
+                                    <button class="categoria-tipo-tab" data-categoria-tipo="hoteles">Hoteles</button>
+                                </div>
+                            </div>
+                            <p id="categorias-sin-destino" class="text-sm text-slate-500 hidden">Crea un destino para empezar a agregar categorías.</p>
+                            <div id="categorias-table-wrap">
+                                <div class="flex gap-2 mb-3">
+                                    <input id="categoria-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nueva categoría">
+                                    <button id="categoria-new-add" class="btn btn-primary px-3" title="Agregar categoría"><i class="fas fa-plus"></i></button>
+                                </div>
+                                <div id="categorias-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cotizaciones Guardadas: antes pestaña del Cotizador, ahora acá — mismos ids
+                 que usaba (cot-search, cot-nueva, cot-table-body, cot-page-info, cot-prev,
+                 cot-next), ver shared/gestion-datos.js. -->
+            <div id="gestion-cotizaciones" class="subtab-content hidden">
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <div class="relative">
+                                <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
+                                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            </div>
+                            <button id="cot-nueva" class="btn btn-primary">
+                                <i class="fas fa-plus-circle mr-2"></i>Nueva Cotización
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full small">
+                            <thead>
+                                <tr>
+                                    <th class="text-left p-3">ID</th>
+                                    <th class="text-left p-3">Nombre PAX</th>
+                                    <th class="text-left p-3">Contacto</th>
+                                    <th class="text-left p-3">Fecha Cot.</th>
+                                    <th class="text-left p-3">N° PAX</th>
+                                    <th class="text-left p-3">Paquete</th>
+                                    <th class="text-right p-3">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cot-table-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
+                        <span id="cot-page-info"></span>
+                        <div class="flex gap-2">
+                            <button id="cot-prev" class="btn border">Anterior</button>
+                            <button id="cot-next" class="btn border">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista "Itinerarios" (pestaña superior, ?vista=itinerarios): no depende de la moneda,
+             sí del idioma — cada idioma tiene su propio catálogo de itinerarios y páginas fijas
+             (las pestañas .idioma-tab las maneja itinerario.js). Mismos ids que la página
+             standalone de Itinerario (itinerario/index.php); sus paneles internos usan
+             itin-panel en vez de subtab-content para no chocar con las subpestañas de moneda. -->
+        <div id="vista-itinerarios" class="<?= $vista === 'itinerarios' ? '' : 'hidden' ?>">
+            <!-- Primero Destinos y Categorías; a su lado los idiomas (inglés primero), cada uno con
+                 su catálogo de itinerarios y páginas fijas (ver initPestanasItinerarios en
+                 gestion-datos.js). -->
+            <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-idioma-tabs">
+                <button type="button" class="subnav-tab active" data-itin-vista="clasificacion"><i class="fas fa-tags mr-1"></i> Destinos y Categorías</button>
+                <button type="button" class="subnav-tab idioma-tab" data-idioma="en"><i class="fas fa-language mr-1"></i> English</button>
+                <button type="button" class="subnav-tab idioma-tab" data-idioma="es"><i class="fas fa-language mr-1"></i> Español</button>
+                <button type="button" class="subnav-tab idioma-tab" data-idioma="pt"><i class="fas fa-language mr-1"></i> Português</button>
+            </div>
+
+            <!-- Destinos y Categorías de Itinerarios: los destinos (tabla compartida con
+                 Actividades y Hoteles) van agrupados en Con pernocte / Sin pernocte (grupo padre,
+                 migración 032); los que aún no tienen grupo quedan en "Sin asignar". Las
+                 categorías son las propias de Itinerarios. Ver CLASIF_CTX.itin en gestion-datos.js. -->
+            <div id="itin-clasificacion">
+                <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
+                <div class="card p-6">
+                    <p class="text-sm text-slate-500 mb-4">Cada destino pertenece a <strong>Con pernocte</strong> o <strong>Sin pernocte</strong> (cámbialo con el selector de cada destino). Elige un destino para ver y gestionar sus categorías de itinerarios. Los destinos son los mismos que usan Actividades y Hoteles.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <div class="md:col-span-5 border rounded-lg p-3">
+                            <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
+                            <div id="itin-destino-new-wrap" class="flex gap-2 mb-3">
+                                <input id="itin-destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
+                                <button id="itin-destino-new-add" class="btn btn-primary px-3" title="Agregar destino en este grupo"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <div id="itin-destinos-table-body" class="divide-y" style="max-height:480px; overflow-y:auto"></div>
+                        </div>
+                        <div class="md:col-span-7 border rounded-lg p-3">
+                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Categorías de itinerarios <span id="itin-categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
+                            <p id="itin-categorias-sin-destino" class="text-sm text-slate-500 hidden">Elige o crea un destino para empezar a agregar categorías.</p>
+                            <div id="itin-categorias-table-wrap">
+                                <div class="flex gap-2 mb-3">
+                                    <input id="itin-categoria-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nueva categoría (ej. Full Day)">
+                                    <button id="itin-categoria-new-add" class="btn btn-primary px-3" title="Agregar categoría"><i class="fas fa-plus"></i></button>
+                                </div>
+                                <div id="itin-categorias-table-body" class="divide-y" style="max-height:480px; overflow-y:auto"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gestion-itinerarios" class="hidden">
                 <div class="flex gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-gestion-subtabs">
                     <button class="subnav-tab active" data-subtab="modulos">
                         <i class="fas fa-file-pdf mr-1"></i>Itinerarios
@@ -430,96 +550,36 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Paquetes: acá solo se listan (Ver / Editar / Eliminar). Se crean y editan en el
-                 Cotizador ("Guardar como paquete" / ?editarPaquete=ID, ver shared/cotizador.js), que ya
-                 tiene el drag-and-drop de Itinerario, Actividades y Hoteles. -->
-            <div id="gestion-paquetes" class="subtab-content hidden">
-                <div class="card p-6">
-                    <div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                        <h2 class="text-base font-semibold text-slate-800 whitespace-nowrap">Paquetes Guardados</h2>
-                        <a href="../<?= $navActive === 'gestion-usd' ? 'usd' : 'pen' ?>/index.php" class="btn btn-primary small" title="Arma Itinerario, Actividades y Hoteles en el Cotizador y usa «Guardar como paquete»"><i class="fas fa-plus mr-1"></i>Crear paquete en el Cotizador</a>
+        <!-- Vista "Paquetes predefinidos" (pestaña superior, ?vista=paquetes): los paquetes son
+             por moneda (usan los tours/hoteles de ese catálogo), así que se listan USD y PEN
+             juntos. Acá solo se ven / eliminan; se crean y editan en el Cotizador de su moneda
+             ("Guardar como paquete" / ?editarPaquete=ID, ver shared/cotizador.js). -->
+        <div id="vista-paquetes" class="<?= $vista === 'paquetes' ? '' : 'hidden' ?> space-y-6">
+            <div class="card cat-card">
+                <div class="cat-header">
+                    <div>
+                        <h2 class="cat-title">Paquetes USD</h2>
+                        <p class="cat-subtitle"><span id="paquetes-count-usd">0 paquetes</span> · se aplican en el Cotizador USD</p>
                     </div>
-                    <div id="paquetes-list" class="space-y-2"></div>
+                    <div class="cat-tools">
+                        <a href="../usd/index.php" class="cat-new-btn" title="Arma Itinerario, Actividades y Hoteles en el Cotizador USD y usa «Guardar como paquete»"><i class="fas fa-plus"></i>Crear en el Cotizador USD</a>
+                    </div>
                 </div>
+                <div id="paquetes-list-usd" class="space-y-2 p-5"></div>
             </div>
-
-            <div id="gestion-clasificacion" class="subtab-content">
-                <div class="card p-6">
-                    <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
-                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántos de cada uno tiene; elige uno a la izquierda para ver y gestionar sus categorías (y cuántos elementos hay en cada una).</p>
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div class="md:col-span-4 border rounded-lg p-3">
-                            <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
-                            <div class="flex gap-2 mb-3">
-                                <input id="destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
-                                <button id="destino-new-add" class="btn btn-primary px-3" title="Agregar destino"><i class="fas fa-plus"></i></button>
-                            </div>
-                            <div id="destinos-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
-                        </div>
-                        <div class="md:col-span-8 border rounded-lg p-3">
-                            <div class="flex items-center gap-3 mb-3 flex-wrap">
-                                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
-                                <div class="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 sm:ml-auto">
-                                    <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Actividades</button>
-                                    <button class="categoria-tipo-tab" data-categoria-tipo="hoteles">Hoteles</button>
-                                    <button class="categoria-tipo-tab" data-categoria-tipo="itinerarios">Itinerarios</button>
-                                </div>
-                            </div>
-                            <p id="categorias-sin-destino" class="text-sm text-slate-500 hidden">Crea un destino para empezar a agregar categorías.</p>
-                            <div id="categorias-table-wrap">
-                                <div class="flex gap-2 mb-3">
-                                    <input id="categoria-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nueva categoría">
-                                    <button id="categoria-new-add" class="btn btn-primary px-3" title="Agregar categoría"><i class="fas fa-plus"></i></button>
-                                </div>
-                                <div id="categorias-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
-                            </div>
-                        </div>
+            <div class="card cat-card">
+                <div class="cat-header">
+                    <div>
+                        <h2 class="cat-title">Paquetes PEN</h2>
+                        <p class="cat-subtitle"><span id="paquetes-count-pen">0 paquetes</span> · se aplican en el Cotizador PEN</p>
+                    </div>
+                    <div class="cat-tools">
+                        <a href="../pen/index.php" class="cat-new-btn" title="Arma Itinerario, Actividades y Hoteles en el Cotizador PEN y usa «Guardar como paquete»"><i class="fas fa-plus"></i>Crear en el Cotizador PEN</a>
                     </div>
                 </div>
-            </div>
-
-            <!-- Cotizaciones Guardadas: antes pestaña del Cotizador, ahora acá — mismos ids
-                 que usaba (cot-search, cot-nueva, cot-table-body, cot-page-info, cot-prev,
-                 cot-next), ver shared/gestion-datos.js. -->
-            <div id="gestion-cotizaciones" class="subtab-content hidden">
-                <div class="card p-6">
-                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <div class="relative">
-                                <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
-                                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                            </div>
-                            <button id="cot-nueva" class="btn btn-primary">
-                                <i class="fas fa-plus-circle mr-2"></i>Nueva Cotización
-                            </button>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full small">
-                            <thead>
-                                <tr>
-                                    <th class="text-left p-3">ID</th>
-                                    <th class="text-left p-3">Nombre PAX</th>
-                                    <th class="text-left p-3">Contacto</th>
-                                    <th class="text-left p-3">Fecha Cot.</th>
-                                    <th class="text-left p-3">N° PAX</th>
-                                    <th class="text-left p-3">Paquete</th>
-                                    <th class="text-right p-3">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="cot-table-body"></tbody>
-                        </table>
-                    </div>
-                    <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
-                        <span id="cot-page-info"></span>
-                        <div class="flex gap-2">
-                            <button id="cot-prev" class="btn border">Anterior</button>
-                            <button id="cot-next" class="btn border">Siguiente</button>
-                        </div>
-                    </div>
-                </div>
+                <div id="paquetes-list-pen" class="space-y-2 p-5"></div>
             </div>
         </div>
         </div>
@@ -529,7 +589,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script>
         window.APP_CONFIG = {
             currencySymbol: <?= json_encode($currencySymbol) ?>,
-            monedaCodigo: <?= json_encode($navActive === 'gestion-usd' ? 'usd' : 'pen') ?>
+            monedaCodigo: <?= json_encode($navActive === 'gestion-usd' ? 'usd' : 'pen') ?>,
+            vista: <?= json_encode($vista) ?>
         };
     </script>
     <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">

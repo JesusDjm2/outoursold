@@ -197,3 +197,11 @@
     cursor: pointer;
 }
 .cat-field input[type="file"]::file-selector-button:hover { background: #f1f5f9; }
+
+/* Itinerarios > Destinos y Categorías: subpestañas Con pernocte / Sin pernocte / Sin
+   asignar. "Sin asignar" resalta mientras queden destinos sin grupo. */
+#itin-grupos-tabs .subnav-tab .conteo-badge { background: rgba(255, 255, 255, 0.25); color: inherit; }
+#itin-grupos-tabs .subnav-tab:not(.active) .conteo-badge { background: #f1f5f9; color: #64748b; }
+#itin-grupos-tabs .grupo-tab-pendiente:not(.active) { color: #b45309; }
+#itin-grupos-tabs .grupo-tab-pendiente:not(.active) .conteo-badge { background: #fef3c7; color: #b45309; }
+.destino-grupo-select { background: #fff; max-width: 130px; }
