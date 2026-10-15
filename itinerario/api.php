@@ -9,6 +9,7 @@
 require_once __DIR__ . '/../shared/auth.php';
 require_once __DIR__ . '/../shared/db.php';
 require_once __DIR__ . '/../shared/error-helpers.php';
+require_once __DIR__ . '/../shared/agencia-helpers.php';
 
 // A diferencia de save_config.php (que solo exigía login en POST), aquí se exige login
 // para cualquier método, incluido GET.
@@ -37,6 +38,59 @@ $tablaGenerados = "itinerario_generados_$idioma";
 
 $path = $_GET['path'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
+
+// ===== Config de Páginas de Presentación / Cierre (migración 033) =====
+// Una por agencia y por idioma (itinerario_config_agencia); el admin usa la de la agencia
+// principal (resolverAgenciaPropiaId). Mientras esa tabla no exista (antes de correr la
+// migración) se sigue usando la config global de siempre (itinerario_config_$idioma,
+// fila id = 1), para que subir este código antes del SQL no rompa nada.
+function configPorAgenciaDisponible($db) {
+    static $disponible = null;
+    if ($disponible === null) {
+        $disponible = (bool) $db->query("SHOW TABLES LIKE 'itinerario_config_agencia'")->fetchColumn();
+    }
+    return $disponible;
+}
+
+// Devuelve ['start' => [...], 'end' => [...]].
+function leerConfigPaginas($db, $tablaConfig, $idioma) {
+    if (configPorAgenciaDisponible($db)) {
+        $agenciaId = resolverAgenciaPropiaId($db);
+        $row = false;
+        if ($agenciaId) {
+            $stmt = $db->prepare("SELECT start_files, end_files FROM itinerario_config_agencia WHERE agencia_id = ? AND idioma = ?");
+            $stmt->execute([$agenciaId, $idioma]);
+            $row = $stmt->fetch();
+        }
+    } else {
+        $row = $db->query("SELECT start_files, end_files FROM $tablaConfig WHERE id = 1")->fetch();
+    }
+    return [
+        'start' => $row ? (json_decode($row['start_files'], true) ?: []) : [],
+        'end' => $row ? (json_decode($row['end_files'], true) ?: []) : [],
+    ];
+}
+
+// Guarda la config de la agencia del usuario. Devuelve false si no tiene agencia (el
+// caller responde el error).
+function guardarConfigPaginas($db, $tablaConfig, $idioma, array $startFiles, array $endFiles) {
+    $start = json_encode(array_values($startFiles), JSON_UNESCAPED_UNICODE);
+    $end = json_encode(array_values($endFiles), JSON_UNESCAPED_UNICODE);
+    if (configPorAgenciaDisponible($db)) {
+        $agenciaId = resolverAgenciaPropiaId($db);
+        if (!$agenciaId) return false;
+        $db->prepare("INSERT INTO itinerario_config_agencia (agencia_id, idioma, start_files, end_files) VALUES (?, ?, ?, ?)
+                      ON DUPLICATE KEY UPDATE start_files = VALUES(start_files), end_files = VALUES(end_files)")
+            ->execute([$agenciaId, $idioma, $start, $end]);
+        return true;
+    }
+    $existe = $db->query("SELECT COUNT(*) FROM $tablaConfig WHERE id = 1")->fetchColumn();
+    $sql = $existe
+        ? "UPDATE $tablaConfig SET start_files = ?, end_files = ? WHERE id = 1"
+        : "INSERT INTO $tablaConfig (start_files, end_files, id) VALUES (?, ?, 1)";
+    $db->prepare($sql)->execute([$start, $end]);
+    return true;
+}
 
 function idOInt($val) {
     return ($val !== null && $val !== '') ? (int) $val : null;
@@ -239,17 +293,8 @@ try {
             break;
 
         case 'config':
-            $stmt = $db->query("SELECT start_files, end_files FROM $tablaConfig WHERE id = 1");
-            $row = $stmt->fetch();
-            if (!$row) {
-                // No debería pasar (la migración siembra la fila), pero por si acaso.
-                $db->exec("INSERT INTO $tablaConfig (id, start_files, end_files) VALUES (1, '[]', '[]')");
-                $row = ['start_files' => '[]', 'end_files' => '[]'];
-            }
-            echo json_encode([
-                'startFiles' => json_decode($row['start_files'], true) ?: [],
-                'endFiles' => json_decode($row['end_files'], true) ?: [],
-            ]);
+            $config = leerConfigPaginas($db, $tablaConfig, $idioma);
+            echo json_encode(['startFiles' => $config['start'], 'endFiles' => $config['end']]);
             break;
 
         case 'paquetes':
@@ -510,14 +555,9 @@ try {
 
                     // El PDF viejo pudo estar referenciado en las páginas de inicio/cierre
                     // configuradas: se actualiza la referencia al nuevo archivo en vez de perderla.
-                    $stmt = $db->prepare("SELECT start_files, end_files FROM $tablaConfig WHERE id = 1");
-                    $stmt->execute();
-                    $configRow = $stmt->fetch();
+                    $config = leerConfigPaginas($db, $tablaConfig, $idioma);
                     $reemplazar = fn($f) => $f === $filenameAnterior ? $filenameNuevo : $f;
-                    $startFiles = array_map($reemplazar, $configRow ? (json_decode($configRow['start_files'], true) ?: []) : []);
-                    $endFiles = array_map($reemplazar, $configRow ? (json_decode($configRow['end_files'], true) ?: []) : []);
-                    $db->prepare("UPDATE $tablaConfig SET start_files = ?, end_files = ? WHERE id = 1")
-                        ->execute([json_encode($startFiles, JSON_UNESCAPED_UNICODE), json_encode($endFiles, JSON_UNESCAPED_UNICODE)]);
+                    guardarConfigPaginas($db, $tablaConfig, $idioma, array_map($reemplazar, $config['start']), array_map($reemplazar, $config['end']));
                 } else {
                     $db->prepare("UPDATE $tablaPaginasFijas SET titulo = ? WHERE id = ?")->execute([$titulo, $id]);
                 }
@@ -566,13 +606,10 @@ try {
                 $db->prepare("DELETE FROM $tablaPaginasFijas WHERE id = ?")->execute([$id]);
 
                 // Quita el filename borrado de las páginas de inicio/cierre configuradas.
-                $stmt = $db->prepare("SELECT start_files, end_files FROM $tablaConfig WHERE id = 1");
-                $stmt->execute();
-                $configRow = $stmt->fetch();
-                $startFiles = $configRow ? array_values(array_diff(json_decode($configRow['start_files'], true) ?: [], [$filename])) : [];
-                $endFiles = $configRow ? array_values(array_diff(json_decode($configRow['end_files'], true) ?: [], [$filename])) : [];
-                $db->prepare("UPDATE $tablaConfig SET start_files = ?, end_files = ? WHERE id = 1")
-                    ->execute([json_encode($startFiles, JSON_UNESCAPED_UNICODE), json_encode($endFiles, JSON_UNESCAPED_UNICODE)]);
+                $config = leerConfigPaginas($db, $tablaConfig, $idioma);
+                $startFiles = array_values(array_diff($config['start'], [$filename]));
+                $endFiles = array_values(array_diff($config['end'], [$filename]));
+                guardarConfigPaginas($db, $tablaConfig, $idioma, $startFiles, $endFiles);
 
                 $db->commit();
                 borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idioma, $filename);
@@ -595,8 +632,11 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             $startFiles = is_array($data['startFiles'] ?? null) ? $data['startFiles'] : [];
             $endFiles = is_array($data['endFiles'] ?? null) ? $data['endFiles'] : [];
-            $stmt = $db->prepare("UPDATE $tablaConfig SET start_files = ?, end_files = ? WHERE id = 1");
-            $stmt->execute([json_encode($startFiles, JSON_UNESCAPED_UNICODE), json_encode($endFiles, JSON_UNESCAPED_UNICODE)]);
+            if (!guardarConfigPaginas($db, $tablaConfig, $idioma, $startFiles, $endFiles)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Tu usuario no tiene una agencia asignada; no se puede guardar la configuración de páginas fijas.']);
+                break;
+            }
             echo json_encode(['success' => true]);
             break;
 
