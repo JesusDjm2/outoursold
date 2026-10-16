@@ -522,7 +522,7 @@ const CATEGORIA_TIPOS = {
     },
     itinerarios: {
         label: 'Itinerarios',
-        sustantivo: ['módulo', 'módulos'],
+        sustantivo: ['itinerario', 'itinerarios'],
         icono: 'fa-route',
         getDataset: () => itinCategoriasData,
         apiBase: () => `${ITINERARIO_API_BASE}api.php`,
@@ -692,10 +692,47 @@ function renderCategorias(ctx) {
         .filter(c => c.destino_id === ctx.destinoSeleccionadoId)
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
     if (visibles.length === 0) {
-        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${destino.nombre}" todavía.</p>`;
+        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${escapeHtml(destino.nombre)}" todavía.</p>`;
     } else {
         visibles.forEach(c => listEl.appendChild(buildCategoriaRow(ctx, tipo, c)));
     }
+    const sinCategoria = construirBloqueSinCategoria(tipo, destino, visibles);
+    if (sinCategoria) listEl.appendChild(sinCategoria);
+}
+
+// Elementos del destino elegido que todavía no tienen categoría: antes no se veían en
+// ninguna parte de este panel (solo se listaban categorías). Cada uno se puede pasar a
+// una categoría del destino desde acá.
+function construirBloqueSinCategoria(tipo, destino, categorias) {
+    const t = CATEGORIA_TIPOS[tipo];
+    const etiqueta = (x) => x.idioma ? `${x.nombre} [${x.idioma.toUpperCase()}]` : x.nombre;
+    const pendientes = listaElementos(tipo)
+        .filter(x => Number(x.destino_id) === destino.id && x.categoria_id == null)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre) || (a.idioma || '').localeCompare(b.idioma || ''));
+    if (!pendientes.length) return null;
+    const bloque = crearNodo('div', 'sin-categoria-bloque mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50');
+    bloque.appendChild(crearNodo('div', 'text-xs font-semibold text-amber-800 mb-2', `Sin categoría en "${destino.nombre}" (${pendientes.length} ${t.sustantivo[pendientes.length === 1 ? 0 : 1]})`));
+    if (!categorias.length) {
+        bloque.appendChild(crearNodo('p', 'text-xs text-amber-700 mb-2', 'Crea una categoría arriba para poder clasificarlos.'));
+    }
+    const ul = crearNodo('ul', 'space-y-1');
+    pendientes.forEach(x => {
+        const li = crearNodo('li', 'flex items-center justify-between gap-2 text-sm');
+        li.appendChild(crearNodo('span', 'min-w-0 truncate', etiqueta(x)));
+        if (categorias.length) {
+            const sel = crearNodo('select', 'rounded-md small border px-2 py-0.5 shrink-0 bg-white');
+            sel.title = 'Asignar a una categoría de este destino';
+            sel.appendChild(new Option('Asignar a…', ''));
+            categorias.forEach(c => sel.appendChild(new Option(c.nombre, String(c.id))));
+            sel.addEventListener('change', () => {
+                if (sel.value) asignarElemento(tipo, x, destino.id, Number(sel.value));
+            });
+            li.appendChild(sel);
+        }
+        ul.appendChild(li);
+    });
+    bloque.appendChild(ul);
+    return bloque;
 }
 
 // ===== Asignaciones de una categoría (ver y editar desde Destinos y Categorías) =====
