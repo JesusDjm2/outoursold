@@ -270,3 +270,30 @@
 .pf-mover { font-size: 0.7rem; padding: 2px 4px; border: 1px solid #e2e8f0; border-radius: 6px; margin-right: 2px; max-width: 96px; background: #fff; }
 .pf-card.is-fuera { background: #fafafa; border-style: dashed; }
 .pf-badge-fuera { background: #f1f5f9; color: #64748b; }
+
+/* Itinerarios: miniatura e indicadores del detalle en cada fila (Lugares a visitar,
+   Incluye, No incluye — los vacíos atenuados), y el formulario completo de edición
+   (abrirEditorItinerario en itinerario.js). */
+.itin-fila-nombre { display: flex; align-items: center; gap: 12px; }
+.itin-miniatura { width: 56px; height: 42px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #f1f5f9; border: 1px solid #e2e8f0; }
+.itin-miniatura.is-vacia { display: flex; align-items: center; justify-content: center; color: #cbd5e1; font-size: 1rem; }
+.itin-detalles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.itin-detalle-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 0.66rem; font-weight: 600; background: #ecfdf5; color: #047857; }
+.itin-detalle-chip.is-vacio { background: #f1f5f9; color: #cbd5e1; }
+
+.itin-editor-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; overflow-y: auto; }
+.itin-editor { width: 100%; max-width: 760px; background: #fff; border-radius: 14px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25); display: flex; flex-direction: column; }
+.itin-editor-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+.itin-editor-head h3 { font-size: 1rem; font-weight: 600; color: #1e293b; }
+.itin-editor-body { padding: 18px 20px; }
+.itin-editor-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid #f1f5f9; background: #f8fafc; border-radius: 0 0 14px 14px; }
+.itin-editor textarea { width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; resize: vertical; font-family: inherit; }
+.itin-editor textarea:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 0 3px rgba(187, 49, 53, 0.08); }
+.ie-pdf { display: flex; align-items: center; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8rem; color: #0891b2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ie-pdf:hover { background: #ecfeff; }
+.ie-imagen { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.ie-imagen-preview { width: 180px; height: 120px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; flex-shrink: 0; }
+.ie-imagen-preview img { width: 100%; height: 100%; object-fit: cover; }
+.ie-imagen-vacia { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #cbd5e1; font-size: 0.75rem; }
+.ie-imagen-vacia i { font-size: 1.5rem; }
+.ie-imagen-acciones { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }

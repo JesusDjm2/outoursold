@@ -129,12 +129,36 @@ function borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idio
     }
 }
 
+// Imagen de un itinerario (migración 036): el nombre que devuelve upload-imagen.php.
+function validarNombreImagen($nombre) {
+    return is_string($nombre)
+        && strpos($nombre, '..') === false
+        && preg_match('/^[A-Za-z0-9 _\-.]+\.(jpg|png|webp)$/', $nombre) === 1;
+}
+
+// Igual que borrarPdfSiSinReferencias, para la imagen de un itinerario.
+function borrarImagenSiSinReferencias($db, $tablaModulos, $idioma, $imagen) {
+    if (!validarNombreImagen($imagen)) return;
+    try {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM $tablaModulos WHERE imagen = ?");
+        $stmt->execute([$imagen]);
+        if ($stmt->fetchColumn() > 0) return;
+    } catch (Exception $e) {
+        return;
+    }
+    $ruta = __DIR__ . "/uploads/$idioma/imagenes/" . $imagen;
+    if (is_file($ruta)) {
+        @unlink($ruta);
+    }
+}
+
 try {
     switch ($path) {
         case 'modulos':
             // Acotado a TU propio catálogo (admin incluido) — igual que shared/api.php.
             $stmt = $db->prepare(
-                "SELECT m.id, m.titulo, m.filename, m.destino_id, m.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
+                "SELECT m.id, m.titulo, m.filename, m.imagen, m.lugares_visitar, m.incluye, m.no_incluye,
+                        m.destino_id, m.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaModulos m
                  LEFT JOIN usuarios u ON u.id = m.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
@@ -145,6 +169,7 @@ try {
             $modulos = $stmt->fetchAll();
             foreach ($modulos as &$m) {
                 $m['archivo_existe'] = is_file(__DIR__ . "/uploads/$idioma/" . $m['filename']);
+                $m['imagen_existe'] = $m['imagen'] ? is_file(__DIR__ . "/uploads/$idioma/imagenes/" . $m['imagen']) : null;
             }
             unset($m);
             echo json_encode($modulos);
@@ -369,6 +394,30 @@ try {
                 $campos[] = 'categoria_id = ?';
                 $valores[] = idOInt($data['categoria_id']);
             }
+            // Textos largos (migración 036): vacío = NULL.
+            foreach (['lugares_visitar', 'incluye', 'no_incluye'] as $campoTexto) {
+                if (array_key_exists($campoTexto, $data)) {
+                    $texto = trim((string) ($data[$campoTexto] ?? ''));
+                    $campos[] = "$campoTexto = ?";
+                    $valores[] = $texto === '' ? null : $texto;
+                }
+            }
+            // Imagen: el nombre que devolvió upload-imagen.php, o null para quitarla. La
+            // anterior se borra del disco si ya nadie la usa (ver más abajo).
+            $imagenAnterior = null;
+            if (array_key_exists('imagen', $data)) {
+                $imagenNueva = $data['imagen'] === null || $data['imagen'] === '' ? null : (string) $data['imagen'];
+                if ($imagenNueva !== null && !validarNombreImagen($imagenNueva)) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Nombre de imagen no válido.']);
+                    break;
+                }
+                $stmtImg = $db->prepare("SELECT imagen FROM $tablaModulos WHERE id = ?");
+                $stmtImg->execute([$id]);
+                $imagenAnterior = $stmtImg->fetchColumn() ?: null;
+                $campos[] = 'imagen = ?';
+                $valores[] = $imagenNueva;
+            }
             if (empty($campos)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Nada que actualizar.']);
@@ -386,6 +435,9 @@ try {
                     echo json_encode(['error' => 'Módulo no encontrado.']);
                     break;
                 }
+            }
+            if ($imagenAnterior && $imagenAnterior !== ($imagenNueva ?? null)) {
+                borrarImagenSiSinReferencias($db, $tablaModulos, $idioma, $imagenAnterior);
             }
             echo json_encode(['success' => true]);
             break;
@@ -445,7 +497,7 @@ try {
                 break;
             }
             if (!verificarDueno($db, $tablaModulos, $id)) break;
-            $stmt = $db->prepare("SELECT filename, creado_por FROM $tablaModulos WHERE id = ?");
+            $stmt = $db->prepare("SELECT filename, imagen, creado_por FROM $tablaModulos WHERE id = ?");
             $stmt->execute([$id]);
             $moduloRow = $stmt->fetch();
             if (!$moduloRow) {
@@ -480,6 +532,9 @@ try {
 
                 $db->commit();
                 borrarPdfSiSinReferencias($db, $tablaModulos, $tablaPaginasFijas, $idioma, $filename);
+                if ($moduloRow['imagen']) {
+                    borrarImagenSiSinReferencias($db, $tablaModulos, $idioma, $moduloRow['imagen']);
+                }
                 echo json_encode(['success' => true, 'paquetes_afectados' => $paquetesAfectados]);
             } catch (Exception $e) {
                 $db->rollBack();

@@ -362,8 +362,14 @@ function buildModuloRow(it) {
     const roto = it.archivo_existe === false;
     tr.innerHTML = `
         <td class="cat-col-name">
-            <div class="cat-name">${escapeHtml(it.titulo)}</div>
-            <div class="cat-meta"><i class="fas fa-file-pdf mr-1"></i>${escapeHtml(it.filename)}${roto ? ' <span class="cat-badge is-danger ml-1" title="El archivo no existe en el servidor">PDF no encontrado</span>' : ''}</div>
+            <div class="itin-fila-nombre">
+                ${miniaturaItinerario(it)}
+                <div class="min-w-0">
+                    <div class="cat-name">${escapeHtml(it.titulo)}</div>
+                    <div class="cat-meta"><i class="fas fa-file-pdf mr-1"></i>${escapeHtml(it.filename)}${roto ? ' <span class="cat-badge is-danger ml-1" title="El archivo no existe en el servidor">PDF no encontrado</span>' : ''}</div>
+                    <div class="itin-detalles">${indicadoresDetalleItinerario(it)}</div>
+                </div>
+            </div>
         </td>
         <td class="cat-col-clasif">
             <div class="cat-clasif">
@@ -394,64 +400,188 @@ function buildModuloRow(it) {
     });
     categoriaSel.addEventListener('change', marcarPendiente);
     habilitarCreacionCategoria(categoriaSel, destinoSel);
-    tr.querySelector('.modulo-editar-btn').addEventListener('click', () => tr.replaceWith(buildModuloEditRow(it)));
+    tr.querySelector('.modulo-editar-btn').addEventListener('click', () => abrirEditorItinerario(it));
     tr.querySelector('.modulo-eliminar-btn').addEventListener('click', () => handleItineraryDelete(it.id));
     return tr;
 }
 
-function buildModuloEditRow(it) {
-    const tr = document.createElement('tr');
-    tr.className = 'is-editing';
-    tr.innerHTML = `
-        <td class="cat-col-name">
-            <input type="text" class="cat-input modulo-titulo-input" placeholder="Título" value="${escapeHtml(it.titulo)}">
-            <div class="cat-meta"><i class="fas fa-file-pdf mr-1"></i>${escapeHtml(it.filename)}</div>
-        </td>
-        <td class="cat-col-clasif">
-            <div class="cat-clasif">
-                <select class="module-destino-select" title="Destino"></select>
-                <select class="module-categoria-select" title="Categoría" disabled></select>
+// ===== Detalle de un itinerario: imagen, Lugares a visitar, Incluye, No incluye (migración 036) =====
+function urlImagenItinerario(imagen) {
+    return `${ITINERARIO_API_BASE}uploads/${idiomaActivo}/imagenes/${encodeURIComponent(imagen)}`;
+}
+
+function miniaturaItinerario(it) {
+    if (it.imagen && it.imagen_existe !== false) {
+        return `<img src="${urlImagenItinerario(it.imagen)}" alt="" class="itin-miniatura" loading="lazy">`;
+    }
+    return `<div class="itin-miniatura is-vacia" title="${it.imagen ? 'La imagen no existe en el servidor' : 'Sin imagen'}"><i class="fas fa-image"></i></div>`;
+}
+
+// Chips de qué campos del detalle ya están cargados (los vacíos van atenuados).
+function indicadoresDetalleItinerario(it) {
+    const campos = [
+        ['lugares_visitar', 'fa-location-dot', 'Lugares a visitar'],
+        ['incluye', 'fa-circle-check', 'Incluye'],
+        ['no_incluye', 'fa-circle-xmark', 'No incluye']
+    ];
+    return campos.map(([clave, icono, label]) => {
+        const lleno = !!(it[clave] && it[clave].trim());
+        return `<span class="itin-detalle-chip${lleno ? '' : ' is-vacio'}" title="${label}: ${lleno ? 'cargado' : 'vacío'}"><i class="fas ${icono}"></i>${label}</span>`;
+    }).join('');
+}
+
+// Formulario completo de un itinerario (el lápiz de la fila). Se arma en el momento, así
+// que sirve igual en Gestión de Datos y en la página standalone de Itinerario.
+function abrirEditorItinerario(it) {
+    document.getElementById('itin-editor')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'itin-editor';
+    overlay.className = 'itin-editor-overlay';
+    overlay.innerHTML = `
+        <div class="itin-editor" role="dialog" aria-modal="true" aria-labelledby="itin-editor-titulo">
+            <div class="itin-editor-head">
+                <h3 id="itin-editor-titulo">Editar itinerario <span class="text-slate-400 font-normal">· ${({ es: 'Español', en: 'English', pt: 'Português' })[idiomaActivo] || idiomaActivo}</span></h3>
+                <button type="button" class="cat-icon-btn ie-cerrar" title="Cerrar"><i class="fas fa-times"></i></button>
             </div>
-        </td>
-        <td class="cat-actions">
-            <div class="cat-actions-inner">
-                <button type="button" class="cat-icon-btn is-ok modulo-guardar-btn" title="Guardar"><i class="fas fa-check"></i></button>
-                <button type="button" class="cat-icon-btn modulo-cancelar-btn" title="Cancelar"><i class="fas fa-times"></i></button>
+            <div class="itin-editor-body">
+                <div class="cat-form-grid">
+                    <div class="cat-field cat-span-8">
+                        <label for="ie-titulo">Título</label>
+                        <input type="text" id="ie-titulo">
+                    </div>
+                    <div class="cat-field cat-span-4">
+                        <label>PDF</label>
+                        <a class="ie-pdf" target="_blank" rel="noopener"><i class="fas fa-file-pdf mr-1"></i><span></span></a>
+                    </div>
+                    <div class="cat-field cat-span-6">
+                        <label for="ie-destino">Destino</label>
+                        <select id="ie-destino"></select>
+                    </div>
+                    <div class="cat-field cat-span-6">
+                        <label for="ie-categoria">Categoría</label>
+                        <select id="ie-categoria" disabled></select>
+                    </div>
+                    <div class="cat-field">
+                        <label>Imagen</label>
+                        <div class="ie-imagen">
+                            <div class="ie-imagen-preview"></div>
+                            <div class="ie-imagen-acciones">
+                                <label class="btn border small cursor-pointer"><i class="fas fa-image mr-1"></i><span class="ie-imagen-elegir-texto">Elegir imagen</span><input type="file" id="ie-imagen-input" accept="image/jpeg,image/png,image/webp" class="hidden"></label>
+                                <button type="button" class="btn border small ie-imagen-quitar"><i class="fas fa-trash mr-1"></i>Quitar</button>
+                                <small class="text-slate-400">JPG, PNG o WebP, hasta 5 MB.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cat-field">
+                        <label for="ie-lugares">Lugares a visitar</label>
+                        <textarea id="ie-lugares" rows="4" placeholder="Ej.: Plaza de Armas, Qorikancha, Sacsayhuamán..."></textarea>
+                    </div>
+                    <div class="cat-field cat-span-6">
+                        <label for="ie-incluye">Incluye</label>
+                        <textarea id="ie-incluye" rows="5" placeholder="Uno por línea. Ej.:&#10;Transporte turístico&#10;Guía profesional"></textarea>
+                    </div>
+                    <div class="cat-field cat-span-6">
+                        <label for="ie-no-incluye">No incluye</label>
+                        <textarea id="ie-no-incluye" rows="5" placeholder="Uno por línea. Ej.:&#10;Alimentación&#10;Propinas"></textarea>
+                    </div>
+                </div>
             </div>
-        </td>
+            <div class="itin-editor-foot">
+                <button type="button" class="btn border small ie-cerrar">Cancelar</button>
+                <button type="button" class="btn btn-primary small ie-guardar"><i class="fas fa-save mr-1"></i>Guardar</button>
+            </div>
+        </div>
     `;
-    const tituloInput = tr.querySelector('.modulo-titulo-input');
-    const destinoSel = tr.querySelector('.module-destino-select');
-    const categoriaSel = tr.querySelector('.module-categoria-select');
+    document.body.appendChild(overlay);
+    const $ = (sel) => overlay.querySelector(sel);
+
+    $('#ie-titulo').value = it.titulo || '';
+    $('#ie-lugares').value = it.lugares_visitar || '';
+    $('#ie-incluye').value = it.incluye || '';
+    $('#ie-no-incluye').value = it.no_incluye || '';
+    $('.ie-pdf').href = `${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}`;
+    $('.ie-pdf span').textContent = it.filename;
+    const destinoSel = $('#ie-destino');
+    const categoriaSel = $('#ie-categoria');
     llenarDestinosSelect(destinoSel, it.destino_id);
-    llenarCategoriasSelect(categoriaSel, it.destino_id, it.categoria_id);
+    llenarCategoriasSelect(categoriaSel, destinoSel.value, it.categoria_id);
     destinoSel.addEventListener('change', () => llenarCategoriasSelect(categoriaSel, destinoSel.value, null));
     habilitarCreacionCategoria(categoriaSel, destinoSel);
 
-    tr.querySelector('.modulo-guardar-btn').addEventListener('click', () =>
-        guardarModulo(it, tituloInput.value, destinoSel.value, categoriaSel.value));
-    tr.querySelector('.modulo-cancelar-btn').addEventListener('click', () => tr.replaceWith(buildModuloRow(it)));
-    return tr;
+    // Imagen: 'actual' (sin cambios), un File nuevo, o null (quitada).
+    let imagenElegida = 'actual';
+    const preview = $('.ie-imagen-preview');
+    const pintarImagen = () => {
+        let src = null;
+        if (imagenElegida instanceof File) src = URL.createObjectURL(imagenElegida);
+        else if (imagenElegida === 'actual' && it.imagen && it.imagen_existe !== false) src = urlImagenItinerario(it.imagen);
+        preview.innerHTML = src ? `<img src="${src}" alt="">` : '<div class="ie-imagen-vacia"><i class="fas fa-image"></i><span>Sin imagen</span></div>';
+        const hay = !!src;
+        $('.ie-imagen-quitar').classList.toggle('hidden', !hay);
+        $('.ie-imagen-elegir-texto').textContent = hay ? 'Cambiar imagen' : 'Elegir imagen';
+    };
+    $('#ie-imagen-input').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { notifyWarning('Solo se permiten imágenes JPG, PNG o WebP.'); return; }
+        if (file.size > 5 * 1024 * 1024) { notifyWarning('La imagen pesa más de 5 MB.'); return; }
+        imagenElegida = file;
+        pintarImagen();
+    });
+    $('.ie-imagen-quitar').addEventListener('click', () => { imagenElegida = null; pintarImagen(); });
+    pintarImagen();
+
+    const cerrar = () => { overlay.remove(); document.removeEventListener('keydown', onEsc); };
+    const onEsc = (e) => { if (e.key === 'Escape') cerrar(); };
+    document.addEventListener('keydown', onEsc);
+    overlay.querySelectorAll('.ie-cerrar').forEach(b => b.addEventListener('click', cerrar));
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) cerrar(); });
+
+    $('.ie-guardar').addEventListener('click', async () => {
+        const titulo = $('#ie-titulo').value.trim();
+        if (!titulo) { notifyError('El título es obligatorio.'); return; }
+        const boton = $('.ie-guardar');
+        boton.disabled = true;
+        boton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...';
+        try {
+            const payload = {
+                id: it.id,
+                titulo,
+                destino_id: destinoSel.value || null,
+                categoria_id: categoriaSel.value || null,
+                lugares_visitar: $('#ie-lugares').value,
+                incluye: $('#ie-incluye').value,
+                no_incluye: $('#ie-no-incluye').value
+            };
+            if (imagenElegida instanceof File) {
+                const formData = new FormData();
+                formData.append('imagen', imagenElegida);
+                formData.append('idioma', idiomaActivo);
+                const subida = await fetch(`${ITINERARIO_API_BASE}upload-imagen.php`, { method: 'POST', body: formData }).then(r => r.json());
+                if (!subida.success) throw new Error(subida.error || 'Error al subir la imagen.');
+                payload.imagen = subida.imagen;
+            } else if (imagenElegida === null) {
+                payload.imagen = null;
+            }
+            const data = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+            if (!data.success) throw new Error(data.error || 'Error desconocido');
+            cerrar();
+            notifySuccess('Itinerario actualizado.');
+            await cargarIdioma(idiomaActivo);
+            renderModulosTable();
+        } catch (error) {
+            notifyError('No se pudo guardar el itinerario: ' + error.message);
+            boton.disabled = false;
+            boton.innerHTML = '<i class="fas fa-save mr-1"></i>Guardar';
+        }
+    });
+    setTimeout(() => $('#ie-titulo').focus(), 0);
 }
 
-async function guardarModulo(it, titulo, destinoId, categoriaId) {
-    titulo = titulo.trim();
-    if (!titulo) { notifyError('El título es obligatorio.'); return; }
-    try {
-        const res = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: it.id, titulo, destino_id: destinoId || null, categoria_id: categoriaId || null })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || 'Error desconocido');
-        notifySuccess('Módulo actualizado.');
-        await cargarIdioma(idiomaActivo);
-        renderModulosTable();
-    } catch (error) {
-        notifyError('No se pudo actualizar el módulo: ' + error.message);
-    }
-}
 
 // Este bloque (alta/subida de módulos) solo existe en Gestión de Datos — no en Cotizador.
 if (document.getElementById('itinerary-module-destino')) {
