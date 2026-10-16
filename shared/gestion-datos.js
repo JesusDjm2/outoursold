@@ -42,16 +42,18 @@ let hotelsData = [];
 let destinosData = [];
 let categoriasData = [];
 let categoriasHotelesData = [];
-// Grupos padre de los destinos (Con pernocte / Sin pernocte, migración 032).
+// Grupos padre de los destinos de Itinerarios (Con pernocte / Sin pernocte, migración 032).
+// Cada grupo tiene sus propios destinos (puede haber un "Cusco" en cada uno); los destinos
+// sin grupo son los de Actividades / Hoteles.
 let gruposDestinoData = [];
-const GRUPO_SIN_ASIGNAR = 'sin-asignar';
+const destinosActividadesHotelesGD = () => destinosData.filter(d => d.grupo_id == null);
 
 // Destinos y Categorías se gestiona en dos lugares, cada uno con su propio estado y DOM:
 //  - moneda: Gestión USD / PEN > Destinos y Categorías (categorías de Actividades y Hoteles,
-//    todos los destinos).
+//    con los destinos SIN grupo).
 //  - itin: Itinerarios > Destinos y Categorías (categorías de Itinerarios, con los destinos
-//    separados por grupo: Con pernocte / Sin pernocte / Sin asignar).
-// Los destinos son los mismos (tabla compartida); cambia qué se ve y qué categorías.
+//    de cada grupo: Con pernocte / Sin pernocte).
+// Misma tabla de destinos; el grupo decide a qué catálogo pertenece cada uno.
 const CLASIF_CTX = {
     moneda: {
         ids: { destinos: 'destinos-table-body', categorias: 'categorias-table-body', sinDestino: 'categorias-sin-destino', tableWrap: 'categorias-table-wrap', actual: 'categorias-destino-actual' },
@@ -59,7 +61,7 @@ const CLASIF_CTX = {
         tipos: ['tours', 'hoteles'],
         tipoActivo: 'tours',
         destinoSeleccionadoId: null,
-        filtro: () => true,
+        filtro: (d) => d.grupo_id == null,
         conGrupos: false
     },
     itin: {
@@ -69,7 +71,7 @@ const CLASIF_CTX = {
         tipoActivo: 'itinerarios',
         destinoSeleccionadoId: null,
         grupoActivo: '1',
-        filtro: (d) => CLASIF_CTX.itin.grupoActivo === GRUPO_SIN_ASIGNAR ? d.grupo_id == null : String(d.grupo_id) === CLASIF_CTX.itin.grupoActivo,
+        filtro: (d) => String(d.grupo_id) === CLASIF_CTX.itin.grupoActivo,
         conGrupos: true
     }
 };
@@ -91,9 +93,6 @@ async function cargarDatosIniciales() {
             fetch(`${API_URL}?path=grupos-destino`).then(r => r.json())
         ]);
         gruposDestinoData = Array.isArray(gruposRes) ? gruposRes : [];
-        // Si quedan destinos sin grupo, Itinerarios > Destinos y Categorías abre en "Sin
-        // asignar" para que lo primero que se vea sea lo que falta clasificar.
-        if (destinosRes.some(d => d.grupo_id == null)) CLASIF_CTX.itin.grupoActivo = GRUPO_SIN_ASIGNAR;
         toursData = toursRes;
         hotelsData = hotelesRes;
         destinosData = destinosRes;
@@ -132,7 +131,7 @@ function irASubtabGestion(subtab) {
 // Llena un <select> de Destino (mismo catálogo para tours y hoteles).
 function llenarSelectDestino(select, selectedId) {
     select.innerHTML = '<option value="">Sin clasificar</option>' +
-        destinosData.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
+        destinosActividadesHotelesGD().map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
 }
 // Llena un <select> de Categoría según el destino elegido — categoriasDataset es
 // categoriasData (tours) o categoriasHotelesData (hoteles), cada uno su propio catálogo.
@@ -156,7 +155,7 @@ function renderGestionResumen() {
     const nCategorias = categoriasData.length + categoriasHotelesData.length;
     const pl = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
     el.textContent = [
-        pl(destinosData.length, 'destino', 'destinos'),
+        pl(destinosActividadesHotelesGD().length, 'destino', 'destinos'),
         pl(nCategorias, 'categoría', 'categorías'),
         pl(toursData.length, 'tour', 'tours'),
         pl(hotelsData.length, 'hotel', 'hoteles')
@@ -217,7 +216,7 @@ function renderTours() {
     } else {
         visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
     }
-    actualizarAvisoDependencia('tours-sin-destinos-hint', destinosData.length === 0, 'clasificacion');
+    actualizarAvisoDependencia('tours-sin-destinos-hint', destinosActividadesHotelesGD().length === 0, 'clasificacion');
     renderGestionResumen();
 }
 
@@ -314,7 +313,7 @@ function buildDestinoCategoriaSelector(categoriasDataset, destinoId, categoriaId
     wrap.innerHTML = `
         <select class="input w-full rounded px-2 py-1 border sel-destino-tour">
             <option value="">Destino...</option>
-            ${destinosData.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('')}
+            ${destinosActividadesHotelesGD().map(d => `<option value="${d.id}">${d.nombre}</option>`).join('')}
         </select>
         <select class="input w-full rounded px-2 py-1 border sel-categoria-tour" disabled>
             <option value="">Categoría...</option>
@@ -421,9 +420,7 @@ function renderDestinosCtx(ctx) {
     }
     listEl.innerHTML = '';
     if (visibles.length === 0) {
-        const vacio = ctx.conGrupos && ctx.grupoActivo === GRUPO_SIN_ASIGNAR
-            ? 'Todos tus destinos ya tienen grupo asignado.'
-            : 'Sin destinos registrados.';
+        const vacio = 'Sin destinos registrados.';
         listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">${vacio}</p>`;
     } else {
         visibles.forEach(d => listEl.appendChild(buildDestinoRow(ctx, d)));
@@ -431,23 +428,18 @@ function renderDestinosCtx(ctx) {
     renderCategorias(ctx);
 }
 
-// Subpestañas Con pernocte / Sin pernocte / Sin asignar (Itinerarios > Destinos y
-// Categorías), con cuántos destinos tiene cada una. "Sin asignar" solo aparece mientras
-// queden destinos sin grupo (o si es la que está abierta).
+// Subpestañas Con pernocte / Sin pernocte (Itinerarios > Destinos y Categorías), con
+// cuántos destinos tiene cada una.
 function renderGruposTabs() {
     const cont = document.getElementById('itin-grupos-tabs');
     if (!cont) return;
     const ctx = CLASIF_CTX.itin;
-    const sinAsignar = destinosData.filter(d => d.grupo_id == null).length;
-    const tabs = [
-        ...gruposDestinoData.map(g => ({ valor: String(g.id), label: g.nombre, n: destinosData.filter(d => String(d.grupo_id) === String(g.id)).length, icono: g.clave === 'con_pernocte' ? 'fa-bed' : 'fa-sun' })),
-        { valor: GRUPO_SIN_ASIGNAR, label: 'Sin asignar', n: sinAsignar, icono: 'fa-circle-question' }
-    ].filter(t => t.valor !== GRUPO_SIN_ASIGNAR || t.n > 0 || ctx.grupoActivo === GRUPO_SIN_ASIGNAR);
+    const tabs = gruposDestinoData.map(g => ({ valor: String(g.id), label: g.nombre, n: destinosData.filter(d => String(d.grupo_id) === String(g.id)).length, icono: g.clave === 'con_pernocte' ? 'fa-bed' : 'fa-sun' }));
     cont.innerHTML = '';
     tabs.forEach(t => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `subnav-tab${ctx.grupoActivo === t.valor ? ' active' : ''}${t.valor === GRUPO_SIN_ASIGNAR && t.n > 0 ? ' grupo-tab-pendiente' : ''}`;
+        btn.className = `subnav-tab${ctx.grupoActivo === t.valor ? ' active' : ''}`;
         btn.innerHTML = `<i class="fas ${t.icono} mr-1"></i>${escapeHtml(t.label)}<span class="conteo-badge">${t.n}</span>`;
         btn.addEventListener('click', () => {
             ctx.grupoActivo = t.valor;
@@ -456,9 +448,6 @@ function renderGruposTabs() {
         });
         cont.appendChild(btn);
     });
-    const nuevo = document.getElementById('itin-destino-new-wrap');
-    // En "Sin asignar" no se crean destinos: se crean directo en su grupo.
-    if (nuevo) nuevo.classList.toggle('hidden', ctx.grupoActivo === GRUPO_SIN_ASIGNAR);
 }
 
 async function asignarGrupoDestino(d, grupoId) {
@@ -471,7 +460,7 @@ async function asignarGrupoDestino(d, grupoId) {
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         const grupo = gruposDestinoData.find(g => String(g.id) === String(grupoId));
-        notifySuccess(`"${d.nombre}" ${grupo ? `pasó a ${grupo.nombre}` : 'quedó sin asignar'}.`);
+        notifySuccess(`"${d.nombre}" pasó a ${grupo ? grupo.nombre : 'otro grupo'}.`);
         await refrescarDestinosCategorias();
     } catch (e) {
         notifyError('Error al cambiar el grupo del destino: ' + e.message);
@@ -563,17 +552,17 @@ function resumenDestino(ctx, destinoId) {
     return { chips, categorias: nCategorias === 0 ? 'Sin categorías' : `${nCategorias} categoría${nCategorias === 1 ? '' : 's'}` };
 }
 
-// Selector de grupo (Con pernocte / Sin pernocte / Sin asignar) de un destino — solo en
-// Itinerarios > Destinos y Categorías. En "Sin asignar" es la acción principal.
+// Selector para mover un destino entre Con pernocte y Sin pernocte (Itinerarios >
+// Destinos y Categorías). Si en el otro grupo ya hay uno con el mismo nombre, el servidor
+// lo rechaza.
 function selectorGrupoDestino(d) {
     const sel = document.createElement('select');
     sel.className = 'destino-grupo-select rounded-md border px-1.5 py-0.5 text-xs';
-    sel.title = 'Grupo del destino';
-    sel.appendChild(new Option(d.grupo_id == null ? 'Asignar grupo…' : 'Sin asignar', ''));
+    sel.title = 'Mover a otro grupo';
     gruposDestinoData.forEach(g => sel.appendChild(new Option(g.nombre, String(g.id))));
-    sel.value = d.grupo_id == null ? '' : String(d.grupo_id);
+    sel.value = String(d.grupo_id);
     sel.addEventListener('click', (e) => e.stopPropagation());
-    sel.addEventListener('change', () => asignarGrupoDestino(d, sel.value || null));
+    sel.addEventListener('change', () => asignarGrupoDestino(d, sel.value));
     return sel;
 }
 
@@ -924,8 +913,13 @@ async function refrescarDestinosCategorias() {
     destinosData = destinosRes;
     categoriasData = categoriasRes;
     categoriasHotelesData = categoriasHotelesRes;
-    // Itinerario guarda su propia referencia a la lista de destinos (itinDestinosData).
-    itinDestinosData = destinosData;
+    // Itinerario guarda su propia lista de destinos (itinDestinosData, solo los de Con / Sin
+    // pernocte): se rearma, junto con el select del alta de itinerarios y las filas de la
+    // tabla, para que un destino recién creado aparezca sin recargar la página.
+    itinDestinosData = destinosDeItinerarios(destinosData);
+    const selDestinoAlta = document.getElementById('itinerary-module-destino');
+    if (selDestinoAlta) llenarDestinosSelect(selDestinoAlta, selDestinoAlta.value || null);
+    renderModulosTable();
     renderDestinos();
     renderTourNewDestinoCategoria();
     renderHotelNewDestinoCategoria();
@@ -963,7 +957,7 @@ function renderHotels() {
     } else {
         visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
     }
-    actualizarAvisoDependencia('hoteles-sin-destinos-hint', destinosData.length === 0, 'clasificacion');
+    actualizarAvisoDependencia('hoteles-sin-destinos-hint', destinosActividadesHotelesGD().length === 0, 'clasificacion');
     renderGestionResumen();
 }
 
@@ -1619,10 +1613,9 @@ async function init() {
     // Itinerarios > Destinos y Categorías: el destino nuevo nace en el grupo abierto (Con /
     // Sin pernocte); las categorías son las de Itinerarios.
     document.getElementById('itin-destino-new-add').addEventListener('click', async () => {
-        const grupo = CLASIF_CTX.itin.grupoActivo;
         const ok = await guardarDestino({
             nombre: document.getElementById('itin-destino-new-nombre').value.trim(),
-            grupo_id: grupo === GRUPO_SIN_ASIGNAR ? null : Number(grupo)
+            grupo_id: Number(CLASIF_CTX.itin.grupoActivo)
         });
         if (ok) document.getElementById('itin-destino-new-nombre').value = '';
     });

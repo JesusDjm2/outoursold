@@ -31,11 +31,11 @@ function responderErrorAmigable(Throwable $e) {
             $msg = $e->getMessage();
             if (preg_match("/Duplicate entry '(.+?)' for key '([^']+)'/", $msg, $m)) {
                 [, $valor, $clave] = $m;
-                // uq_destinos_nombre es (nombre, creado_por): MySQL concatena ambos valores
-                // con '-' en el mensaje ("Lima-15") — se quita el ID de usuario final para
-                // mostrar solo el nombre, ya que la unicidad es por usuario, no global.
+                // uq_destinos_nombre es (nombre, creado_por, grupo_id) desde la migración 034:
+                // MySQL concatena los valores con '-' en el mensaje ("Lima-15-1") — se quitan
+                // el ID de usuario y el de grupo para mostrar solo el nombre.
                 if ($clave === 'uq_destinos_nombre') {
-                    $valor = preg_replace('/-\d+$/', '', $valor);
+                    $valor = preg_replace('/-\d+(-\d*)?$/', '', $valor);
                 }
                 $etiqueta = ERROR_HELPERS_CLAVES_UNICAS[$clave] ?? null;
                 http_response_code(409);

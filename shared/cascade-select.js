@@ -35,19 +35,28 @@ function normalizarClasificacionKeys(keys) {
 function crearHelpersClasificacion(getItems, getCategorias, keys, getDestinos) {
     const { labelKey, valueKey } = normalizarClasificacionKeys(keys);
     const resolverDestinos = getDestinos || (() => destinosData);
-    const destinoValDe = (item) => item.destino_id != null ? String(item.destino_id) : SIN_DESTINO_VAL;
-    const categoriaValDe = (item) => item.categoria_id != null ? String(item.categoria_id) : SIN_CATEGORIA_VAL;
+    // Un ítem cuyo destino no está en ESTE catálogo de destinos (p.ej. un itinerario que
+    // apunta a un destino de Actividades/Hoteles, que no es de Con/Sin pernocte, o a uno ya
+    // borrado) se trata como "Sin clasificar" — si no, quedaría inalcanzable en el árbol.
+    // `ids` se calcula una vez por llamada en los recorridos largos (ver getItemsFiltrados).
+    const idsDestinos = () => new Set(resolverDestinos().map(d => String(d.id)));
+    const destinoValDe = (item, ids = idsDestinos()) =>
+        item.destino_id != null && ids.has(String(item.destino_id)) ? String(item.destino_id) : SIN_DESTINO_VAL;
+    const categoriaValDe = (item, ids = idsDestinos()) =>
+        destinoValDe(item, ids) !== SIN_DESTINO_VAL && item.categoria_id != null ? String(item.categoria_id) : SIN_CATEGORIA_VAL;
     // "Sin clasificar" / "Sin categoría" siempre al final, después de los reales.
     const getDestinoOpciones = () => {
+        const ids = idsDestinos();
         const opciones = resolverDestinos().map(d => ({ value: String(d.id), label: d.nombre }))
             .sort((a, b) => a.label.localeCompare(b.label));
-        if (getItems().some(item => item.destino_id == null)) opciones.push({ value: SIN_DESTINO_VAL, label: SIN_DESTINO_LABEL });
+        if (getItems().some(item => destinoValDe(item, ids) === SIN_DESTINO_VAL)) opciones.push({ value: SIN_DESTINO_VAL, label: SIN_DESTINO_LABEL });
         return opciones;
     };
     const getCategoriaOpciones = (destinoVal) => {
         if (!destinoVal) return [];
         if (destinoVal === SIN_DESTINO_VAL) {
-            return getItems().some(item => item.destino_id == null && item.categoria_id == null)
+            const ids = idsDestinos();
+            return getItems().some(item => destinoValDe(item, ids) === SIN_DESTINO_VAL)
                 ? [{ value: SIN_CATEGORIA_VAL, label: SIN_CATEGORIA_LABEL }] : [];
         }
         const destinoId = Number(destinoVal);
@@ -60,9 +69,12 @@ function crearHelpersClasificacion(getItems, getCategorias, keys, getDestinos) {
         }
         return opciones;
     };
-    const getItemsFiltrados = (destinoVal, categoriaVal) => getItems()
-        .filter(item => destinoValDe(item) === destinoVal && categoriaValDe(item) === categoriaVal)
-        .sort((a, b) => a[labelKey].localeCompare(b[labelKey]));
+    const getItemsFiltrados = (destinoVal, categoriaVal) => {
+        const ids = idsDestinos();
+        return getItems()
+            .filter(item => destinoValDe(item, ids) === destinoVal && categoriaValDe(item, ids) === categoriaVal)
+            .sort((a, b) => a[labelKey].localeCompare(b[labelKey]));
+    };
     return { getItems, labelKey, valueKey, destinoValDe, categoriaValDe, getDestinoOpciones, getCategoriaOpciones, getItemsFiltrados };
 }
 

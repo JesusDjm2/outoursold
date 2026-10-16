@@ -60,18 +60,31 @@ function nombreCategoria(id) { return itinCategoriasData.find(c => c.id === id)?
 // por su cuenta, como hasta ahora. `typeof destinosData` (no `window.destinosData`): un
 // `let`/`const` de otro <script> clásico en la misma página es visible como identificador
 // suelto compartiendo el scope léxico global, pero NUNCA se vuelve propiedad de `window`.
+// Destinos de Itinerarios: solo los de Con / Sin pernocte (con grupo; los sin grupo son
+// de Actividades / Hoteles). Como cada grupo puede tener su propio "Cusco", el nombre lleva
+// el grupo ("Cusco · Con pernocte") para distinguirlos en selects y en el desplegable del
+// armador. Copias nuevas: no se toca el destinosData compartido con la página.
+const GRUPOS_DESTINO_NOMBRE = { 1: 'Con pernocte', 2: 'Sin pernocte' }; // ids fijos (migración 032)
+function destinosDeItinerarios(lista) {
+    return (Array.isArray(lista) ? lista : [])
+        .filter(d => d.grupo_id != null)
+        .map(d => ({ ...d, nombre: `${d.nombre} · ${GRUPOS_DESTINO_NOMBRE[d.grupo_id] || 'Grupo ' + d.grupo_id}` }));
+}
+
 async function cargarDestinosYCategorias() {
     try {
         const categoriasPromise = fetch(`${ITINERARIO_API_BASE}api.php?path=categorias-itinerarios`).then(r => r.json());
+        // Itinerarios usa solo los destinos de Con / Sin pernocte (con grupo); los sin grupo
+        // son de Actividades / Hoteles.
         if (typeof destinosData !== 'undefined' && Array.isArray(destinosData)) {
-            itinDestinosData = destinosData;
+            itinDestinosData = destinosDeItinerarios(destinosData);
             itinCategoriasData = await categoriasPromise;
         } else {
             const [destinos, categorias] = await Promise.all([
                 fetch(`${ITINERARIO_API_BASE}../usd/api.php?path=destinos`).then(r => r.json()),
                 categoriasPromise
             ]);
-            itinDestinosData = destinos;
+            itinDestinosData = destinosDeItinerarios(destinos);
             itinCategoriasData = categorias;
         }
     } catch (error) {

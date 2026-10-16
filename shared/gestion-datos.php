@@ -369,14 +369,15 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                 <button type="button" class="subnav-tab idioma-tab" data-idioma="pt"><i class="fas fa-language mr-1"></i> Português</button>
             </div>
 
-            <!-- Destinos y Categorías de Itinerarios: los destinos (tabla compartida con
-                 Actividades y Hoteles) van agrupados en Con pernocte / Sin pernocte (grupo padre,
-                 migración 032); los que aún no tienen grupo quedan en "Sin asignar". Las
-                 categorías son las propias de Itinerarios. Ver CLASIF_CTX.itin en gestion-datos.js. -->
+            <!-- Destinos y Categorías de Itinerarios: Con pernocte y Sin pernocte (grupo padre,
+                 migraciones 032 y 034) tienen cada uno sus propios destinos — puede haber un
+                 "Cusco" en cada uno — y estos son solo de Itinerarios: Actividades y Hoteles usan
+                 los destinos sin grupo. Las categorías son las propias de Itinerarios. Ver
+                 CLASIF_CTX.itin en gestion-datos.js. -->
             <div id="itin-clasificacion">
                 <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
                 <div class="card p-6">
-                    <p class="text-sm text-slate-500 mb-4">Cada destino pertenece a <strong>Con pernocte</strong> o <strong>Sin pernocte</strong> (cámbialo con el selector de cada destino). Elige un destino para ver y gestionar sus categorías de itinerarios. Los destinos son los mismos que usan Actividades y Hoteles.</p>
+                    <p class="text-sm text-slate-500 mb-4"><strong>Con pernocte</strong> y <strong>Sin pernocte</strong> tienen cada uno sus propios destinos y categorías (puede haber un mismo nombre, como "Cusco", en los dos). Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div class="md:col-span-5 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>

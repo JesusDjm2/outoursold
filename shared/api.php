@@ -122,16 +122,40 @@ try {
                 echo json_encode(['error' => 'El nombre del destino es obligatorio']);
                 break;
             }
+            // El nombre se repite libremente ENTRE grupos: Con pernocte, Sin pernocte y los
+            // destinos sin grupo (los de Actividades / Hoteles) son catálogos separados, así
+            // que puede haber un "Cusco" en cada uno. Dentro del mismo grupo, no. Se valida
+            // acá (y no solo con el UNIQUE de la migración 034) porque en MySQL un UNIQUE con
+            // grupo_id NULL no impide duplicados entre los destinos sin grupo.
+            $existeEnGrupo = function ($grupoId, $excluirId) use ($db, $nombreDestino) {
+                $stmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ? AND grupo_id <=> ? AND id <> ?");
+                $stmt->execute([$nombreDestino, $_SESSION['user_id'], $grupoId, (int) $excluirId]);
+                return (bool) $stmt->fetchColumn();
+            };
+            $mensajeDuplicado = fn($grupoId) => "Ya existe un destino con el nombre \"$nombreDestino\"" . ($grupoId ? ' en este grupo.' : '.');
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, 'destinos', $data['id'])) break;
+                $stmt = $db->prepare("SELECT grupo_id FROM destinos WHERE id = ?");
+                $stmt->execute([$data['id']]);
+                $grupoActual = $stmt->fetchColumn() ?: null;
+                if ($existeEnGrupo($grupoActual, $data['id'])) {
+                    http_response_code(409);
+                    echo json_encode(['error' => $mensajeDuplicado($grupoActual)]);
+                    break;
+                }
                 $stmt = $db->prepare("UPDATE destinos SET nombre = ? WHERE id = ?");
                 $stmt->execute([$nombreDestino, $data['id']]);
                 echo json_encode(['success' => true, 'id' => $data['id']]);
             } else {
-                // Un destino nuevo puede nacer ya dentro de un grupo (Con / Sin pernocte), si se
-                // crea desde esa subpestaña de Itinerarios > Destinos y Categorías.
+                // Un destino de Itinerarios nace dentro de su grupo (Con / Sin pernocte); uno
+                // de Actividades / Hoteles, sin grupo.
                 $grupoId = grupoDestinoValido($db, $data['grupo_id'] ?? null);
                 if ($grupoId === false) break;
+                if ($existeEnGrupo($grupoId, 0)) {
+                    http_response_code(409);
+                    echo json_encode(['error' => $mensajeDuplicado($grupoId)]);
+                    break;
+                }
                 $stmt = $db->prepare("INSERT INTO destinos (nombre, grupo_id, creado_por) VALUES (?, ?, ?)");
                 $stmt->execute([$nombreDestino, $grupoId, $_SESSION['user_id']]);
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
@@ -888,7 +912,9 @@ try {
             $destinoIdPorNombre = [];
             $categoriaIdPorNombre = [];
             // Busca solo entre TUS PROPIOS destinos (nunca los de otro usuario).
-            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ?");
+            // Solo entre los de Actividades / Hoteles (sin grupo): los de Con / Sin pernocte
+            // son de Itinerarios y pueden repetir el nombre.
+            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ? AND grupo_id IS NULL");
             $crearDestinoStmt = $db->prepare("INSERT INTO destinos (nombre, creado_por) VALUES (?, ?)");
             $buscarCategoriaStmt = $db->prepare("SELECT id FROM $tablaCategoriaCsv WHERE destino_id = ? AND LOWER(TRIM(nombre)) = LOWER(TRIM(?))");
             $crearCategoriaStmt = $db->prepare("INSERT INTO $tablaCategoriaCsv (destino_id, nombre, creado_por) VALUES (?, ?, ?)");

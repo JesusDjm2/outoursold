@@ -17,8 +17,11 @@ function escapeHtml(str) {
 // crearHelpersClasificacion / buildClasificacionSelector viven en shared/cascade-select.js.
 // Usado por las filas de Actividades/Hoteles de Cotizador (createTourRow/createHotelRow) y
 // por el armador de paquetes de Gestión de Datos (agregarFilaPaquete/agregarFilaPaqueteHotel).
-const toursHelpers = crearHelpersClasificacion(() => toursData, () => categoriasData, 'tour');
-const hotelesHelpers = crearHelpersClasificacion(() => hotelsData, () => categoriasHotelesData, 'aloj');
+// Actividades y Hoteles usan solo los destinos SIN grupo: los de Con / Sin pernocte son de
+// Itinerarios (ver itinerario.js) y pueden repetir nombre ("Cusco" en cada uno).
+const destinosActividadesHoteles = () => destinosData.filter(d => d.grupo_id == null);
+const toursHelpers = crearHelpersClasificacion(() => toursData, () => categoriasData, 'tour', destinosActividadesHoteles);
+const hotelesHelpers = crearHelpersClasificacion(() => hotelsData, () => categoriasHotelesData, 'aloj', destinosActividadesHoteles);
 
 function buildTourSelector(initialTourName, onResolved) {
     return buildClasificacionSelector(toursHelpers, 'Actividad...', initialTourName, onResolved);
