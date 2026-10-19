@@ -195,6 +195,110 @@ function actualizarAvisoDependencia(hintId, faltante, subtabDestino) {
 let cambiosPendientesTours = new Map();
 let cambiosPendientesHoteles = new Map();
 
+// ===== Paginación y filtro por destino de Tours / Hoteles =====
+// Todo client-side: el catálogo ya viene completo en toursData/hotelsData, así que solo se
+// pinta la página visible (antes se pintaban todas las filas, cada una con 2 selects). Los
+// cambios de clasificación pendientes sobreviven a cambiar de página, buscar o filtrar:
+// cada fila se arma con su valor pendiente si lo tiene (ver valoresClasificacionFila).
+const CAT_TAMANOS_PAGINA = [10, 25, 50, 100];
+const CAT_SIN_DESTINO = '__sin_destino__';
+function crearEstadoCatalogo(clave) {
+    let porPagina = 25;
+    try {
+        const guardado = Number(localStorage.getItem(`gestion.porPagina.${clave}`));
+        if (CAT_TAMANOS_PAGINA.includes(guardado)) porPagina = guardado;
+    } catch (_) { /* sin almacenamiento */ }
+    return { clave, pagina: 1, porPagina, destino: '' };
+}
+const catEstado = { tours: crearEstadoCatalogo('tours'), hoteles: crearEstadoCatalogo('hoteles') };
+
+// Filtra por texto y destino, ordena y devuelve solo la página actual (corrigiendo la
+// página si quedó fuera de rango, p.ej. tras eliminar el último de la última página).
+function paginarCatalogo(items, campoNombre, texto, estado) {
+    const destinosValidos = new Set(destinosActividadesHotelesGD().map(d => d.id));
+    const filtrados = items
+        .filter(it => it[campoNombre].toLowerCase().includes(texto))
+        .filter(it => {
+            if (!estado.destino) return true;
+            const sinDestino = it.destino_id == null || !destinosValidos.has(Number(it.destino_id));
+            return estado.destino === CAT_SIN_DESTINO ? sinDestino : Number(it.destino_id) === Number(estado.destino);
+        })
+        .sort((a, b) => a[campoNombre].localeCompare(b[campoNombre]));
+    const paginas = Math.max(1, Math.ceil(filtrados.length / estado.porPagina));
+    estado.pagina = Math.min(Math.max(1, estado.pagina), paginas);
+    const inicio = (estado.pagina - 1) * estado.porPagina;
+    return { visibles: filtrados.slice(inicio, inicio + estado.porPagina), total: filtrados.length, paginas, inicio };
+}
+
+// Select "Todos los destinos / <destinos> / Sin clasificar" del encabezado, con el conteo
+// de cada uno. Conserva lo elegido; si ese destino ya no existe, vuelve a "Todos".
+function llenarFiltroDestino(select, items, estado) {
+    const destinos = destinosActividadesHotelesGD().slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const ids = new Set(destinos.map(d => d.id));
+    const conteo = new Map();
+    let sinDestino = 0;
+    items.forEach(it => {
+        const id = Number(it.destino_id);
+        if (it.destino_id != null && ids.has(id)) conteo.set(id, (conteo.get(id) || 0) + 1);
+        else sinDestino++;
+    });
+    if (estado.destino && estado.destino !== CAT_SIN_DESTINO && !ids.has(Number(estado.destino))) estado.destino = '';
+    select.innerHTML = `<option value="">Todos los destinos (${items.length})</option>` +
+        destinos.map(d => `<option value="${d.id}">${escapeHtml(d.nombre)} (${conteo.get(d.id) || 0})</option>`).join('') +
+        (sinDestino ? `<option value="${CAT_SIN_DESTINO}">Sin clasificar (${sinDestino})</option>` : '');
+    select.value = estado.destino;
+    select.classList.toggle('is-activo', !!estado.destino);
+}
+
+// Pie de la tabla: "1–25 de 132", filas por página y navegación con elipsis.
+function renderPaginador(contenedor, estado, { total, paginas, inicio, totalSinFiltro }, onCambio) {
+    if (!total) { contenedor.innerHTML = ''; contenedor.hidden = true; return; }
+    contenedor.hidden = false;
+    const fin = Math.min(inicio + estado.porPagina, total);
+    const actual = estado.pagina;
+    // 1 … 4 5 [6] 7 8 … 20
+    const numeros = [];
+    for (let p = 1; p <= paginas; p++) {
+        if (p === 1 || p === paginas || Math.abs(p - actual) <= 1 || (actual <= 3 && p <= 4) || (actual >= paginas - 2 && p >= paginas - 3)) numeros.push(p);
+        else if (numeros[numeros.length - 1] !== '…') numeros.push('…');
+    }
+    contenedor.innerHTML = `
+        <div class="cat-pag-info">
+            <strong>${inicio + 1}–${fin}</strong> de <strong>${total}</strong>${total !== totalSinFiltro ? ` <span>(filtrado de ${totalSinFiltro})</span>` : ''}
+        </div>
+        <div class="cat-pag-ctrl">
+            <label class="cat-pag-size">Filas
+                <select aria-label="Filas por página">${CAT_TAMANOS_PAGINA.map(n => `<option value="${n}"${n === estado.porPagina ? ' selected' : ''}>${n}</option>`).join('')}</select>
+            </label>
+            ${paginas > 1 ? `<nav class="cat-pag-nav" aria-label="Paginación">
+                <button type="button" data-pag="${actual - 1}" aria-label="Página anterior"${actual === 1 ? ' disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+                ${numeros.map(n => n === '…'
+                    ? '<span class="cat-pag-gap">…</span>'
+                    : `<button type="button" data-pag="${n}"${n === actual ? ' class="is-actual" aria-current="page"' : ''}>${n}</button>`).join('')}
+                <button type="button" data-pag="${actual + 1}" aria-label="Página siguiente"${actual === paginas ? ' disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+            </nav>` : ''}
+        </div>`;
+    contenedor.querySelector('select').addEventListener('change', (e) => {
+        estado.porPagina = Number(e.target.value);
+        estado.pagina = 1;
+        try { localStorage.setItem(`gestion.porPagina.${estado.clave}`, estado.porPagina); } catch (_) { /* sin almacenamiento */ }
+        onCambio();
+    });
+    contenedor.querySelectorAll('[data-pag]').forEach(btn => btn.addEventListener('click', () => {
+        estado.pagina = Number(btn.dataset.pag);
+        onCambio();
+        // Si el inicio de la tabla quedó arriba de la pantalla, se vuelve a él.
+        const card = contenedor.closest('.cat-card');
+        if (card && card.getBoundingClientRect().top < 0) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }));
+}
+
+// Destino/Categoría con que se arma una fila: la pendiente (si se cambió y aún no se guardó) o la guardada.
+function valoresClasificacionFila(item, pendientes) {
+    const p = pendientes.get(item.id);
+    return p ? { destino_id: p.destino_id, categoria_id: p.categoria_id } : { destino_id: item.destino_id, categoria_id: item.categoria_id };
+}
+
 function actualizarBotonGuardarTours() {
     const btn = document.getElementById('tours-guardar-flotante');
     const n = cambiosPendientesTours.size;
@@ -202,22 +306,30 @@ function actualizarBotonGuardarTours() {
     document.getElementById('tours-guardar-count').textContent = n;
 }
 
+// Tras cargar/recargar el catálogo (alta, edición, borrado, CSV, guardar clasificación):
+// los pendientes ya no aplican. Buscar, filtrar o paginar usan pintarTours() y los conservan.
 function renderTours() {
-    const tbody = document.getElementById('tours-table-body');
-    document.getElementById('tours-count').textContent = toursData.length;
-    tbody.innerHTML = '';
     cambiosPendientesTours.clear();
     actualizarBotonGuardarTours();
-    const visibles = toursData
-        .filter(t => t.tour.toLowerCase().includes(toursFilter))
-        .sort((a, b) => a.tour.localeCompare(b.tour));
-    if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${toursFilter ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes tours. Usa «Nuevo tour» para agregar el primero.'}</td></tr>`;
-    } else {
-        visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
-    }
+    document.getElementById('tours-count').textContent = toursData.length;
     actualizarAvisoDependencia('tours-sin-destinos-hint', destinosActividadesHotelesGD().length === 0, 'clasificacion');
     renderGestionResumen();
+    pintarTours();
+}
+
+function pintarTours() {
+    const estado = catEstado.tours;
+    llenarFiltroDestino(document.getElementById('tours-filtro-destino'), toursData, estado);
+    const tbody = document.getElementById('tours-table-body');
+    const pag = paginarCatalogo(toursData, 'tour', toursFilter, estado);
+    tbody.innerHTML = '';
+    if (pag.total === 0) {
+        const filtrando = toursFilter || estado.destino;
+        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${filtrando ? 'Sin resultados para tu búsqueda o filtro.' : 'Aún no tienes tours. Usa «Nuevo tour» para agregar el primero.'}</td></tr>`;
+    } else {
+        pag.visibles.forEach(t => tbody.appendChild(buildTourRow(t)));
+    }
+    renderPaginador(document.getElementById('tours-paginacion'), estado, { ...pag, totalSinFiltro: toursData.length }, pintarTours);
 }
 
 // Fila de Tours / Hoteles (shared/catalogo.css): nombre con el distribuidor debajo,
@@ -286,10 +398,13 @@ function buildTourRow(t) {
     tr.innerHTML = filaCatalogoHtml(t.tour, t, 'tour-row-destino', 'tour-row-categoria');
     const destinoSel = tr.querySelector('.tour-row-destino');
     const categoriaSel = tr.querySelector('.tour-row-categoria');
-    llenarSelectDestino(destinoSel, t.destino_id);
-    llenarSelectCategoria(categoriaSel, categoriasData, t.destino_id, t.categoria_id);
+    const clasif = valoresClasificacionFila(t, cambiosPendientesTours);
+    llenarSelectDestino(destinoSel, clasif.destino_id);
+    llenarSelectCategoria(categoriaSel, categoriasData, clasif.destino_id, clasif.categoria_id);
+    tr.classList.toggle('is-pendiente', cambiosPendientesTours.has(t.id));
     const marcarPendiente = () => {
         cambiosPendientesTours.set(t.id, { destino_id: destinoSel.value || null, categoria_id: categoriaSel.value || null });
+        tr.classList.add('is-pendiente');
         actualizarBotonGuardarTours();
     };
     destinoSel.addEventListener('change', () => {
@@ -980,22 +1095,29 @@ function actualizarBotonGuardarHoteles() {
     document.getElementById('hoteles-guardar-count').textContent = n;
 }
 
+// Mismo criterio que renderTours / pintarTours.
 function renderHotels() {
-    const tbody = document.getElementById('hotels-table-body');
-    document.getElementById('hoteles-count').textContent = hotelsData.length;
-    tbody.innerHTML = '';
     cambiosPendientesHoteles.clear();
     actualizarBotonGuardarHoteles();
-    const visibles = hotelsData
-        .filter(h => h.aloj.toLowerCase().includes(hotelsFilter))
-        .sort((a, b) => a.aloj.localeCompare(b.aloj));
-    if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${hotelsFilter ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes alojamientos. Usa «Nuevo alojamiento» para agregar el primero.'}</td></tr>`;
-    } else {
-        visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
-    }
+    document.getElementById('hoteles-count').textContent = hotelsData.length;
     actualizarAvisoDependencia('hoteles-sin-destinos-hint', destinosActividadesHotelesGD().length === 0, 'clasificacion');
     renderGestionResumen();
+    pintarHoteles();
+}
+
+function pintarHoteles() {
+    const estado = catEstado.hoteles;
+    llenarFiltroDestino(document.getElementById('hoteles-filtro-destino'), hotelsData, estado);
+    const tbody = document.getElementById('hotels-table-body');
+    const pag = paginarCatalogo(hotelsData, 'aloj', hotelsFilter, estado);
+    tbody.innerHTML = '';
+    if (pag.total === 0) {
+        const filtrando = hotelsFilter || estado.destino;
+        tbody.innerHTML = `<tr><td colspan="5" class="cat-empty">${filtrando ? 'Sin resultados para tu búsqueda o filtro.' : 'Aún no tienes alojamientos. Usa «Nuevo alojamiento» para agregar el primero.'}</td></tr>`;
+    } else {
+        pag.visibles.forEach(h => tbody.appendChild(buildHotelRow(h)));
+    }
+    renderPaginador(document.getElementById('hoteles-paginacion'), estado, { ...pag, totalSinFiltro: hotelsData.length }, pintarHoteles);
 }
 
 function buildHotelRow(h) {
@@ -1003,10 +1125,13 @@ function buildHotelRow(h) {
     tr.innerHTML = filaCatalogoHtml(h.aloj, h, 'hotel-row-destino', 'hotel-row-categoria');
     const destinoSel = tr.querySelector('.hotel-row-destino');
     const categoriaSel = tr.querySelector('.hotel-row-categoria');
-    llenarSelectDestino(destinoSel, h.destino_id);
-    llenarSelectCategoria(categoriaSel, categoriasHotelesData, h.destino_id, h.categoria_id);
+    const clasif = valoresClasificacionFila(h, cambiosPendientesHoteles);
+    llenarSelectDestino(destinoSel, clasif.destino_id);
+    llenarSelectCategoria(categoriaSel, categoriasHotelesData, clasif.destino_id, clasif.categoria_id);
+    tr.classList.toggle('is-pendiente', cambiosPendientesHoteles.has(h.id));
     const marcarPendiente = () => {
         cambiosPendientesHoteles.set(h.id, { destino_id: destinoSel.value || null, categoria_id: categoriaSel.value || null });
+        tr.classList.add('is-pendiente');
         actualizarBotonGuardarHoteles();
     };
     destinoSel.addEventListener('change', () => {
@@ -1555,13 +1680,26 @@ async function init() {
         tab.addEventListener('click', () => irASubtabGestion(tab.dataset.subtab));
     });
 
+    // Buscar y filtrar vuelven a la página 1 y conservan la clasificación pendiente.
     document.getElementById('tours-search').addEventListener('input', (e) => {
         toursFilter = e.target.value.trim().toLowerCase();
-        renderTours();
+        catEstado.tours.pagina = 1;
+        pintarTours();
     });
     document.getElementById('hoteles-search').addEventListener('input', (e) => {
         hotelsFilter = e.target.value.trim().toLowerCase();
-        renderHotels();
+        catEstado.hoteles.pagina = 1;
+        pintarHoteles();
+    });
+    document.getElementById('tours-filtro-destino').addEventListener('change', (e) => {
+        catEstado.tours.destino = e.target.value;
+        catEstado.tours.pagina = 1;
+        pintarTours();
+    });
+    document.getElementById('hoteles-filtro-destino').addEventListener('change', (e) => {
+        catEstado.hoteles.destino = e.target.value;
+        catEstado.hoteles.pagina = 1;
+        pintarHoteles();
     });
     // Guarda de una sola vez todas las clasificaciones Destino/Categoría pendientes (marcadas
     // al tocar los selects de cada fila) — un solo request, el servidor solo actualiza esos IDs.

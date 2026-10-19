@@ -103,6 +103,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <i class="fas fa-search"></i>
                                 <input id="tours-search" type="text" placeholder="Buscar tour...">
                             </div>
+                            <select id="tours-filtro-destino" class="cat-filter" aria-label="Filtrar por destino"></select>
                             <div class="relative">
                                 <button type="button" id="tours-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
                                 <div id="tours-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
@@ -164,7 +165,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         </div>
                     </div>
                     <div class="cat-table-wrap">
-                        <table class="cat-table">
+                        <table class="cat-table is-compacta">
                             <thead>
                                 <tr>
                                     <th class="cat-col-name">Tour / Actividad</th>
@@ -177,6 +178,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             <tbody id="tours-table-body"></tbody>
                         </table>
                     </div>
+                    <div id="tours-paginacion" class="cat-pag" hidden></div>
                 </div>
                 <button id="tours-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
                     <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="tours-guardar-count">0</span>)
@@ -195,6 +197,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <i class="fas fa-search"></i>
                                 <input id="hoteles-search" type="text" placeholder="Buscar alojamiento...">
                             </div>
+                            <select id="hoteles-filtro-destino" class="cat-filter" aria-label="Filtrar por destino"></select>
                             <div class="relative">
                                 <button type="button" id="hoteles-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
                                 <div id="hoteles-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
@@ -256,7 +259,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         </div>
                     </div>
                     <div class="cat-table-wrap">
-                        <table class="cat-table">
+                        <table class="cat-table is-compacta">
                             <thead>
                                 <tr>
                                     <th class="cat-col-name">Alojamiento</th>
@@ -269,6 +272,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             <tbody id="hotels-table-body"></tbody>
                         </table>
                     </div>
+                    <div id="hoteles-paginacion" class="cat-pag" hidden></div>
                 </div>
                 <button id="hoteles-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
                     <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="hoteles-guardar-count">0</span>)
