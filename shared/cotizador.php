@@ -35,6 +35,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <link rel="stylesheet" href="../shared/sidebar.css?v=<?= filemtime(__DIR__ . '/sidebar.css') ?>">
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/hero.css') ?>">
     <link rel="stylesheet" href="../itinerario/itinerario.css?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.css') ?>">
+    <link rel="stylesheet" href="../shared/itinerario-selector.css?v=<?= filemtime(__DIR__ . '/itinerario-selector.css') ?>">
 </head>
 <body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/sidebar.php'; ?>
@@ -174,12 +175,12 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              selector "Aplicar paquete..." de arriba ya cubre itinerario junto con
                              actividades y hoteles (ver #aplicar-paquete-select). -->
                         <div class="itinerary-table-container">
-                            <table class="w-full small">
+                            <table class="w-full small itin-armador-visual">
                                 <thead>
                                     <tr>
                                         <th class="p-2 w-8">&nbsp;</th>
                                         <th class="p-2 text-left w-20">Día</th>
-                                        <th class="p-2 text-left">Itinerarios</th>
+                                        <th class="p-2 text-left">Itinerario del día</th>
                                         <th class="p-2 w-16">Acción</th>
                                     </tr>
                                 </thead>
@@ -190,7 +191,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              del itinerario junto con el de la cotización si hay módulos armados acá. El
                              aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
                         <div class="flex flex-wrap items-center gap-2 mt-3">
-                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                            <!-- Selector visual (shared/itinerario-selector.js): Con / Sin pernocte →
+                                 Destino → Categoría con imágenes, para armar varios días de una vez.
+                                 Un día puntual se cambia tocándolo en la tabla. -->
+                            <button id="elegir-itinerarios" type="button" class="itin-elegir-btn small"><i class="fas fa-images"></i>Elegir itinerarios</button>
+                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border bg-white" title="Agrega un día vacío al final">+ Día</button>
                             <span class="solo-cotizacion small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
                         </div>
                         </div>
@@ -427,6 +432,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script>window.ITINERARIO_API_BASE = '../itinerario/';</script>
     <script src="../itinerario/itinerario.js?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.js') ?>"></script>
     <script src="../shared/catalogo-shared.js?v=<?= filemtime(__DIR__ . '/catalogo-shared.js') ?>"></script>
+    <script src="../shared/itinerario-selector.js?v=<?= filemtime(__DIR__ . '/itinerario-selector.js') ?>"></script>
     <script src="../shared/cotizador.js?v=<?= filemtime(__DIR__ . '/cotizador.js') ?>"></script>
 </body>
 </html>

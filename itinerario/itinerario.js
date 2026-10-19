@@ -1194,6 +1194,14 @@ function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedF
     let selectorEl, hiddenInput = null;
     if (esPaginaFija) {
         selectorEl = buildPaginaFijaSelect(selectedFile);
+    } else if (isMainItinerary && typeof construirCeldaItinerarioVisual === 'function') {
+        // Cotizador: cada día es una tarjeta compacta que abre el selector visual
+        // (shared/itinerario-selector.js) en vez del desplegable en cascada.
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.className = 'module-filename';
+        hiddenInput.value = selectedFile || '';
+        selectorEl = construirCeldaItinerarioVisual(tr, hiddenInput);
     } else {
         hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden';
@@ -1243,6 +1251,7 @@ function marcarModulosFueraDeCatalogo() {
             cascadeLabel.textContent = hidden.value + ' (fuera de catálogo)';
         }
     });
+    if (typeof refrescarFilasItinerarioVisual === 'function') refrescarFilasItinerarioVisual();
 }
 
 function recalculateDayNumbers() {
