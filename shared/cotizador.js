@@ -252,7 +252,7 @@ async function aplicarPaquete(paquete) {
     }
     document.getElementById('itinerary-builder-body').innerHTML = '';
     if (idiomaPaquete) {
-        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos });
+        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos, dias: paquete.itinerario.dias });
     } else {
         addItineraryBuilderRow('itinerary-builder-body', true);
     }
@@ -444,7 +444,8 @@ async function reusarHistorialCotizacion(c) {
             await activarIdioma(idiomaOrigen);
             cambioIdioma = true;
         }
-        aplicarPaqueteItinerario({ modulos });
+        // Lista completa (sin filtrar) para que `dias` siga alineado con `modulos`.
+        aplicarPaqueteItinerario({ modulos: c.data.itinerarioArmado.modulos, dias: c.data.itinerarioArmado.dias });
         if (cambioIdioma) {
             notifyWarning(`El itinerario de esta cotización está en ${nombresIdioma[idiomaOrigen] || idiomaOrigen}: el idioma de la cotización se cambió a ${nombresIdioma[idiomaOrigen] || idiomaOrigen}.`);
         }
@@ -787,7 +788,11 @@ async function guardarComoPaquete() {
     const hoteles = Array.from(document.getElementById('hotels-body').querySelectorAll('tr'))
         .map(tr => ({ aloj: tr.querySelector('.hotel-name').value, nhab: tr.querySelector('.nhab').value, noches: tr.querySelector('.noches').value }))
         .filter(h => h.aloj);
-    const modulos = Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean);
+    // Días relativos a la llegada (Día 1 = llegada), sin fechas: al aplicar el paquete se
+    // calculan con la F. Llegada de esa cotización.
+    const armado = leerArmadoItinerario();
+    const modulos = armado.map(x => x.filename);
+    const dias = armado.map(x => x.dia);
     if (!tours.length && !hoteles.length && !modulos.length) {
         notifyWarning('Agrega al menos un itinerario, una actividad o un hotel antes de guardar el paquete.');
         return;
@@ -797,7 +802,7 @@ async function guardarComoPaquete() {
     try {
         const payload = {
             nombre, tours, hoteles,
-            itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos } : null
+            itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos, dias } : null
         };
         if (paqueteEditandoId) payload.id = paqueteEditandoId;
         const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
@@ -845,7 +850,7 @@ async function cargarPaqueteParaEditar(id) {
     sincronizarTabsIdioma();
     await activarIdioma(idioma);
     if (paquete.itinerario?.modulos?.length) {
-        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos });
+        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos, dias: paquete.itinerario.dias });
     }
 
     calcularResumen();
@@ -939,11 +944,17 @@ async function guardarCotizacion() {
         },
         notas: document.getElementById('notas_cotizacion').innerHTML,
         porcentaje_reserva: document.getElementById('porcentaje_reserva').value,
-        itinerarioArmado: {
-            pasajero: document.getElementById('itinerary-passenger').value,
-            titulo: document.getElementById('itinerary-title').value,
-            modulos: Array.from(document.querySelectorAll('#itinerary-builder-body .module-filename')).map(el => el.value).filter(Boolean)
-        },
+        // `dias` va en paralelo a `modulos` (Día 1 = F. Llegada; puede repetirse y saltear
+        // días libres). Lo guardado antes, sin `dias`, se lee como un día por módulo.
+        itinerarioArmado: (() => {
+            const armado = leerArmadoItinerario();
+            return {
+                pasajero: document.getElementById('itinerary-passenger').value,
+                titulo: document.getElementById('itinerary-title').value,
+                modulos: armado.map(x => x.filename),
+                dias: armado.map(x => x.dia)
+            };
+        })(),
         // Paquete predefinido con el que se armó (si se aplicó uno): se guarda dentro del
         // mismo JSON de la cotización, para volver a mostrarlo al reabrirla y listarlo en
         // Gestión de Datos > Cotizaciones Guardadas.
@@ -1081,14 +1092,9 @@ function restaurarItinerarioArmado(armado) {
     const nombrePax = document.querySelector('input[name="nombre_pax"]').value || '';
     document.getElementById('itinerary-passenger').value = armado?.pasajero || nombrePax;
     document.getElementById('itinerary-title').value = armado?.titulo || tituloItinerarioPara(nombrePax);
-    const body = document.getElementById('itinerary-builder-body');
-    body.innerHTML = '';
-    const modulos = armado?.modulos || [];
-    if (modulos.length === 0) {
-        addItineraryBuilderRow('itinerary-builder-body', true);
-    } else {
-        modulos.forEach(filename => addItineraryBuilderRow('itinerary-builder-body', true, filename));
-    }
+    document.getElementById('itinerary-builder-body').innerHTML = '';
+    // Con el armador vacío se respetan los días guardados tal cual (ver aplicarPaqueteItinerario).
+    aplicarPaqueteItinerario({ modulos: armado?.modulos || [], dias: armado?.dias });
 }
 
 // "Cotizaciones Guardadas" (tabla, búsqueda, paginación, abrir/duplicar/ver PDF/eliminar)

@@ -372,3 +372,12 @@
     .cat-pag { justify-content: center; }
     .cat-pag-info { width: 100%; text-align: center; }
 }
+
+/* Itinerarios > Editar: reemplazar el PDF (se sube al guardar, ver abrirEditorItinerario). */
+.ie-pdf-reemplazo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ie-pdf-nuevo { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: #047857; }
+.ie-pdf-nuevo:empty { display: none; }
+.ie-pdf-nuevo em { font-weight: 400; color: #64748b; }
+.ie-pdf-deshacer { width: 22px; height: 22px; border-radius: 6px; color: #94a3b8; }
+.ie-pdf-deshacer:hover { background: #f1f5f9; color: #0f172a; }
+.ie-pdf-reemplazo small { flex-basis: 100%; }

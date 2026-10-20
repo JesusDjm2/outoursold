@@ -179,9 +179,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <thead>
                                     <tr>
                                         <th class="p-2 w-8">&nbsp;</th>
-                                        <th class="p-2 text-left w-20">Día</th>
+                                        <th class="p-2 text-left w-20">Día / Fecha</th>
                                         <th class="p-2 text-left">Itinerario del día</th>
-                                        <th class="p-2 w-16">Acción</th>
+                                        <th class="p-2 w-16">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="itinerary-builder-body"></tbody>

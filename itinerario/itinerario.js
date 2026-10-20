@@ -379,7 +379,7 @@ function buildModuloRow(it) {
         </td>
         <td class="cat-actions">
             <div class="cat-actions-inner">
-                <a href="${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}" target="_blank" rel="noopener" class="cat-icon-btn is-view modulo-ver-btn${roto ? ' is-disabled' : ''}" title="Ver PDF"><i class="fas fa-eye"></i></a>
+                <a href="${urlPdfModulo(it)}" target="_blank" rel="noopener" class="cat-icon-btn is-view modulo-ver-btn${roto ? ' is-disabled' : ''}" title="Ver PDF"><i class="fas fa-eye"></i></a>
                 <button type="button" class="cat-icon-btn modulo-editar-btn" title="Editar"><i class="fas fa-pen"></i></button>
                 <button type="button" class="cat-icon-btn is-danger modulo-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
             </div>
@@ -403,6 +403,13 @@ function buildModuloRow(it) {
     tr.querySelector('.modulo-editar-btn').addEventListener('click', () => abrirEditorItinerario(it));
     tr.querySelector('.modulo-eliminar-btn').addEventListener('click', () => handleItineraryDelete(it.id));
     return tr;
+}
+
+// URL del PDF de un itinerario, con su versión (fecha del archivo) para que tras reemplazarlo
+// el navegador no muestre la copia vieja de su caché.
+function urlPdfModulo(it) {
+    const v = it.archivo_version ? `?v=${it.archivo_version}` : '';
+    return `${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}${v}`;
 }
 
 // ===== Detalle de un itinerario: imagen, Lugares a visitar, Incluye, No incluye (migración 036) =====
@@ -453,6 +460,13 @@ function abrirEditorItinerario(it) {
                         <label>PDF</label>
                         <a class="ie-pdf" target="_blank" rel="noopener"><i class="fas fa-file-pdf mr-1"></i><span></span></a>
                     </div>
+                    <div class="cat-field">
+                        <div class="ie-pdf-reemplazo">
+                            <label class="btn border small cursor-pointer"><i class="fas fa-file-arrow-up mr-1"></i>Reemplazar PDF<input type="file" id="ie-pdf-input" accept="application/pdf,.pdf" class="hidden"></label>
+                            <span class="ie-pdf-nuevo"></span>
+                            <small class="text-slate-400">Las cotizaciones y paquetes que ya usan este itinerario pasan a usar el PDF nuevo.</small>
+                        </div>
+                    </div>
                     <div class="cat-field cat-span-6">
                         <label for="ie-destino">Destino</label>
                         <select id="ie-destino"></select>
@@ -499,8 +513,20 @@ function abrirEditorItinerario(it) {
     $('#ie-lugares').value = it.lugares_visitar || '';
     $('#ie-incluye').value = it.incluye || '';
     $('#ie-no-incluye').value = it.no_incluye || '';
-    $('.ie-pdf').href = `${ITINERARIO_API_BASE}uploads/${idiomaActivo}/${encodeURIComponent(it.filename)}`;
+    $('.ie-pdf').href = urlPdfModulo(it);
     $('.ie-pdf span').textContent = it.filename;
+
+    // PDF nuevo: se sube recién al guardar (como la imagen).
+    let pdfNuevo = null;
+    $('#ie-pdf-input').addEventListener('change', (ev) => {
+        const archivo = ev.target.files[0];
+        ev.target.value = '';
+        if (!archivo) return;
+        if (archivo.type && archivo.type !== 'application/pdf') { notifyWarning('Solo se permiten archivos PDF.'); return; }
+        pdfNuevo = archivo;
+        $('.ie-pdf-nuevo').innerHTML = `<i class="fas fa-file-pdf"></i>${escapeHtml(archivo.name)} <em>· se reemplaza al guardar</em> <button type="button" class="ie-pdf-deshacer" title="No reemplazar"><i class="fas fa-times"></i></button>`;
+        $('.ie-pdf-deshacer').addEventListener('click', () => { pdfNuevo = null; $('.ie-pdf-nuevo').innerHTML = ''; });
+    });
     const destinoSel = $('#ie-destino');
     const categoriaSel = $('#ie-categoria');
     llenarDestinosSelect(destinoSel, it.destino_id);
@@ -563,6 +589,15 @@ function abrirEditorItinerario(it) {
             } else if (imagenElegida === null) {
                 payload.imagen = null;
             }
+            let avisoPdf = '';
+            if (pdfNuevo) {
+                const formData = new FormData();
+                formData.append('pdf', pdfNuevo);
+                formData.append('id', it.id);
+                const subida = await fetch(`${ITINERARIO_API_BASE}api.php?path=reemplazar-pdf-modulo&idioma=${idiomaActivo}`, { method: 'POST', body: formData }).then(r => r.json());
+                if (!subida.success) throw new Error(subida.error || 'Error al reemplazar el PDF.');
+                if (!subida.mismoArchivo) avisoPdf = ' El PDF anterior lo usaba también otro registro, así que este itinerario quedó con un archivo propio; las cotizaciones ya guardadas siguen con el anterior.';
+            }
             const data = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -570,7 +605,7 @@ function abrirEditorItinerario(it) {
             }).then(r => r.json());
             if (!data.success) throw new Error(data.error || 'Error desconocido');
             cerrar();
-            notifySuccess('Itinerario actualizado.');
+            notifySuccess('Itinerario actualizado.' + avisoPdf);
             await cargarIdioma(idiomaActivo);
             renderModulosTable();
         } catch (error) {
@@ -1185,10 +1220,20 @@ function buildPaginaFijaSelect(selectedFile) {
 // <select> plano de arriba directamente, sin input oculto — ambos casos exponen la clase
 // .module-filename con el filename como .value, que es lo que leen el resto de las
 // funciones (guardar config, armar paquete, generar PDF).
-function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedFile = null) {
+// `dia` (solo armador principal): día del viaje, 1 = Fecha de Llegada. Varias filas pueden
+// compartir día y un día sin filas es un día libre. Sin `dia`, la fila va al día siguiente
+// del último. Devuelve la fila creada (o null si era un módulo "día libre", que ya no se
+// arma como fila: ese día queda libre).
+function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedFile = null, dia = null) {
     const tbody = document.getElementById(targetBodyId);
+    const esArmadoConDias = isMainItinerary && typeof prepararFilaItinerarioConDia === 'function';
+    if (esArmadoConDias && selectedFile && esFilenameDiaLibre(selectedFile)) return null;
     const tr = document.createElement('tr');
     tr.className = 'draggable border-b';
+    if (isMainItinerary) {
+        tr.classList.add('itin-fila');
+        tr.dataset.dia = String(dia ?? (maxDiaArmado() + 1));
+    }
 
     const esPaginaFija = targetBodyId === 'start-builder-body' || targetBodyId === 'end-builder-body';
     let selectorEl, hiddenInput = null;
@@ -1233,8 +1278,50 @@ function addItineraryBuilderRow(targetBodyId, isMainItinerary = false, selectedF
     });
 
     tbody.appendChild(tr);
+    if (esArmadoConDias) prepararFilaItinerarioConDia(tr);
     if (isMainItinerary) recalculateDayNumbers();
     itinAddDragHandlers(tr);
+    return tr;
+}
+
+// ===== Días del armador principal =====
+function filasArmado() {
+    return [...document.querySelectorAll('#itinerary-builder-body tr.itin-fila')];
+}
+function maxDiaArmado() {
+    return filasArmado().reduce((max, tr) => Math.max(max, Number(tr.dataset.dia) || 0), 0);
+}
+
+// [{ filename, dia }] de lo armado, ordenado por día (estable dentro del mismo día). Es lo
+// que se guarda en la cotización / paquete y lo que arma el PDF.
+function leerArmadoItinerario() {
+    return filasArmado()
+        .map((tr, i) => ({ filename: tr.querySelector('.module-filename')?.value || '', dia: Number(tr.dataset.dia) || i + 1, orden: i }))
+        .filter(x => x.filename)
+        .sort((a, b) => a.dia - b.dia || a.orden - b.orden)
+        .map(({ filename, dia }) => ({ filename, dia }));
+}
+
+// El módulo "día libre" que traían los catálogos se reemplaza por los días libres
+// implícitos (un día sin itinerario). Se reconoce por el título, en los 3 idiomas.
+function esModuloDiaLibre(m) {
+    const t = String(m?.titulo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    return /\b(dia libre|dias libres|free day|free days|dia livre|dias livres)\b/.test(t);
+}
+function esFilenameDiaLibre(filename, idioma = idiomaActivo) {
+    const m = (idiomaCache[idioma]?.modules || []).find(x => x.filename === filename);
+    return !!m && esModuloDiaLibre(m);
+}
+
+// Normaliza una lista guardada a [{ filename, dia }]. Lo guardado antes de los días
+// (solo `modulos`) se lee como un itinerario por día, consecutivos. Un módulo "día libre"
+// se descarta y su día queda libre.
+function normalizarItinerarioGuardado(modulos, dias) {
+    const lista = (modulos || []).map(String);
+    const conDias = Array.isArray(dias) && dias.length === lista.length && dias.every(d => Number(d) >= 1);
+    return lista
+        .map((filename, i) => ({ filename, dia: conDias ? Number(dias[i]) : i + 1 }))
+        .filter(x => x.filename && !esFilenameDiaLibre(x.filename));
 }
 
 // Tras eliminar un módulo del catálogo, actualiza la etiqueta de cualquier fila (armador
@@ -1255,6 +1342,8 @@ function marcarModulosFueraDeCatalogo() {
 }
 
 function recalculateDayNumbers() {
+    // Cotizador: días con fecha, agrupados y con días libres (shared/itinerario-selector.js).
+    if (typeof refrescarArmadoItinerario === 'function') { refrescarArmadoItinerario(); return; }
     const rows = document.querySelectorAll('#itinerary-builder-body tr');
     rows.forEach((row, index) => {
         const dayInput = row.querySelector('.day-number');
@@ -1265,7 +1354,21 @@ function recalculateDayNumbers() {
 function itinAddDragHandlers(row) {
     row.setAttribute('draggable', 'true');
     row.addEventListener('dragstart', () => { row.classList.add('opacity-60'); window._dragging = row; });
-    row.addEventListener('dragend', () => { row.classList.remove('opacity-60'); if (row.closest('tbody').id === 'itinerary-builder-body') recalculateDayNumbers(); });
+    row.addEventListener('dragstart', () => {
+        // Días antes de arrastrar: al soltar, los mismos días se reparten en el nuevo orden
+        // (como en Actividades), así reordenar no borra días libres ni agrupaciones.
+        if (row.classList.contains('itin-fila')) window._diasAntesDeArrastrar = filasArmado().map(tr => Number(tr.dataset.dia)).sort((a, b) => a - b);
+    });
+    row.addEventListener('dragend', () => {
+        row.classList.remove('opacity-60');
+        if (row.closest('tbody').id !== 'itinerary-builder-body') return;
+        const dias = window._diasAntesDeArrastrar;
+        if (dias && row.classList.contains('itin-fila')) {
+            filasArmado().forEach((tr, i) => { if (dias[i] != null) tr.dataset.dia = String(dias[i]); });
+        }
+        window._diasAntesDeArrastrar = null;
+        recalculateDayNumbers();
+    });
 }
 
 function itinSetupDragDrop() {
@@ -1468,9 +1571,16 @@ function descartarFilaVaciaInicial() {
     if (filasVacias) body.innerHTML = '';
 }
 
+// Con el armador vacío, los días se respetan tal cual (si el paquete empieza en el Día 2
+// porque el 1 es la llegada, sigue siendo así). Si ya hay días armados, se agrega a
+// continuación: su primer día pasa a ser el siguiente al último, con los mismos huecos.
 function aplicarPaqueteItinerario(paquete) {
     descartarFilaVaciaInicial();
-    paquete.modulos.forEach(filename => addItineraryBuilderRow('itinerary-builder-body', true, filename));
+    const items = normalizarItinerarioGuardado(paquete.modulos, paquete.dias);
+    const base = maxDiaArmado();
+    const primero = items.length ? Math.min(...items.map(x => x.dia)) : 1;
+    items.forEach(x => addItineraryBuilderRow('itinerary-builder-body', true, x.filename, base ? base + x.dia - primero + 1 : x.dia));
+    if (!filasArmado().length && document.getElementById('itinerary-builder-body')) addItineraryBuilderRow('itinerary-builder-body', true);
     recalculateDayNumbers();
 }
 
@@ -1550,9 +1660,7 @@ function renderHistorialReusarList() {
     document.getElementById('itinerario-historial-next').disabled = shown >= total;
 }
 function reusarHistorialGenerado(g) {
-    descartarFilaVaciaInicial();
-    g.modulos.forEach(filename => addItineraryBuilderRow('itinerary-builder-body', true, filename));
-    recalculateDayNumbers();
+    aplicarPaqueteItinerario({ modulos: g.modulos });
     cerrarHistorialReusar();
     notifySuccess(`Se agregaron ${g.modulos.length} día(s) de "${g.pasajero} — ${g.titulo}".`);
 }
@@ -1664,6 +1772,81 @@ document.getElementById('historial-filtro-limpiar')?.addEventListener('click', (
 // ===================================================================
 // FUNCIÓN handleGenerateItinerary (VERSIÓN ROBUSTA Y SECUENCIAL)
 // ===================================================================
+// ===== Sellos de cada página del itinerario =====
+// Número del día (a la derecha de "DÍA", donde siempre estuvo), fecha corta en un chip bajo
+// la cabecera y, si corresponde, la etiqueta de días libres a su lado — en la franja libre
+// que dejan las plantillas entre la cabecera y la línea de tiempo.
+const TEXTOS_DIAS_LIBRES = {
+    es: { uno: d => `Día ${d} libre`, varios: (a, b) => `Días ${a}-${b} libres`, cuantos: n => `${n} días libres`, locale: 'es-PE' },
+    en: { uno: d => `Free day ${d}`, varios: (a, b) => `Free days ${a}-${b}`, cuantos: n => `${n} free days`, locale: 'en-US' },
+    pt: { uno: d => `Dia ${d} livre`, varios: (a, b) => `Dias ${a}-${b} livres`, cuantos: n => `${n} dias livres`, locale: 'pt-BR' }
+};
+
+function sumarDiasFechaISO(fechaISO, dias) {
+    const d = new Date(fechaISO + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+}
+
+// "jue 15 oct" / "Thu Oct 15" / "qui 15 out" del día N (Día 1 = llegada); null sin llegada.
+function fechaCortaDia(fLlegada, dia, idioma) {
+    if (!fLlegada) return null;
+    const loc = (TEXTOS_DIAS_LIBRES[idioma] || TEXTOS_DIAS_LIBRES.es).locale;
+    return new Date(sumarDiasFechaISO(fLlegada, dia - 1) + 'T00:00:00Z')
+        .toLocaleDateString(loc, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+        .replace(/[.,]/g, '').replace(/\bde\b/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function crearSellosDiaPdf(idioma, fLlegada, font, rgb) {
+    const t = TEXTOS_DIAS_LIBRES[idioma] || TEXTOS_DIAS_LIBRES.es;
+    const BLANCO = rgb(1, 1, 1);
+    const CHIP_FECHA = rgb(0.11, 0.12, 0.2);
+    const CHIP_LIBRE = rgb(1, 0.95, 0.8);
+    const TEXTO_LIBRE = rgb(0.6, 0.35, 0.02);
+    const CHIP_TOP = 128, CHIP_H = 20, CHIP_X = 14;
+    const fecha = (dia) => fechaCortaDia(fLlegada, dia, idioma);
+    const rango = (a, b) => {
+        const fa = fecha(a), fb = fecha(b);
+        return fa && fb ? `${fa} - ${fb}` : null;
+    };
+
+    // Píldora con texto; devuelve el x donde termina, para encadenar otra al lado.
+    const chip = (page, x, texto, fondo, color, size) => {
+        const { height } = page.getSize();
+        const w = font.widthOfTextAtSize(texto, size) + 20;
+        const r = CHIP_H / 2;
+        const top = height - CHIP_TOP;
+        page.drawSvgPath(`M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w - r} ${CHIP_H} H ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`, { x, y: top, color: fondo });
+        page.drawText(texto, { x: x + 10, y: top - CHIP_H + (CHIP_H - size * 0.7) / 2, size, font, color });
+        return x + w;
+    };
+    const numero = (page, texto) => {
+        const { height } = page.getSize();
+        let size = 28;
+        while (size > 14 && font.widthOfTextAtSize(texto, size) > 46) size -= 1;
+        page.drawText(texto, { x: 65, y: height - 96 + (28 - size) * 0.35, size, font, color: BLANCO });
+    };
+    const chipFecha = (page, texto) => texto ? chip(page, CHIP_X, texto.toUpperCase(), CHIP_FECHA, BLANCO, 9.5) + 6 : CHIP_X;
+
+    return {
+        dia(page, dia) {
+            numero(page, String(dia));
+            page._finChipFecha = chipFecha(page, fecha(dia));
+        },
+        etiquetaLibre(page, dia, { desde, hasta }) {
+            const texto = desde === hasta
+                ? [t.uno(desde), fecha(desde)].filter(Boolean).join(' · ')
+                : [t.varios(desde, hasta), rango(desde, hasta)].filter(Boolean).join(' · ');
+            chip(page, page._finChipFecha ?? CHIP_X, texto, CHIP_LIBRE, TEXTO_LIBRE, 8.5);
+        },
+        bloqueLibre(page, { desde, hasta }) {
+            numero(page, `${desde}-${hasta}`);
+            const x = chipFecha(page, rango(desde, hasta));
+            chip(page, x, t.cuantos(hasta - desde + 1), CHIP_LIBRE, TEXTO_LIBRE, 8.5);
+        }
+    };
+}
+
 async function handleGenerateItinerary() {
     const passengerName = document.getElementById('itinerary-passenger').value || 'Viajero';
     // Embebido en Cotizador, el título ya se autogenera a partir del Nombre PAX (el campo
@@ -1693,16 +1876,30 @@ async function handleGenerateItinerary() {
         const startFiles = document.getElementById('start-builder-body')
             ? getFiles('#start-builder-body .module-filename')
             : fixedStartFilesActivos().slice();
-        const bodyFiles = getFiles('#itinerary-builder-body .module-filename');
+        const armado = leerArmadoItinerario();
+        const bodyFiles = armado.map(x => x.filename);
         const endFiles = document.getElementById('end-builder-body')
             ? getFiles('#end-builder-body .module-filename')
             : fixedEndFilesActivos().slice();
 
-        const allFilesToProcess = [
-            ...startFiles.map(filename => ({ filename, type: 'start' })),
-            ...bodyFiles.map(filename => ({ filename, type: 'body' })),
-            ...endFiles.map(filename => ({ filename, type: 'end' }))
-        ];
+        // Días libres: los días sin itinerario entre dos días armados, agrupados en bloques
+        // seguidos. Un bloque de 1 día va como etiqueta en la primera página del día
+        // siguiente; desde 2 días, una página propia hecha con el módulo "día libre" del
+        // catálogo como plantilla (si no hay, también va como etiqueta).
+        const plantillaLibre = modulosActivos().find(m => esModuloDiaLibre(m) && m.archivo_existe !== false) || null;
+        const allFilesToProcess = startFiles.map(filename => ({ filename, type: 'start' }));
+        let diaAnterior = null;
+        armado.forEach(x => {
+            let libreAntes = null;
+            if (diaAnterior !== null && x.dia - diaAnterior > 1) {
+                const bloque = { desde: diaAnterior + 1, hasta: x.dia - 1 };
+                if (bloque.hasta > bloque.desde && plantillaLibre) allFilesToProcess.push({ filename: plantillaLibre.filename, type: 'libre', ...bloque });
+                else libreAntes = bloque;
+            }
+            allFilesToProcess.push({ filename: x.filename, type: 'body', dia: x.dia, primeraDelDia: x.dia !== diaAnterior, libreAntes });
+            diaAnterior = x.dia;
+        });
+        endFiles.forEach(filename => allFilesToProcess.push({ filename, type: 'end' }));
 
         if (allFilesToProcess.length === 0) {
             hideLoadingModal();
@@ -1713,7 +1910,9 @@ async function handleGenerateItinerary() {
         let charlotteFont = await pdfDoc.embedFont(charlotteFontBytes || 'Helvetica-Bold');
         let janoFont = await pdfDoc.embedFont(janoFontBytes || 'Helvetica-Bold');
 
-        let dayCounterForPdf = 1;
+        // Fechas: Día 1 = Fecha de Llegada de Datos Pax (solo existe en el Cotizador).
+        const fLlegada = document.querySelector('input[name="f_llegada"]')?.value || '';
+        const sellos = crearSellosDiaPdf(idiomaPdf, fLlegada, janoFont, rgb);
         let isFirstPageOfAll = true;
         let totalFiles = allFilesToProcess.length;
 
@@ -1721,19 +1920,22 @@ async function handleGenerateItinerary() {
         for (let i = 0; i < totalFiles; i++) {
             const fileInfo = allFilesToProcess[i];
             const { filename, type } = fileInfo;
+            // La plantilla de días libres aporta solo su primera página.
+            const soloPrimera = type === 'libre';
             const progress = 30 + (i / totalFiles * 65);
             updateProgress(progress, `Procesando ${i + 1} de ${totalFiles}: ${filename}`);
 
             const pdfUrl = `${ITINERARIO_API_BASE}./uploads/${idiomaPdf}/${encodeURIComponent(filename)}`;
-            const res = await fetch(pdfUrl);
+            // no-cache: revalida con el servidor, por si el PDF se reemplazó (mismo nombre).
+            const res = await fetch(pdfUrl, { cache: 'no-cache' });
             if (!res.ok) {
                 throw new Error(`Módulo no encontrado: "${filename}" (${res.status}). El archivo PDF no está subido en el servidor para el idioma "${idiomaPdf}".`);
             }
             const bytes = await res.arrayBuffer();
             const tempDoc = await PDFDocument.load(bytes);
-            const copiedPages = await pdfDoc.copyPages(tempDoc, tempDoc.getPageIndices());
+            const copiedPages = await pdfDoc.copyPages(tempDoc, soloPrimera ? [0] : tempDoc.getPageIndices());
 
-            for (const page of copiedPages) {
+            for (const [indicePagina, page] of copiedPages.entries()) {
                 if (type === 'start' && isFirstPageOfAll) {
                     const { width, height } = page.getSize();
                     const centerX = width / 2;
@@ -1750,18 +1952,13 @@ async function handleGenerateItinerary() {
                 }
 
                 if (type === 'body') {
-                    const { width, height } = page.getSize();
-                    page.drawText(`${dayCounterForPdf}`, {
-                        x: 65, y: height - 96,
-                        size: 28, font: janoFont, color: rgb(1, 1, 1)
-                    });
+                    sellos.dia(page, fileInfo.dia);
+                    if (fileInfo.primeraDelDia && fileInfo.libreAntes && indicePagina === 0) sellos.etiquetaLibre(page, fileInfo.dia, fileInfo.libreAntes);
+                } else if (type === 'libre') {
+                    sellos.bloqueLibre(page, fileInfo);
                 }
 
                 pdfDoc.addPage(page);
-            }
-
-            if (type === 'body') {
-                dayCounterForPdf++;
             }
         }
 

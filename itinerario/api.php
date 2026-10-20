@@ -168,7 +168,10 @@ try {
             $stmt->execute([$_SESSION['user_id']]);
             $modulos = $stmt->fetchAll();
             foreach ($modulos as &$m) {
-                $m['archivo_existe'] = is_file(__DIR__ . "/uploads/$idioma/" . $m['filename']);
+                $rutaPdf = __DIR__ . "/uploads/$idioma/" . $m['filename'];
+                $m['archivo_existe'] = is_file($rutaPdf);
+                // Para que "Ver PDF" no muestre la versión vieja del caché tras reemplazarlo.
+                $m['archivo_version'] = $m['archivo_existe'] ? filemtime($rutaPdf) : null;
                 $m['imagen_existe'] = $m['imagen'] ? is_file(__DIR__ . "/uploads/$idioma/imagenes/" . $m['imagen']) : null;
             }
             unset($m);
@@ -364,6 +367,78 @@ try {
             $stmt = $db->prepare("SELECT id, titulo, filename, destino_id, categoria_id FROM $tablaModulos WHERE id = ?");
             $stmt->execute([$id]);
             echo json_encode(['success' => true, 'id' => $id, 'modulo' => $stmt->fetch()]);
+            break;
+
+        // Reemplaza el PDF de un itinerario (Gestión de Datos > Itinerarios > Editar). Se
+        // sobrescribe el MISMO archivo, porque cotizaciones, paquetes e historial guardan el
+        // nombre del archivo: así todo lo que ya lo usaba toma el PDF nuevo. Si ese archivo
+        // también lo usa otro registro (otro itinerario o una página fija), no se pisa: este
+        // registro pasa a tener un archivo propio con nombre nuevo.
+        case 'reemplazar-pdf-modulo':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $id = idOInt($_POST['id'] ?? null);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID requerido.']);
+                break;
+            }
+            if (!verificarDueno($db, $tablaModulos, $id)) break;
+            if (!isset($_FILES['pdf']) || $_FILES['pdf']['error'] !== UPLOAD_ERR_OK) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No se recibió el PDF o hubo un error en la subida.']);
+                break;
+            }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime = finfo_file($finfo, $_FILES['pdf']['tmp_name']);
+            finfo_close($finfo);
+            if ($mime !== 'application/pdf') {
+                http_response_code(400);
+                echo json_encode(['error' => 'El archivo no es un PDF válido.']);
+                break;
+            }
+            $stmt = $db->prepare("SELECT filename FROM $tablaModulos WHERE id = ?");
+            $stmt->execute([$id]);
+            $filenameActual = (string) $stmt->fetchColumn();
+            $dir = __DIR__ . "/uploads/$idioma/";
+
+            $stmt = $db->prepare("SELECT COUNT(*) FROM $tablaModulos WHERE filename = ? AND id <> ?");
+            $stmt->execute([$filenameActual, $id]);
+            $compartido = $stmt->fetchColumn() > 0;
+            if (!$compartido) {
+                $stmt = $db->prepare("SELECT COUNT(*) FROM $tablaPaginasFijas WHERE filename = ?");
+                $stmt->execute([$filenameActual]);
+                $compartido = $stmt->fetchColumn() > 0;
+            }
+
+            if (!$compartido && validarNombreArchivoPdf($filenameActual)) {
+                // Primero a un temporal en la misma carpeta y luego rename(): si algo falla
+                // a mitad de camino, el PDF anterior queda intacto.
+                $temporal = $dir . '.reemplazo-' . bin2hex(random_bytes(6)) . '.pdf';
+                if (!move_uploaded_file($_FILES['pdf']['tmp_name'], $temporal) || !rename($temporal, $dir . $filenameActual)) {
+                    @unlink($temporal);
+                    http_response_code(500);
+                    echo json_encode(['error' => 'No se pudo guardar el PDF en el servidor.']);
+                    break;
+                }
+                echo json_encode(['success' => true, 'filename' => $filenameActual, 'mismoArchivo' => true]);
+                break;
+            }
+
+            // Compartido (o con un nombre viejo fuera de la lista permitida): archivo nuevo.
+            $base = preg_replace('/[^A-Za-z0-9 _\-]/', '_', pathinfo($filenameActual, PATHINFO_FILENAME)) ?: 'itinerario';
+            $nuevo = $base . '.pdf';
+            for ($n = 1; file_exists($dir . $nuevo); $n++) $nuevo = "{$base}_{$n}.pdf";
+            if (!move_uploaded_file($_FILES['pdf']['tmp_name'], $dir . $nuevo)) {
+                http_response_code(500);
+                echo json_encode(['error' => 'No se pudo guardar el PDF en el servidor.']);
+                break;
+            }
+            $db->prepare("UPDATE $tablaModulos SET filename = ? WHERE id = ?")->execute([$nuevo, $id]);
+            echo json_encode(['success' => true, 'filename' => $nuevo, 'mismoArchivo' => false]);
             break;
 
         case 'actualizar-modulo':

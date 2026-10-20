@@ -604,7 +604,18 @@ try {
                     'noches' => max(1, intval($h['noches'] ?? 1))
                 ];
             }, $hoteles), fn($h) => $h['aloj'] !== ''));
-            $modulos = $itinerario ? array_values(array_filter(array_map('strval', $itinerario['modulos'] ?? []))) : [];
+            // `dias` (opcional) va en paralelo a `modulos`: día del viaje de cada módulo (1 =
+            // llegada; puede repetirse y saltear días libres). Se guarda solo si viene completo.
+            $modulos = [];
+            $dias = [];
+            $diasRecibidos = is_array($itinerario['dias'] ?? null) ? array_values($itinerario['dias']) : [];
+            foreach (array_values($itinerario['modulos'] ?? []) as $i => $modulo) {
+                $modulo = strval($modulo);
+                if ($modulo === '') continue;
+                $modulos[] = $modulo;
+                $dias[] = intval($diasRecibidos[$i] ?? 0);
+            }
+            $diasValidos = $dias && min($dias) >= 1 && max($dias) <= 366;
             $idiomaItinerario = $itinerario['idioma'] ?? '';
             if ($modulos && !in_array($idiomaItinerario, ['es', 'en', 'pt'], true)) {
                 http_response_code(400);
@@ -618,7 +629,9 @@ try {
             }
             $toursJson = json_encode($tours, JSON_UNESCAPED_UNICODE);
             $hotelesJson = $hoteles ? json_encode($hoteles, JSON_UNESCAPED_UNICODE) : null;
-            $itinerarioJson = $modulos ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos], JSON_UNESCAPED_UNICODE) : null;
+            $itinerarioJson = $modulos
+                ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos] + ($diasValidos ? ['dias' => $dias] : []), JSON_UNESCAPED_UNICODE)
+                : null;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaPaquetesTours, $data['id'])) break;
                 $stmt = $db->prepare("UPDATE $tablaPaquetesTours SET nombre = ?, tours = ?, hoteles = ?, itinerario = ? WHERE id = ?");

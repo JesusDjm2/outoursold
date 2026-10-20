@@ -388,55 +388,96 @@ html.isel-abierto, html.isel-abierto body { overflow: hidden; }
 .isel-bandeja-info { display: flex; flex-direction: column; flex-shrink: 0; min-width: 104px; }
 .isel-bandeja-info strong { font-size: 0.875rem; }
 .isel-bandeja-count { font-size: 0.75rem; color: var(--isel-muted); font-variant-numeric: tabular-nums; }
+/* La bandeja es una fila de días: cada día (encabezado + sus itinerarios), las pastillas
+   de días libres entre medio y el "+ Día N" final. El día destino (al que se suman las
+   tarjetas) queda resaltado con el color de marca. */
 .isel-bandeja-lista {
     flex: 1;
     min-width: 0;
     display: flex;
+    align-items: stretch;
     gap: 8px;
     margin: 0; padding: 4px 2px;
     list-style: none;
     overflow-x: auto;
-    scroll-snap-type: x proximity;
     scrollbar-width: thin;
 }
-.isel-bandeja-lista > li {
-    position: relative;
+.isel-dia {
     flex: 0 0 auto;
-    display: flex; align-items: center; gap: 2px;
-    max-width: 260px;
-    padding: 4px 4px 4px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
     border: 1px solid var(--isel-line);
     border-radius: 12px;
     background: #fff;
-    scroll-snap-align: end;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.isel-dia.is-destino { border-color: var(--isel-accent); box-shadow: 0 0 0 3px var(--isel-accent-soft); }
+.isel-dia.is-destino-drop, .isel-libre.is-destino-drop { border-color: var(--isel-accent); background: var(--isel-accent-soft); }
+.isel-dia-head {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-size: 0.72rem; font-weight: 700;
+    color: var(--isel-ink);
+    text-align: left;
+    white-space: nowrap;
+}
+.isel-dia-head:hover { background: #f1f5f9; }
+.isel-dia-head small { font-weight: 500; color: var(--isel-muted); text-transform: capitalize; }
+.isel-dia-head i { font-size: 0.65rem; margin-right: 4px; }
+.isel-dia.is-destino .isel-dia-head { color: var(--isel-accent); }
+.isel-dia-chips { display: flex; gap: 4px; }
+.isel-dia-nuevo { border-style: dashed; background: #fcfcfd; }
+.isel-dia-nuevo-hint { display: flex; align-items: center; height: 38px; padding: 0 8px; font-size: 0.75rem; color: var(--isel-faint); white-space: nowrap; }
+.isel-chip {
+    display: flex; align-items: center; gap: 2px;
+    max-width: 250px;
+    padding: 2px;
+    border-radius: 9px;
+    background: #f8fafc;
     cursor: grab;
-    transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+    transition: opacity 0.15s;
 }
-.isel-bandeja-lista > li.is-nuevo { animation: isel-entra 0.28s ease; }
-.isel-bandeja-lista > li.is-arrastrando { opacity: 0.4; }
-.isel-bandeja-lista > li.is-destino-drop { border-color: var(--isel-accent); box-shadow: 0 0 0 3px var(--isel-accent-soft); }
-.isel-bandeja-lista > li.is-fuera { border-style: dashed; background: #fafafa; }
-.isel-bandeja-lista > li.isel-bandeja-vacia {
-    border-style: dashed;
-    padding: 0 14px;
-    height: 48px;
-    color: var(--isel-faint);
-    font-size: 0.8rem;
-    cursor: default;
+.isel-chip.is-nuevo { animation: isel-entra 0.28s ease; }
+.isel-chip.is-arrastrando { opacity: 0.4; }
+.isel-chip.is-fuera { outline: 1px dashed #f59e0b; }
+.isel-libre {
+    flex: 0 0 auto;
+    display: flex; align-items: center;
+    border: 1px dashed #fcd34d;
+    border-radius: 12px;
+    background: #fffbeb;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-@keyframes isel-entra { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
-.isel-chip-dia {
-    position: absolute; top: -7px; left: -5px;
-    min-width: 20px; height: 20px;
+.isel-libre.is-destino { border-style: solid; border-color: var(--isel-accent); box-shadow: 0 0 0 3px var(--isel-accent-soft); }
+.isel-libre-btn {
+    display: flex; flex-direction: column; justify-content: center; gap: 1px;
+    height: 100%;
+    padding: 4px 12px;
+    font-size: 0.72rem; font-weight: 700;
+    color: #92400e;
+    text-align: left;
+    white-space: nowrap;
+}
+.isel-libre-btn i { margin-right: 5px; }
+.isel-libre-ajuste {
+    width: 24px; height: 24px;
+    flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 5px;
-    border-radius: 999px;
-    background: var(--isel-ink);
-    color: #fff;
-    font-size: 0.68rem; font-weight: 700;
-    border: 2px solid #fff;
-    z-index: 1;
+    margin: 0 4px;
+    border-radius: 7px;
+    color: #b45309;
+    font-size: 0.6rem;
+    transition: background 0.15s;
 }
+.isel-libre-ajuste:hover { background: #fef3c7; }
+.isel-libre-ajuste + .isel-libre-btn { padding-left: 2px; padding-right: 2px; }
+.isel-libre-btn small { font-weight: 500; color: #b45309; text-transform: capitalize; }
+.isel-quitar-salto { width: 26px; height: 26px; margin-right: 4px; border-radius: 7px; color: #b45309; font-size: 0.72rem; }
+.isel-quitar-salto:hover { background: #fef3c7; }
+@keyframes isel-entra { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
 .isel-chip-ver { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 2px; border-radius: 8px; text-align: left; }
 .isel-chip-thumb { width: 52px; height: 38px; flex-shrink: 0; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #f59e0b; }
 .isel-chip-thumb-img { width: 100%; height: 100%; object-fit: cover; }
@@ -461,8 +502,8 @@ html.isel-abierto, html.isel-abierto body { overflow: hidden; }
 /* Las flechas de mover solo aparecen al pasar o enfocar el día (en táctil, siempre). */
 @media (hover: hover) and (pointer: fine) {
     .isel-chip-mover { display: none !important; }
-    .isel-bandeja-lista > li:hover .isel-chip-mover,
-    .isel-bandeja-lista > li:focus-within .isel-chip-mover { display: inline-flex !important; }
+    .isel-chip:hover .isel-chip-mover,
+    .isel-chip:focus-within .isel-chip-mover { display: inline-flex !important; }
 }
 .isel-bandeja-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .isel-aplicar.is-pendiente { box-shadow: 0 0 0 4px var(--isel-accent-soft); }
@@ -599,6 +640,8 @@ html.isel-abierto, html.isel-abierto body { overflow: hidden; }
     .isel-bandeja-acciones { order: 4; flex-basis: 100%; }
     .isel-bandeja-acciones .isel-aplicar { flex: 1; }
     .isel-chip-titulo { max-width: 96px; }
+    .isel-dia-libre span { display: none; }
+    .isel-dia-libre { padding: 0 12px; }
 
     /* Detalle como hoja inferior. */
     .isel-detalle {
@@ -684,16 +727,110 @@ html.isel-abierto, html.isel-abierto body { overflow: hidden; }
 /* Con tarjetas por día la tabla ya no necesita el ancho mínimo del select en cascada. */
 .itinerary-table-container table.itin-armador-visual { min-width: 0; table-layout: fixed; }
 .itin-armador-visual th:nth-child(1) { width: 40px; }
-.itin-armador-visual th:nth-child(2) { width: 84px; }
-.itin-armador-visual th:nth-child(4) { width: 64px; }
-.itin-armador-visual .day-number { font-weight: 600; color: #475569; }
+.itin-armador-visual th:nth-child(2) { width: 150px; }
+.itin-armador-visual th:nth-child(4) { width: 108px; }
+
+/* Día / Fecha: número del día y su fecha (calculada con la F. Llegada, editable). */
+.itinerary-table-container td.itin-col-dia { vertical-align: middle; white-space: normal; }
+.itin-dia-fecha { display: flex; flex-direction: column; gap: 3px; }
+.itin-dia-num { font-size: 0.72rem; font-weight: 700; color: #475569; letter-spacing: 0.02em; }
+.itin-dia-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    font-size: 0.78rem;
+    color: #1e293b;
+    background: #fff;
+}
+.itin-dia-input:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1) 12%, transparent); }
+.itin-dia-input:disabled { background: #f8fafc; color: #cbd5e1; cursor: help; }
+.itin-mismo-dia-label { display: none; align-items: center; gap: 6px; padding-left: 4px; font-size: 0.72rem; color: #94a3b8; }
+.itin-mismo-dia-label i { font-size: 0.65rem; }
+/* Segundo (o más) itinerario del mismo día: sin fecha propia y pegado al de arriba. */
+tr.is-mismo-dia .itin-dia-fecha { display: none; }
+tr.is-mismo-dia .itin-mismo-dia-label { display: flex; }
+.itin-armador-visual tbody tr.itin-fila:has(+ tr.is-mismo-dia) { border-bottom-color: transparent; }
+tr.is-mismo-dia > td { padding-top: 0 !important; }
+
+.itin-col-acciones { white-space: nowrap; }
+.itin-mismo-dia-btn {
+    width: 28px; height: 28px;
+    margin-right: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 0.7rem;
+    vertical-align: middle;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.itin-mismo-dia-btn:hover { border-color: var(--accent-1); color: var(--accent-1); background: color-mix(in srgb, var(--accent-1) 6%, #fff); }
+
+/* Fila de día(s) libre(s): implícita entre dos días con itinerario. */
+tr.itin-libre-fila > td { background: #fffdf5; }
+tr.itin-libre-fila .itin-dia-num { color: #b45309; }
+.itin-libre-fechas { display: block; margin-top: 2px; font-size: 0.72rem; color: #b45309; text-transform: capitalize; }
+.itin-libre { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; padding: 4px 10px; border: 1px dashed #fcd34d; border-radius: 12px; }
+.itin-libre-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 600; color: #92400e; }
+/* − [N días libres] + : cambia la cantidad corriendo los días siguientes. */
+.itin-libre-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.itin-libre-menos, .itin-libre-mas {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 7px;
+    border: 1px solid #fcd34d;
+    background: #fff;
+    color: #b45309;
+    font-size: 0.65rem;
+    transition: background 0.15s, border-color 0.15s;
+}
+.itin-libre-menos:hover, .itin-libre-mas:hover { background: #fef3c7; border-color: #f59e0b; }
+/* Insertar un día libre antes: solo entre dos días seguidos (ver refrescarArmadoItinerario). */
+.itin-libre-antes-btn {
+    display: none;
+    width: 28px; height: 28px;
+    margin-right: 6px;
+    align-items: center; justify-content: center;
+    border-radius: 7px;
+    border: 1px dashed #fcd34d;
+    color: #b45309;
+    font-size: 0.7rem;
+    vertical-align: middle;
+    transition: background 0.15s, border-color 0.15s;
+}
+.itin-libre-antes-btn:hover { background: #fffbeb; border-style: solid; border-color: #f59e0b; }
+tr.puede-libre-antes .itin-libre-antes-btn { display: inline-flex; }
+.itin-libre-nota { font-size: 0.72rem; color: #b45309; }
+.itin-libre-agregar {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 7px;
+    font-size: 0.72rem; font-weight: 600;
+    color: #92400e;
+    background: #fef3c7;
+    transition: background 0.15s;
+}
+.itin-libre-agregar:hover { background: #fde68a; }
+
 @media (max-width: 639px) {
     .itin-armador-visual th, .itin-armador-visual td { padding-left: 4px !important; padding-right: 4px !important; }
-    .itin-armador-visual th:nth-child(1) { width: 28px; }
-    .itin-armador-visual th:nth-child(2) { width: 58px; }
+    .itin-armador-visual th:nth-child(1) { width: 22px; }
+    .itin-armador-visual th:nth-child(2) { width: 96px; }
     .itin-armador-visual th:nth-child(4) { width: 36px; }
-    .itin-armador-visual .day-number { font-size: 0.75rem; padding: 4px 0; }
-    .itin-dia { gap: 8px; padding-right: 8px; }
+    .itin-dia-input { font-size: 0.7rem; padding: 0 2px; }
+    /* La tarjeta entera ya abre el selector: sin "Cambiar" y con miniatura chica, para que
+       el título tenga espacio. Las acciones van una sobre otra. */
+    .itin-dia { gap: 8px; padding: 4px 8px 4px 4px; min-height: 48px; }
+    .itin-dia-cambiar { display: none; }
+    .itin-dia-thumb { width: 36px; height: 36px; }
+    .itin-col-acciones > button { display: flex; margin: 0 auto; }
+    .itin-mismo-dia-btn, .itin-libre-antes-btn { margin: 0 auto 6px !important; }
+    tr.puede-libre-antes .itin-libre-antes-btn { display: flex; }
+    .itin-libre-nota { display: none; }
+    .itin-libre-agregar span { display: none; }
 }
 .itin-dia.is-resaltado { animation: itin-dia-resalta 1.6s ease; }
 @keyframes itin-dia-resalta {
