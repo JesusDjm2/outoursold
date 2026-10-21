@@ -64,7 +64,7 @@ function nombreCategoria(id) { return itinCategoriasData.find(c => c.id === id)?
 // de Actividades / Hoteles). Como cada grupo puede tener su propio "Cusco", el nombre lleva
 // el grupo ("Cusco · Con pernocte") para distinguirlos en selects y en el desplegable del
 // armador. Copias nuevas: no se toca el destinosData compartido con la página.
-const GRUPOS_DESTINO_NOMBRE = { 1: 'Con pernocte', 2: 'Sin pernocte' }; // ids fijos (migración 032)
+const GRUPOS_DESTINO_NOMBRE = { 1: 'Con hotel', 2: 'Sin hotel' }; // ids fijos (migración 032; nombres, 037)
 function destinosDeItinerarios(lista) {
     return (Array.isArray(lista) ? lista : [])
         .filter(d => d.grupo_id != null)
@@ -437,6 +437,53 @@ function indicadoresDetalleItinerario(it) {
     }).join('');
 }
 
+// Guarda cambios de un itinerario del catálogo (lo usan el editor de Gestión de Datos y el
+// popup de detalles del Cotizador). `cambios`: titulo, lugares_visitar, incluye, no_incluye,
+// y opcionalmente destino_id / categoria_id (solo se envían si vienen), imagen ('actual'
+// sin cambios, un File nuevo o null para quitarla) y pdf (File para reemplazarlo). Recarga
+// el catálogo del idioma y devuelve { filename } (puede cambiar si el PDF era compartido)
+// y un aviso para mostrar.
+async function guardarItinerarioCatalogo(it, cambios) {
+    const payload = {
+        id: it.id,
+        titulo: cambios.titulo,
+        lugares_visitar: cambios.lugares_visitar,
+        incluye: cambios.incluye,
+        no_incluye: cambios.no_incluye
+    };
+    if ('destino_id' in cambios) payload.destino_id = cambios.destino_id;
+    if ('categoria_id' in cambios) payload.categoria_id = cambios.categoria_id;
+    if (cambios.imagen instanceof File) {
+        const formData = new FormData();
+        formData.append('imagen', cambios.imagen);
+        formData.append('idioma', idiomaActivo);
+        const subida = await fetch(`${ITINERARIO_API_BASE}upload-imagen.php`, { method: 'POST', body: formData }).then(r => r.json());
+        if (!subida.success) throw new Error(subida.error || 'Error al subir la imagen.');
+        payload.imagen = subida.imagen;
+    } else if (cambios.imagen === null) {
+        payload.imagen = null;
+    }
+    let filename = it.filename;
+    let aviso = '';
+    if (cambios.pdf) {
+        const formData = new FormData();
+        formData.append('pdf', cambios.pdf);
+        formData.append('id', it.id);
+        const subida = await fetch(`${ITINERARIO_API_BASE}api.php?path=reemplazar-pdf-modulo&idioma=${idiomaActivo}`, { method: 'POST', body: formData }).then(r => r.json());
+        if (!subida.success) throw new Error(subida.error || 'Error al reemplazar el PDF.');
+        filename = subida.filename;
+        if (!subida.mismoArchivo) aviso = ' El PDF anterior lo usaba también otro registro, así que este itinerario quedó con un archivo propio; las cotizaciones ya guardadas siguen con el anterior.';
+    }
+    const data = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+    if (!data.success) throw new Error(data.error || 'Error desconocido');
+    await cargarIdioma(idiomaActivo);
+    return { filename, aviso };
+}
+
 // Formulario completo de un itinerario (el lápiz de la fila). Se arma en el momento, así
 // que sirve igual en Gestión de Datos y en la página standalone de Itinerario.
 function abrirEditorItinerario(it) {
@@ -570,43 +617,18 @@ function abrirEditorItinerario(it) {
         boton.disabled = true;
         boton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...';
         try {
-            const payload = {
-                id: it.id,
+            const { aviso } = await guardarItinerarioCatalogo(it, {
                 titulo,
                 destino_id: destinoSel.value || null,
                 categoria_id: categoriaSel.value || null,
                 lugares_visitar: $('#ie-lugares').value,
                 incluye: $('#ie-incluye').value,
-                no_incluye: $('#ie-no-incluye').value
-            };
-            if (imagenElegida instanceof File) {
-                const formData = new FormData();
-                formData.append('imagen', imagenElegida);
-                formData.append('idioma', idiomaActivo);
-                const subida = await fetch(`${ITINERARIO_API_BASE}upload-imagen.php`, { method: 'POST', body: formData }).then(r => r.json());
-                if (!subida.success) throw new Error(subida.error || 'Error al subir la imagen.');
-                payload.imagen = subida.imagen;
-            } else if (imagenElegida === null) {
-                payload.imagen = null;
-            }
-            let avisoPdf = '';
-            if (pdfNuevo) {
-                const formData = new FormData();
-                formData.append('pdf', pdfNuevo);
-                formData.append('id', it.id);
-                const subida = await fetch(`${ITINERARIO_API_BASE}api.php?path=reemplazar-pdf-modulo&idioma=${idiomaActivo}`, { method: 'POST', body: formData }).then(r => r.json());
-                if (!subida.success) throw new Error(subida.error || 'Error al reemplazar el PDF.');
-                if (!subida.mismoArchivo) avisoPdf = ' El PDF anterior lo usaba también otro registro, así que este itinerario quedó con un archivo propio; las cotizaciones ya guardadas siguen con el anterior.';
-            }
-            const data = await fetch(`${ITINERARIO_API_BASE}api.php?path=actualizar-modulo&idioma=${idiomaActivo}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            }).then(r => r.json());
-            if (!data.success) throw new Error(data.error || 'Error desconocido');
+                no_incluye: $('#ie-no-incluye').value,
+                imagen: imagenElegida,
+                pdf: pdfNuevo
+            });
             cerrar();
-            notifySuccess('Itinerario actualizado.' + avisoPdf);
-            await cargarIdioma(idiomaActivo);
+            notifySuccess('Itinerario actualizado.' + aviso);
             renderModulosTable();
         } catch (error) {
             notifyError('No se pudo guardar el itinerario: ' + error.message);

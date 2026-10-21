@@ -282,7 +282,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             <div id="gestion-clasificacion" class="subtab-content">
                 <div class="card p-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
-                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántas actividades y hoteles tiene; elige uno a la izquierda para ver y gestionar sus categorías. Las categorías de itinerarios y los grupos Con / Sin pernocte se gestionan en la pestaña <a href="gestion.php?vista=itinerarios" class="underline">Itinerarios</a>.</p>
+                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántas actividades y hoteles tiene; elige uno a la izquierda para ver y gestionar sus categorías. Las categorías de itinerarios y los grupos Con / Sin hotel se gestionan en la pestaña <a href="gestion.php?vista=itinerarios" class="underline">Itinerarios</a>.</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div class="md:col-span-4 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
@@ -381,7 +381,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             <div id="itin-clasificacion">
                 <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
                 <div class="card p-6">
-                    <p class="text-sm text-slate-500 mb-4"><strong>Con pernocte</strong> y <strong>Sin pernocte</strong> tienen cada uno sus propios destinos y categorías (puede haber un mismo nombre, como "Cusco", en los dos). Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
+                    <p class="text-sm text-slate-500 mb-4"><strong>Con hotel</strong> y <strong>Sin hotel</strong> tienen cada uno sus propios destinos y categorías (puede haber un mismo nombre, como "Cusco", en los dos). Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                         <div class="md:col-span-5 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>

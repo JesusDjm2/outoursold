@@ -174,30 +174,26 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <!-- El "aplicar itinerario predeterminado" viejo (solo itinerario) se quitó: el
                              selector "Aplicar paquete..." de arriba ya cubre itinerario junto con
                              actividades y hoteles (ver #aplicar-paquete-select). -->
-                        <div class="itinerary-table-container">
+                        <!-- Armado del itinerario (shared/itinerario-selector.js): tarjetas por día,
+                             panel desplegable para elegir (Con / Sin hotel → destino → tarjetas con
+                             imagen) y popup de detalles/edición. La tabla de abajo queda oculta como
+                             almacén: la leen guardar, paquetes y el PDF (itinerario.js). -->
+                        <div class="itin-armado">
+                            <div class="itin-armado-barra">
+                                <span id="itin-resumen" class="itin-resumen"></span>
+                                <button id="elegir-itinerarios" type="button" class="itin-elegir-btn small" aria-controls="itin-panel" aria-expanded="false"><i class="fas fa-plus"></i>Agregar itinerarios</button>
+                            </div>
+                            <div id="itin-grilla" class="itin-grilla"></div>
+                            <div id="itin-panel" class="itin-panel" hidden></div>
+                        </div>
+                        <div class="itinerary-table-container" hidden>
                             <table class="w-full small itin-armador-visual">
-                                <thead>
-                                    <tr>
-                                        <th class="p-2 w-8">&nbsp;</th>
-                                        <th class="p-2 text-left w-20">Día / Fecha</th>
-                                        <th class="p-2 text-left">Itinerario del día</th>
-                                        <th class="p-2 w-16">Acciones</th>
-                                    </tr>
-                                </thead>
                                 <tbody id="itinerary-builder-body"></tbody>
                             </table>
                         </div>
                         <!-- Sin botón propio de generar: "Guardar" (Resumen de Factura) ya genera el PDF
-                             del itinerario junto con el de la cotización si hay módulos armados acá. El
-                             aviso de abajo lo hace descubrible, porque Guardar queda varios scrolls más abajo. -->
-                        <div class="flex flex-wrap items-center gap-2 mt-3">
-                            <!-- Selector visual (shared/itinerario-selector.js): Con / Sin pernocte →
-                                 Destino → Categoría con imágenes, para armar varios días de una vez.
-                                 Un día puntual se cambia tocándolo en la tabla. -->
-                            <button id="elegir-itinerarios" type="button" class="itin-elegir-btn small"><i class="fas fa-images"></i>Elegir itinerarios</button>
-                            <button id="add-itinerary-row" type="button" class="px-3 py-1 rounded-md small border bg-white" title="Agrega un día vacío al final">+ Día</button>
-                            <span class="solo-cotizacion small text-slate-500">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</span>
-                        </div>
+                             del itinerario junto con el de la cotización si hay módulos armados acá. -->
+                        <p class="solo-cotizacion small text-slate-500 mt-3">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</p>
                         </div>
                     </div>
                     <div class="card p-3 accordion-section" data-accordion-key="actividades">
