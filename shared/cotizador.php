@@ -181,7 +181,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="itin-armado">
                             <div class="itin-armado-barra">
                                 <span id="itin-resumen" class="itin-resumen"></span>
-                                <button id="elegir-itinerarios" type="button" class="itin-elegir-btn small" aria-controls="itin-panel" aria-expanded="false"><i class="fas fa-plus"></i>Agregar itinerarios</button>
                             </div>
                             <div id="itin-grilla" class="itin-grilla"></div>
                             <div id="itin-panel" class="itin-panel" hidden></div>

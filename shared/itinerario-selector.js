@@ -305,7 +305,6 @@ function abrirPanelItinerarios({ destino = null, reemplazar = null } = {}) {
     renderPanelGrupos();
     renderPanelCatalogo();
     renderGrilla();
-    document.getElementById('elegir-itinerarios')?.setAttribute('aria-expanded', 'true');
     requestAnimationFrame(() => {
         const r = panel.getBoundingClientRect();
         if (r.top > window.innerHeight - 160 || r.top < 0) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -319,7 +318,6 @@ function cerrarPanelItinerarios() {
     armadoUI.reemplazar = null;
     armadoUI.saltos = 0;
     panel.hidden = true;
-    document.getElementById('elegir-itinerarios')?.setAttribute('aria-expanded', 'false');
     renderGrilla();
 }
 
@@ -653,10 +651,6 @@ function resaltarTarjeta(uid) {
     setTimeout(() => card.classList.remove('is-nueva'), 1200);
 }
 
-document.getElementById('elegir-itinerarios')?.addEventListener('click', () => {
-    if (armadoUI.panelAbierto) cerrarPanelItinerarios();
-    else abrirPanelItinerarios({ destino: null });
-});
 document.querySelector('input[name="f_llegada"]')?.addEventListener('change', refrescarArmadoItinerario);
 
 // ===== Popup de detalles (y edición) =====

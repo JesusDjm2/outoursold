@@ -13,25 +13,13 @@
     --ia-line: #e2e8f0;
 }
 
-/* ===== Barra superior: resumen + botón ===== */
+/* ===== Barra superior: resumen (el panel se abre desde la grilla) ===== */
 .itin-armado-barra { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.itin-armado-barra:has(> .itin-resumen:empty) { display: none; }
 .itin-resumen { font-size: 0.8rem; color: var(--ia-muted); }
 .itin-resumen strong { color: var(--ia-ink); }
 .itin-resumen-fechas { text-transform: capitalize; }
 .itin-resumen-aviso { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; color: #b45309; }
-.itin-elegir-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    margin-left: auto;
-    padding: 7px 14px;
-    border-radius: 9px;
-    color: #fff;
-    background: var(--accent-1);
-    font-weight: 600;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
-    transition: filter 0.15s;
-}
-.itin-elegir-btn:hover { filter: brightness(0.94); }
-.itin-elegir-btn[aria-expanded="true"] { background: #1e293b; }
 
 /* ===== Grilla de elegidos ===== */
 .itin-grilla { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
@@ -486,7 +474,6 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .itin-card-badge-dia, .itin-card-badge-fecha { font-size: 0.6rem; padding: 1px 5px; }
     .itin-libre-card-fechas { display: none !important; }
     .itin-card-titulo { font-size: 0.7rem; left: 7px; right: 7px; bottom: 6px; }
-    .itin-elegir-btn { width: 100%; justify-content: center; }
     .itin-vacio-cta { margin-left: 0; }
     .itin-panel { margin-left: -6px; margin-right: -6px; padding: 12px 10px; }
     .itin-panel-destino { width: 100%; flex-wrap: wrap; }
