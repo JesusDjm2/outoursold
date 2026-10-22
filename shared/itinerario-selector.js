@@ -48,6 +48,10 @@ function iselDestinos() {
     const lista = (typeof destinosData !== 'undefined' && Array.isArray(destinosData)) ? destinosData : [];
     return lista.filter(d => d.grupo_id != null);
 }
+// Orden propio del usuario (arrastrando los chips de destino); a igual orden, por nombre.
+function iselCompararDestinos(a, b) {
+    return (Number(a.orden) || 0) - (Number(b.orden) || 0) || a.nombre.localeCompare(b.nombre);
+}
 
 // Catálogo del idioma activo con su clasificación resuelta (sin el módulo "día libre": un
 // día sin itinerario ya es libre).
@@ -344,6 +348,7 @@ function construirPanel(panel) {
         </div>
         <div class="itin-panel-destinos" role="group" aria-label="Filtrar por destino"></div>
         <div class="itin-panel-grid" aria-live="polite"></div>`;
+    activarOrdenDestinos(panel.querySelector('.itin-panel-destinos'));
     let debounce;
     panel.querySelector('.itin-panel-buscar input').addEventListener('input', (ev) => {
         clearTimeout(debounce);
@@ -391,6 +396,84 @@ function construirPanel(panel) {
         pintarEstadoTarjetasPanel();
         renderGrilla();
     });
+}
+
+// Arrastrar un chip de destino cambia el orden de los destinos (chips y secciones del panel)
+// y se guarda en la BD (destinos.orden), así la próxima cotización ya lo trae. Con puntero
+// (mouse o dedo); un toque sin mover sigue siendo el filtro.
+function activarOrdenDestinos(cont) {
+    let arrastre = null;
+    let sinClickHasta = 0;
+    // El click que sigue al soltar un arrastre no debe filtrar.
+    cont.addEventListener('click', (ev) => {
+        if (performance.now() < sinClickHasta) { ev.stopPropagation(); ev.preventDefault(); }
+    }, true);
+    cont.addEventListener('pointerdown', (ev) => {
+        const chip = ev.target.closest('.itin-panel-chip.is-ordenable');
+        if (!chip || ev.button !== 0) return;
+        arrastre = { chip, x0: ev.clientX, activo: false, id: ev.pointerId, antes: idsChips() };
+    });
+    cont.addEventListener('pointermove', (ev) => {
+        if (!arrastre || ev.pointerId !== arrastre.id) return;
+        if (!arrastre.activo) {
+            if (Math.abs(ev.clientX - arrastre.x0) < 6) return;
+            arrastre.activo = true;
+            arrastre.chip.setPointerCapture(ev.pointerId);
+            arrastre.chip.classList.add('is-arrastrando');
+            cont.classList.add('is-ordenando');
+        }
+        ev.preventDefault();
+        // Desplaza la fila de chips si el puntero llega a un borde.
+        const caja = cont.getBoundingClientRect();
+        if (ev.clientX < caja.left + 30) cont.scrollLeft -= 12;
+        else if (ev.clientX > caja.right - 30) cont.scrollLeft += 12;
+        const otros = [...cont.querySelectorAll('.itin-panel-chip.is-ordenable')].filter(c => c !== arrastre.chip);
+        const siguiente = otros.find(c => { const r = c.getBoundingClientRect(); return ev.clientX < r.left + r.width / 2; });
+        if (siguiente) { if (arrastre.chip.nextElementSibling !== siguiente) cont.insertBefore(arrastre.chip, siguiente); }
+        else if (otros.length && otros[otros.length - 1].nextElementSibling !== arrastre.chip) otros[otros.length - 1].after(arrastre.chip);
+    });
+    const terminar = (ev) => {
+        if (!arrastre || ev.pointerId !== arrastre.id) return;
+        const { chip, activo, antes } = arrastre;
+        arrastre = null;
+        if (!activo) return;
+        chip.classList.remove('is-arrastrando');
+        cont.classList.remove('is-ordenando');
+        sinClickHasta = performance.now() + 400;
+        const despues = idsChips();
+        if (despues.join() !== antes.join()) guardarOrdenDestinos(despues);
+    };
+    cont.addEventListener('pointerup', terminar);
+    cont.addEventListener('pointercancel', terminar);
+    function idsChips() {
+        return [...cont.querySelectorAll('.itin-panel-chip.is-ordenable')].map(c => Number(c.dataset.filtroDestino));
+    }
+}
+
+// Los chips pueden ser solo una parte de los destinos del grupo (búsqueda activa, o destinos
+// sin itinerarios en este idioma): los movidos se reacomodan dentro de los lugares que ya
+// ocupaban y el resto queda donde estaba. Se guarda el grupo completo.
+async function guardarOrdenDestinos(idsMovidos) {
+    const movidos = new Set(idsMovidos);
+    const grupo = iselDestinos().filter(d => String(d.grupo_id) === armadoUI.grupo).sort(iselCompararDestinos);
+    const cola = [...idsMovidos];
+    const ids = grupo.map(d => movidos.has(Number(d.id)) ? cola.shift() : Number(d.id));
+    const porId = new Map(destinosData.map(d => [Number(d.id), d]));
+    ids.forEach((id, i) => { const d = porId.get(id); if (d) d.orden = i + 1; });
+    renderPanelCatalogo();
+    try {
+        const res = await fetch(`${API_URL}?path=ordenar-destinos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'No se pudo guardar el orden');
+        iselToast('Orden de destinos guardado');
+    } catch (error) {
+        console.error('Error al guardar el orden de destinos:', error);
+        iselToast(error.message || 'No se pudo guardar el orden', 'error');
+    }
 }
 
 // "Agregando al: [Día 5 · vie 14 nov ▾]" (o, en modo Cambiar, qué se está reemplazando).
@@ -465,20 +548,21 @@ function renderPanelCatalogo() {
     const porDestino = new Map();
     entradas.forEach(e => {
         const k = e.destino ? String(e.destino.id) : '0';
-        if (!porDestino.has(k)) porDestino.set(k, { nombre: e.destino?.nombre || 'Sin clasificar', n: 0 });
+        if (!porDestino.has(k)) porDestino.set(k, { destino: e.destino, nombre: e.destino?.nombre || 'Sin clasificar', n: 0 });
         porDestino.get(k).n++;
     });
     if (armadoUI.filtroDestino && !porDestino.has(armadoUI.filtroDestino)) armadoUI.filtroDestino = '';
     const chips = panel.querySelector('.itin-panel-destinos');
     chips.hidden = porDestino.size < 2;
+    // Los chips de destino se arrastran para cambiar su orden (ver activarOrdenDestinos).
     chips.innerHTML = `<button type="button" class="itin-panel-chip${armadoUI.filtroDestino ? '' : ' is-activo'}" data-filtro-destino="">Todos<span>${entradas.length}</span></button>` +
-        [...porDestino.entries()].sort((a, b) => a[1].nombre.localeCompare(b[1].nombre))
-            .map(([k, d]) => `<button type="button" class="itin-panel-chip${armadoUI.filtroDestino === k ? ' is-activo' : ''}" data-filtro-destino="${k}">${escapeHtml(d.nombre)}<span>${d.n}</span></button>`).join('');
+        [...porDestino.entries()].sort((a, b) => (!a[1].destino - !b[1].destino) || (a[1].destino ? iselCompararDestinos(a[1].destino, b[1].destino) : 0))
+            .map(([k, d]) => `<button type="button" class="itin-panel-chip${armadoUI.filtroDestino === k ? ' is-activo' : ''}${d.destino ? ' is-ordenable' : ''}" data-filtro-destino="${k}"${d.destino ? ' title="Arrastra para cambiar el orden"' : ''}>${d.destino ? '<i class="fas fa-grip-vertical" aria-hidden="true"></i>' : ''}${escapeHtml(d.nombre)}<span>${d.n}</span></button>`).join('');
 
     const visibles = entradas
         .filter(e => !armadoUI.filtroDestino || (e.destino ? String(e.destino.id) : '0') === armadoUI.filtroDestino)
-        // Destino → categoría → título; "Sin clasificar" y "Sin categoría" siempre al final.
-        .sort((a, b) => (!a.destino - !b.destino) || (a.destino?.nombre || '').localeCompare(b.destino?.nombre || '')
+        // Destino (en su orden) → categoría → título; "Sin clasificar" y "Sin categoría" siempre al final.
+        .sort((a, b) => (!a.destino - !b.destino) || (a.destino && b.destino ? iselCompararDestinos(a.destino, b.destino) : 0)
             || (!a.categoria - !b.categoria) || (a.categoria?.nombre || '').localeCompare(b.categoria?.nombre || '')
             || a.m.titulo.localeCompare(b.m.titulo));
 

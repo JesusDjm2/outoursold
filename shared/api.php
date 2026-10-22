@@ -98,12 +98,12 @@ try {
             // Acotado a TU propio catálogo (admin incluido) — ver el de todas las agencias
             // mezclado es cosa de Comparativo/Catálogo por agencia, no de este selector.
             $stmt = $db->prepare(
-                "SELECT d.id, d.nombre, d.grupo_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
+                "SELECT d.id, d.nombre, d.grupo_id, d.orden, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM destinos d
                  LEFT JOIN usuarios u ON u.id = d.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
                  WHERE d.creado_por = ?
-                 ORDER BY d.nombre"
+                 ORDER BY d.orden, d.nombre"
             );
             $stmt->execute([$_SESSION['user_id']]);
             echo json_encode($stmt->fetchAll());
@@ -156,8 +156,16 @@ try {
                     echo json_encode(['error' => $mensajeDuplicado($grupoId)]);
                     break;
                 }
-                $stmt = $db->prepare("INSERT INTO destinos (nombre, grupo_id, creado_por) VALUES (?, ?, ?)");
-                $stmt->execute([$nombreDestino, $grupoId, $_SESSION['user_id']]);
+                // Uno de Itinerarios nace al final del orden de su grupo (ver ordenar-destinos);
+                // los sin grupo quedan en 0 y siguen saliendo por nombre.
+                $orden = 0;
+                if ($grupoId !== null) {
+                    $stmt = $db->prepare("SELECT COALESCE(MAX(orden), 0) + 1 FROM destinos WHERE creado_por = ? AND grupo_id = ?");
+                    $stmt->execute([$_SESSION['user_id'], $grupoId]);
+                    $orden = (int) $stmt->fetchColumn();
+                }
+                $stmt = $db->prepare("INSERT INTO destinos (nombre, grupo_id, orden, creado_por) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$nombreDestino, $grupoId, $orden, $_SESSION['user_id']]);
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
             }
             break;
@@ -165,6 +173,28 @@ try {
         // Catálogo fijo de grupos de destino (migración 032): Con pernocte / Sin pernocte.
         case 'grupos-destino':
             echo json_encode($db->query("SELECT id, clave, nombre FROM grupos_destino ORDER BY orden")->fetchAll());
+            break;
+
+        // Guarda el orden de los destinos propios arrastrado en el panel de itinerarios del
+        // Cotizador: recibe los ids ya ordenados y cada uno queda con su posición (1, 2, ...).
+        case 'ordenar-destinos':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $ids = array_values(array_unique(array_map('intval', is_array($data['ids'] ?? null) ? $data['ids'] : [])));
+            if (!$ids) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Lista de destinos requerida']);
+                break;
+            }
+            $db->beginTransaction();
+            $stmt = $db->prepare("UPDATE destinos SET orden = ? WHERE id = ? AND creado_por = ?");
+            foreach ($ids as $i => $id) $stmt->execute([$i + 1, $id, $_SESSION['user_id']]);
+            $db->commit();
+            echo json_encode(['success' => true]);
             break;
 
         // Mueve un destino propio a un grupo, o lo deja "Sin asignar" (grupo_id null).

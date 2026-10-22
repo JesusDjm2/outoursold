@@ -262,6 +262,10 @@
 .itin-panel-chip { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 5px 11px; border: 1px solid var(--ia-line); border-radius: 999px; background: #fff; font-size: 0.76rem; font-weight: 600; color: #475569; }
 .itin-panel-chip span { font-size: 0.66rem; color: var(--ia-faint); }
 .itin-panel-chip.is-activo { border-color: var(--ia-accent); background: var(--ia-accent-soft); color: var(--ia-accent); }
+.itin-panel-chip.is-ordenable { cursor: grab; touch-action: pan-y; user-select: none; }
+.itin-panel-chip.is-ordenable > i { font-size: 0.62rem; color: var(--ia-faint); margin-left: -3px; }
+.itin-panel-destinos.is-ordenando, .itin-panel-destinos.is-ordenando .itin-panel-chip { cursor: grabbing; }
+.itin-panel-chip.is-arrastrando { border-color: var(--ia-accent); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18); transform: scale(1.05); position: relative; z-index: 1; }
 
 .itin-panel-grid {
     display: grid;
