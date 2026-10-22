@@ -438,7 +438,7 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .idet-aviso i { margin-top: 3px; }
 .idet-campo { display: flex; flex-direction: column; gap: 5px; }
 .idet-campo > span { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; }
-.idet-campo input[type="text"], .idet-campo textarea {
+.idet-campo input[type="text"], .idet-campo textarea, .idet-campo select {
     width: 100%;
     padding: 8px 10px;
     border: 1px solid #e2e8f0;
@@ -447,7 +447,9 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     color: #0f172a;
     resize: vertical;
 }
-.idet-campo input:focus, .idet-campo textarea:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
+.idet-campo select { background: #fff; }
+.idet-campo select:disabled { background: #f8fafc; color: #94a3b8; }
+.idet-campo input:focus, .idet-campo textarea:focus, .idet-campo select:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
 .idet-campos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .if-imagen { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .if-imagen-preview { width: 132px; height: 88px; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: center; }

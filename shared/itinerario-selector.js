@@ -812,6 +812,10 @@ function renderDetalleEdicion(caja, e) {
         <div class="idet-body idet-form">
             <p class="idet-aviso"><i class="fas fa-circle-info"></i>Los cambios se guardan en el catálogo: se verán en todas las cotizaciones y paquetes que usan este itinerario.</p>
             <label class="idet-campo"><span>Título</span><input type="text" class="if-titulo" value="${escapeHtml(m.titulo)}"></label>
+            <div class="idet-campos-2">
+                <label class="idet-campo"><span>Destino</span><select class="if-destino"></select></label>
+                <label class="idet-campo"><span>Categoría</span><select class="if-categoria" disabled></select></label>
+            </div>
             <div class="idet-campo">
                 <span>Imagen</span>
                 <div class="if-imagen">
@@ -842,6 +846,14 @@ function renderDetalleEdicion(caja, e) {
             <button type="button" class="idet-btn is-primario if-guardar"><i class="fas fa-save"></i>Guardar</button>
         </div>`;
     const $ = (s) => caja.querySelector(s);
+    // Destino (con su grupo Con / Sin hotel) y categoría: mismos selectores que el editor de
+    // Gestión de Datos (itinerario.js), incluido "+ Crear nueva categoría...".
+    const destinoSel = $('.if-destino');
+    const categoriaSel = $('.if-categoria');
+    llenarDestinosSelect(destinoSel, m.destino_id);
+    llenarCategoriasSelect(categoriaSel, destinoSel.value, m.categoria_id);
+    destinoSel.addEventListener('change', () => llenarCategoriasSelect(categoriaSel, destinoSel.value, null));
+    habilitarCreacionCategoria(categoriaSel, destinoSel);
     let imagen = 'actual';
     let pdf = null;
     const pintarImagen = () => {
@@ -884,6 +896,8 @@ function renderDetalleEdicion(caja, e) {
             const anterior = m.filename;
             const { filename, aviso } = await guardarItinerarioCatalogo(m, {
                 titulo,
+                destino_id: destinoSel.value || null,
+                categoria_id: categoriaSel.value || null,
                 lugares_visitar: $('.if-lugares').value,
                 incluye: $('.if-incluye').value,
                 no_incluye: $('.if-no-incluye').value,
@@ -897,7 +911,8 @@ function renderDetalleEdicion(caja, e) {
             detalleActual.filename = filename;
             detalleActual.editando = false;
             refrescarArmadoItinerario();
-            if (armadoUI.panelAbierto) renderPanelCatalogo();
+            // Si cambió de destino puede haber pasado a otro grupo (Con / Sin hotel): conteos también.
+            if (armadoUI.panelAbierto) { renderPanelGrupos(); renderPanelCatalogo(); }
             renderDetalle();
             iselToast('Itinerario actualizado');
             if (aviso) notifyWarning(aviso.trim());
