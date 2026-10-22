@@ -137,26 +137,87 @@ function require_login() {
     }
 }
 
+// ===== Ámbito de los datos: la agencia =====
 // Catálogo (destinos, categorías, tours, hoteles, módulos de itinerario, páginas fijas,
-// paquetes) es propio de cada usuario, igual que cotizaciones/itinerarios generados: un
-// admin puede tocar cualquier fila, un no-admin solo las suyas. Compartida por
-// shared/api.php e itinerario/api.php. Devuelve true si puede proceder; si no, ya
-// respondió el error HTTP y el caller debe hacer `break`.
-function verificarDueno($db, $tabla, $id) {
-    if (is_admin()) return true;
-    $stmt = $db->prepare("SELECT creado_por FROM $tabla WHERE id = ?");
+// paquetes), cotizaciones e itinerarios generados son de la AGENCIA: todos los usuarios de
+// una agencia ven y editan lo que cualquiera de ellos creó, y nada se cruza con otras
+// agencias. Un usuario sin agencia (típicamente el admin) solo ve y toca lo suyo. El admin
+// NO tiene pase libre: lo de las agencias lo ve en solo lectura desde Agencias
+// (shared/agencias-api.php). Las filas siguen guardando creado_por / generado_por (el
+// usuario); la agencia se resuelve en cada consulta, así que si un usuario cambia de agencia
+// sus datos se van con él.
+
+// agencia_id del usuario logueado (null si no tiene), una consulta por request.
+function agenciaDeSesion() {
+    static $cache = [];
+    $uid = (int) ($_SESSION['user_id'] ?? 0);
+    if (!array_key_exists($uid, $cache)) {
+        $stmt = getDB()->prepare("SELECT agencia_id FROM usuarios WHERE id = ?");
+        $stmt->execute([$uid]);
+        $cache[$uid] = ($aid = $stmt->fetchColumn()) ? (int) $aid : null;
+    }
+    return $cache[$uid];
+}
+
+// Condición SQL "esta fila es de mi ámbito" sobre la columna de autor indicada, con sus
+// parámetros: [$sql, $params]. Uso: [$fd, $pd] = filtroDueno('t.creado_por');
+function filtroDueno($columna = 'creado_por') {
+    $agenciaId = agenciaDeSesion();
+    if ($agenciaId) return ["$columna IN (SELECT id FROM usuarios WHERE agencia_id = ?)", [$agenciaId]];
+    return ["$columna = ?", [(int) $_SESSION['user_id']]];
+}
+
+// true si la fila $id de $tabla es de mi ámbito (sin responder nada).
+function esDelAmbito($db, $tabla, $id, $columna = 'creado_por') {
+    [$fd, $pd] = filtroDueno($columna);
+    $stmt = $db->prepare("SELECT 1 FROM $tabla WHERE id = ? AND $fd");
+    $stmt->execute(array_merge([$id], $pd));
+    return (bool) $stmt->fetchColumn();
+}
+
+// Para editar/borrar: true si puede proceder; si no, ya respondió el error HTTP y el caller
+// debe hacer `break`. Compartida por shared/api.php e itinerario/api.php.
+function verificarDueno($db, $tabla, $id, $columna = 'creado_por') {
+    if (esDelAmbito($db, $tabla, $id, $columna)) return true;
+    $stmt = $db->prepare("SELECT 1 FROM $tabla WHERE id = ?");
     $stmt->execute([$id]);
-    $row = $stmt->fetch();
-    if (!$row) {
+    if (!$stmt->fetchColumn()) {
         http_response_code(404);
         echo json_encode(['error' => 'No encontrado.']);
-        return false;
-    }
-    if (intval($row['creado_por']) !== intval($_SESSION['user_id'])) {
+    } else {
         http_response_code(403);
-        echo json_encode(['error' => 'No tienes permiso sobre este registro.']);
-        return false;
+        echo json_encode(['error' => 'No tienes permiso sobre este registro: es de otra agencia.']);
     }
-    return true;
+    return false;
+}
+
+// Destino / categoría que llega del cliente para vincular a un tour, hotel o itinerario:
+// null/'' = sin asignar; si viene un id, debe ser de mi ámbito (que nadie enganche sus datos
+// al catálogo de otra agencia). Devuelve el id (int), null, o false si es ajeno (ya
+// respondió el error HTTP y el caller debe hacer `break`).
+function idVinculoPropio($db, $tabla, $id) {
+    if ($id === null || $id === '' || (int) $id === 0) return null;
+    if (esDelAmbito($db, $tabla, (int) $id)) return (int) $id;
+    http_response_code(400);
+    echo json_encode(['error' => 'El destino o la categoría elegidos no son de tu agencia.']);
+    return false;
+}
+
+// Lista de "guardar-clasificaciones-*" ([{id, destino_id, categoria_id}, ...]) normalizada
+// y con cada destino/categoría validado con idVinculoPropio. Devuelve la lista limpia, o
+// false si alguno es ajeno (ya respondió el error HTTP). Las filas a actualizar se acotan
+// aparte, con filtroDueno en el UPDATE.
+function validarCambiosClasificacion($db, $cambios, $tablaCategorias) {
+    $limpios = [];
+    foreach ($cambios as $c) {
+        $id = intval($c['id'] ?? 0);
+        if (!$id) continue;
+        $destinoId = idVinculoPropio($db, 'destinos', $c['destino_id'] ?? null);
+        if ($destinoId === false) return false;
+        $categoriaId = idVinculoPropio($db, $tablaCategorias, $c['categoria_id'] ?? null);
+        if ($categoriaId === false) return false;
+        $limpios[] = ['id' => $id, 'destino_id' => $destinoId, 'categoria_id' => $categoriaId];
+    }
+    return $limpios;
 }
 ?>

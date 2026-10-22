@@ -55,22 +55,35 @@ function grupoDestinoValido($db, $grupoId) {
     return (int) $grupoId;
 }
 
+// Ámbito de las cotizaciones: el de la agencia (filtroDueno) y, solo para el admin, además
+// las históricas sin creado_por (de antes de registrar el autor), que siempre fueron suyas.
+function filtroCotizaciones() {
+    [$fd, $pd] = filtroDueno();
+    return [is_admin() ? "($fd OR creado_por IS NULL)" : $fd, $pd];
+}
+function cotizacionEsDelAmbito($db, $tabla, $id) {
+    [$fc, $pc] = filtroCotizaciones();
+    $stmt = $db->prepare("SELECT 1 FROM $tabla WHERE id = ? AND $fc");
+    $stmt->execute(array_merge([$id], $pc));
+    return (bool) $stmt->fetchColumn();
+}
+
 try {
     switch ($path) {
         case 'tours':
-            // Siempre acotado a TU propio catálogo, admin incluido: el admin también arma
-            // sus propias cotizaciones con sus propios tours, no con los de cada agencia.
-            // Ver todo mezclado de todas las agencias es cosa de Comparativo/Catálogo por
-            // agencia (shared/agencias-api.php), no de este selector de trabajo.
+            // Siempre acotado al catálogo de TU agencia (filtroDueno, auth.php), admin incluido:
+            // el admin también arma sus propias cotizaciones con sus propios tours. Ver el de
+            // cada agencia es cosa de Agencias › Catálogo (shared/agencias-api.php), en solo lectura.
+            [$fd, $pd] = filtroDueno('t.creado_por');
             $stmt = $db->prepare(
                 "SELECT t.id, t.tour, t.distr, t.preg, t.ppromo, t.pconf, t.pctotal, t.destino_id, t.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaTours t
                  LEFT JOIN usuarios u ON u.id = t.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE t.creado_por = ?
+                 WHERE $fd
                  ORDER BY t.tour"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -95,17 +108,17 @@ try {
             break;
 
         case 'destinos':
-            // Acotado a TU propio catálogo (admin incluido) — ver el de todas las agencias
-            // mezclado es cosa de Comparativo/Catálogo por agencia, no de este selector.
+            // Acotado al catálogo de TU agencia (admin incluido), igual que tours.
+            [$fd, $pd] = filtroDueno('d.creado_por');
             $stmt = $db->prepare(
                 "SELECT d.id, d.nombre, d.grupo_id, d.orden, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM destinos d
                  LEFT JOIN usuarios u ON u.id = d.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE d.creado_por = ?
+                 WHERE $fd
                  ORDER BY d.orden, d.nombre"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -128,8 +141,9 @@ try {
             // acá (y no solo con el UNIQUE de la migración 034) porque en MySQL un UNIQUE con
             // grupo_id NULL no impide duplicados entre los destinos sin grupo.
             $existeEnGrupo = function ($grupoId, $excluirId) use ($db, $nombreDestino) {
-                $stmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ? AND grupo_id <=> ? AND id <> ?");
-                $stmt->execute([$nombreDestino, $_SESSION['user_id'], $grupoId, (int) $excluirId]);
+                [$fd, $pd] = filtroDueno();
+                $stmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND $fd AND grupo_id <=> ? AND id <> ?");
+                $stmt->execute(array_merge([$nombreDestino], $pd, [$grupoId, (int) $excluirId]));
                 return (bool) $stmt->fetchColumn();
             };
             $mensajeDuplicado = fn($grupoId) => "Ya existe un destino con el nombre \"$nombreDestino\"" . ($grupoId ? ' en este grupo.' : '.');
@@ -160,8 +174,9 @@ try {
                 // los sin grupo quedan en 0 y siguen saliendo por nombre.
                 $orden = 0;
                 if ($grupoId !== null) {
-                    $stmt = $db->prepare("SELECT COALESCE(MAX(orden), 0) + 1 FROM destinos WHERE creado_por = ? AND grupo_id = ?");
-                    $stmt->execute([$_SESSION['user_id'], $grupoId]);
+                    [$fd, $pd] = filtroDueno();
+                    $stmt = $db->prepare("SELECT COALESCE(MAX(orden), 0) + 1 FROM destinos WHERE $fd AND grupo_id = ?");
+                    $stmt->execute(array_merge($pd, [$grupoId]));
                     $orden = (int) $stmt->fetchColumn();
                 }
                 $stmt = $db->prepare("INSERT INTO destinos (nombre, grupo_id, orden, creado_por) VALUES (?, ?, ?, ?)");
@@ -190,9 +205,10 @@ try {
                 echo json_encode(['error' => 'Lista de destinos requerida']);
                 break;
             }
+            [$fd, $pd] = filtroDueno();
             $db->beginTransaction();
-            $stmt = $db->prepare("UPDATE destinos SET orden = ? WHERE id = ? AND creado_por = ?");
-            foreach ($ids as $i => $id) $stmt->execute([$i + 1, $id, $_SESSION['user_id']]);
+            $stmt = $db->prepare("UPDATE destinos SET orden = ? WHERE id = ? AND $fd");
+            foreach ($ids as $i => $id) $stmt->execute(array_merge([$i + 1, $id], $pd));
             $db->commit();
             echo json_encode(['success' => true]);
             break;
@@ -246,15 +262,16 @@ try {
             break;
 
         case 'categorias':
+            [$fd, $pd] = filtroDueno('c.creado_por');
             $stmt = $db->prepare(
                 "SELECT c.id, c.destino_id, c.nombre, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM categorias c
                  LEFT JOIN usuarios u ON u.id = c.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE c.creado_por = ?
+                 WHERE $fd
                  ORDER BY c.nombre"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -272,6 +289,7 @@ try {
                 echo json_encode(['error' => 'El destino y el nombre de la categoría son obligatorios']);
                 break;
             }
+            if (idVinculoPropio($db, 'destinos', $destinoIdCat) === false) break;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, 'categorias', $data['id'])) break;
                 $stmt = $db->prepare("UPDATE categorias SET nombre = ?, destino_id = ? WHERE id = ?");
@@ -312,28 +330,30 @@ try {
             break;
 
         case 'hoteles':
+            [$fd, $pd] = filtroDueno('h.creado_por');
             $stmt = $db->prepare(
                 "SELECT h.id, h.aloj, h.distr, h.preg, h.ppromo, h.pconf, h.pctotal, h.destino_id, h.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaHoteles h
                  LEFT JOIN usuarios u ON u.id = h.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE h.creado_por = ?
+                 WHERE $fd
                  ORDER BY h.aloj"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
         case 'categorias-hoteles':
+            [$fd, $pd] = filtroDueno('c.creado_por');
             $stmt = $db->prepare(
                 "SELECT c.id, c.destino_id, c.nombre, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM categorias_hoteles c
                  LEFT JOIN usuarios u ON u.id = c.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE c.creado_por = ?
+                 WHERE $fd
                  ORDER BY c.nombre"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -351,6 +371,7 @@ try {
                 echo json_encode(['error' => 'El destino y el nombre de la categoría son obligatorios']);
                 break;
             }
+            if (idVinculoPropio($db, 'destinos', $destinoIdCatHotel) === false) break;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, 'categorias_hoteles', $data['id'])) break;
                 $stmt = $db->prepare("UPDATE categorias_hoteles SET nombre = ?, destino_id = ? WHERE id = ?");
@@ -413,8 +434,10 @@ try {
                 echo json_encode(['error' => 'Los precios no pueden ser negativos']);
                 break;
             }
-            $destinoId = !empty($data['destino_id']) ? intval($data['destino_id']) : null;
-            $categoriaId = !empty($data['categoria_id']) ? intval($data['categoria_id']) : null;
+            $destinoId = idVinculoPropio($db, 'destinos', $data['destino_id'] ?? null);
+            if ($destinoId === false) break;
+            $categoriaId = idVinculoPropio($db, 'categorias', $data['categoria_id'] ?? null);
+            if ($categoriaId === false) break;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaTours, $data['id'])) break;
                 $stmt = $db->prepare("UPDATE $tablaTours SET tour = ?, distr = ?, preg = ?, ppromo = ?, pconf = ?, pctotal = ?, destino_id = ?, categoria_id = ? WHERE id = ?");
@@ -461,24 +484,17 @@ try {
                 echo json_encode(['error' => 'No hay cambios para guardar.']);
                 break;
             }
-            $esAdminClasifTours = is_admin();
-            $stmt = $esAdminClasifTours
-                ? $db->prepare("UPDATE $tablaTours SET destino_id = ?, categoria_id = ? WHERE id = ?")
-                : $db->prepare("UPDATE $tablaTours SET destino_id = ?, categoria_id = ? WHERE id = ? AND creado_por = ?");
+            // Solo tours de mi agencia, y solo con destinos/categorías de mi agencia.
+            $cambios = validarCambiosClasificacion($db, $cambios, 'categorias');
+            if ($cambios === false) break;
+            [$fd, $pd] = filtroDueno();
+            $stmt = $db->prepare("UPDATE $tablaTours SET destino_id = ?, categoria_id = ? WHERE id = ? AND $fd");
             $db->beginTransaction();
             try {
                 $actualizados = 0;
                 foreach ($cambios as $c) {
-                    $id = intval($c['id'] ?? 0);
-                    if (!$id) continue;
-                    $destinoId = !empty($c['destino_id']) ? intval($c['destino_id']) : null;
-                    $categoriaId = !empty($c['categoria_id']) ? intval($c['categoria_id']) : null;
-                    if ($esAdminClasifTours) {
-                        $stmt->execute([$destinoId, $categoriaId, $id]);
-                    } else {
-                        $stmt->execute([$destinoId, $categoriaId, $id, $_SESSION['user_id']]);
-                    }
-                    $actualizados++;
+                    $stmt->execute(array_merge([$c['destino_id'], $c['categoria_id'], $c['id']], $pd));
+                    $actualizados += $stmt->rowCount() > 0 ? 1 : 0;
                 }
                 $db->commit();
                 echo json_encode(['success' => true, 'actualizados' => $actualizados]);
@@ -511,8 +527,10 @@ try {
                 echo json_encode(['error' => 'Los precios no pueden ser negativos']);
                 break;
             }
-            $destinoIdHotel = !empty($data['destino_id']) ? intval($data['destino_id']) : null;
-            $categoriaIdHotel = !empty($data['categoria_id']) ? intval($data['categoria_id']) : null;
+            $destinoIdHotel = idVinculoPropio($db, 'destinos', $data['destino_id'] ?? null);
+            if ($destinoIdHotel === false) break;
+            $categoriaIdHotel = idVinculoPropio($db, 'categorias_hoteles', $data['categoria_id'] ?? null);
+            if ($categoriaIdHotel === false) break;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaHoteles, $data['id'])) break;
                 $stmt = $db->prepare("UPDATE $tablaHoteles SET aloj = ?, distr = ?, preg = ?, ppromo = ?, pconf = ?, pctotal = ?, destino_id = ?, categoria_id = ? WHERE id = ?");
@@ -557,24 +575,16 @@ try {
                 echo json_encode(['error' => 'No hay cambios para guardar.']);
                 break;
             }
-            $esAdminClasifHoteles = is_admin();
-            $stmt = $esAdminClasifHoteles
-                ? $db->prepare("UPDATE $tablaHoteles SET destino_id = ?, categoria_id = ? WHERE id = ?")
-                : $db->prepare("UPDATE $tablaHoteles SET destino_id = ?, categoria_id = ? WHERE id = ? AND creado_por = ?");
+            $cambios = validarCambiosClasificacion($db, $cambios, 'categorias_hoteles');
+            if ($cambios === false) break;
+            [$fd, $pd] = filtroDueno();
+            $stmt = $db->prepare("UPDATE $tablaHoteles SET destino_id = ?, categoria_id = ? WHERE id = ? AND $fd");
             $db->beginTransaction();
             try {
                 $actualizados = 0;
                 foreach ($cambios as $c) {
-                    $id = intval($c['id'] ?? 0);
-                    if (!$id) continue;
-                    $destinoId = !empty($c['destino_id']) ? intval($c['destino_id']) : null;
-                    $categoriaId = !empty($c['categoria_id']) ? intval($c['categoria_id']) : null;
-                    if ($esAdminClasifHoteles) {
-                        $stmt->execute([$destinoId, $categoriaId, $id]);
-                    } else {
-                        $stmt->execute([$destinoId, $categoriaId, $id, $_SESSION['user_id']]);
-                    }
-                    $actualizados++;
+                    $stmt->execute(array_merge([$c['destino_id'], $c['categoria_id'], $c['id']], $pd));
+                    $actualizados += $stmt->rowCount() > 0 ? 1 : 0;
                 }
                 $db->commit();
                 echo json_encode(['success' => true, 'actualizados' => $actualizados]);
@@ -588,12 +598,13 @@ try {
             // Si la migración 030 (columnas hoteles/itinerario) todavía no se aplicó en esta
             // base, se cae al SELECT anterior en vez de romper el arranque del Cotizador
             // (que pide los paquetes al cargar): siguen funcionando como paquetes de solo tours.
+            [$fd, $pd] = filtroDueno();
             try {
-                $stmt = $db->prepare("SELECT id, nombre, tours, hoteles, itinerario FROM $tablaPaquetesTours WHERE creado_por = ? ORDER BY nombre");
-                $stmt->execute([$_SESSION['user_id']]);
+                $stmt = $db->prepare("SELECT id, nombre, tours, hoteles, itinerario FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
+                $stmt->execute($pd);
             } catch (PDOException $e) {
-                $stmt = $db->prepare("SELECT id, nombre, tours, NULL AS hoteles, NULL AS itinerario FROM $tablaPaquetesTours WHERE creado_por = ? ORDER BY nombre");
-                $stmt->execute([$_SESSION['user_id']]);
+                $stmt = $db->prepare("SELECT id, nombre, tours, NULL AS hoteles, NULL AS itinerario FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
+                $stmt->execute($pd);
             }
             $paquetes = [];
             while ($row = $stmt->fetch()) {
@@ -708,12 +719,10 @@ try {
                 $like = "%$term%";
                 array_push($params, $like, $like, $like);
             }
-            // Un no-admin solo ve lo que él mismo creó. Los registros históricos sin
-            // creado_por (de antes de esta función) quedan visibles solo para el admin.
-            if (!is_admin()) {
-                $condiciones[] = "creado_por = ?";
-                $params[] = $_SESSION['user_id'];
-            }
+            // Solo las de mi agencia, admin incluido (las de las demás las ve desde Agencias).
+            [$fc, $pc] = filtroCotizaciones();
+            $condiciones[] = $fc;
+            array_push($params, ...$pc);
             $where = $condiciones ? ' WHERE ' . implode(' AND ', $condiciones) : '';
 
             $countStmt = $db->prepare("SELECT COUNT(*) FROM $tablaCotizaciones" . $where);
@@ -731,16 +740,20 @@ try {
             break;
 
         case 'cotizacion':
+            // Las de mi agencia se abren normal. El admin además puede ABRIR la de otra
+            // agencia (desde Agencias › Cotizaciones) en solo lectura: el cabecero
+            // X-Solo-Lectura hace que el cotizador bloquee guardar, y guardar-cotizacion
+            // la rechaza igual.
             $id = $_GET['id'] ?? '';
-            if (is_admin()) {
+            $soloLectura = !cotizacionEsDelAmbito($db, $tablaCotizaciones, $id);
+            $row = null;
+            if (!$soloLectura || is_admin()) {
                 $stmt = $db->prepare("SELECT data FROM $tablaCotizaciones WHERE id = ?");
                 $stmt->execute([$id]);
-            } else {
-                $stmt = $db->prepare("SELECT data FROM $tablaCotizaciones WHERE id = ? AND creado_por = ?");
-                $stmt->execute([$id, $_SESSION['user_id']]);
+                $row = $stmt->fetch();
             }
-            $row = $stmt->fetch();
             if ($row) {
+                if ($soloLectura) header('X-Solo-Lectura: 1');
                 echo $row['data'];
             } else {
                 http_response_code(404);
@@ -753,17 +766,15 @@ try {
         // principal. Se pide siempre fresco (no se guarda dentro del JSON de la cotización)
         // para que el logo/términos usados reflejen la ficha de agencia actual.
         case 'cotizacion-agencia':
+            // Mismo acceso que 'cotizacion' (el admin la lee también en solo lectura).
             $id = $_GET['id'] ?? '';
-            if (is_admin()) {
+            $filaCot = false;
+            if (is_admin() || cotizacionEsDelAmbito($db, $tablaCotizaciones, $id)) {
                 $stmt = $db->prepare("SELECT u.agencia_id FROM $tablaCotizaciones c
                                        LEFT JOIN usuarios u ON u.id = c.creado_por WHERE c.id = ?");
                 $stmt->execute([$id]);
-            } else {
-                $stmt = $db->prepare("SELECT u.agencia_id FROM $tablaCotizaciones c
-                                       LEFT JOIN usuarios u ON u.id = c.creado_por WHERE c.id = ? AND c.creado_por = ?");
-                $stmt->execute([$id, $_SESSION['user_id']]);
+                $filaCot = $stmt->fetch();
             }
-            $filaCot = $stmt->fetch();
             if (!$filaCot) {
                 http_response_code(404);
                 echo json_encode(['error' => 'No encontrada']);
@@ -813,9 +824,10 @@ try {
             $stmt->execute([$id]);
             $existente = $stmt->fetch();
 
-            if ($existente && !is_admin() && intval($existente['creado_por']) !== intval($_SESSION['user_id'])) {
+            // Nadie (admin incluido) guarda encima de una cotización de otra agencia.
+            if ($existente && !cotizacionEsDelAmbito($db, $tablaCotizaciones, $id)) {
                 http_response_code(403);
-                echo json_encode(['error' => 'No tienes permiso para modificar esta cotización.']);
+                echo json_encode(['error' => 'Esta cotización es de otra agencia: solo puedes verla, no modificarla.']);
                 break;
             }
 
@@ -843,15 +855,10 @@ try {
                 echo json_encode(['error' => 'ID requerido']);
                 break;
             }
-            if (!is_admin()) {
-                $stmt = $db->prepare("SELECT creado_por FROM $tablaCotizaciones WHERE id = ?");
-                $stmt->execute([$data['id']]);
-                $row = $stmt->fetch();
-                if (!$row || intval($row['creado_por']) !== intval($_SESSION['user_id'])) {
-                    http_response_code(403);
-                    echo json_encode(['error' => 'No tienes permiso para eliminar esta cotización.']);
-                    break;
-                }
+            if (!cotizacionEsDelAmbito($db, $tablaCotizaciones, $data['id'])) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permiso para eliminar esta cotización.']);
+                break;
             }
             $stmt = $db->prepare("DELETE FROM $tablaCotizaciones WHERE id = ?");
             $stmt->execute([$data['id']]);
@@ -954,17 +961,18 @@ try {
             // crear duplicados por "Cusco" vs "cusco " =====
             $destinoIdPorNombre = [];
             $categoriaIdPorNombre = [];
-            // Busca solo entre TUS PROPIOS destinos (nunca los de otro usuario).
+            // Busca solo entre los destinos de TU agencia (nunca los de otra).
             // Solo entre los de Actividades / Hoteles (sin grupo): los de Con / Sin pernocte
             // son de Itinerarios y pueden repetir el nombre.
-            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND creado_por = ? AND grupo_id IS NULL");
+            [$fdCsv, $pdCsv] = filtroDueno();
+            $buscarDestinoStmt = $db->prepare("SELECT id FROM destinos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?)) AND $fdCsv AND grupo_id IS NULL");
             $crearDestinoStmt = $db->prepare("INSERT INTO destinos (nombre, creado_por) VALUES (?, ?)");
             $buscarCategoriaStmt = $db->prepare("SELECT id FROM $tablaCategoriaCsv WHERE destino_id = ? AND LOWER(TRIM(nombre)) = LOWER(TRIM(?))");
             $crearCategoriaStmt = $db->prepare("INSERT INTO $tablaCategoriaCsv (destino_id, nombre, creado_por) VALUES (?, ?, ?)");
-            $resolverDestinoId = function ($nombre) use ($db, $buscarDestinoStmt, $crearDestinoStmt, &$destinoIdPorNombre) {
+            $resolverDestinoId = function ($nombre) use ($db, $buscarDestinoStmt, $crearDestinoStmt, $pdCsv, &$destinoIdPorNombre) {
                 $clave = mb_strtolower(trim($nombre));
                 if (isset($destinoIdPorNombre[$clave])) return $destinoIdPorNombre[$clave];
-                $buscarDestinoStmt->execute([$nombre, $_SESSION['user_id']]);
+                $buscarDestinoStmt->execute(array_merge([$nombre], $pdCsv));
                 $id = $buscarDestinoStmt->fetchColumn();
                 if ($id === false) {
                     $crearDestinoStmt->execute([trim($nombre), $_SESSION['user_id']]);
@@ -987,7 +995,7 @@ try {
             // ===== 3. Crear o actualizar por nombre (tolerante a mayúsculas/espacios) — nunca
             // se borra nada que no venga en el archivo, a diferencia del reemplazo total de
             // antes =====
-            $buscarExistenteStmt = $db->prepare("SELECT id FROM $table WHERE creado_por = ? AND LOWER(TRIM($nombreCampo)) = LOWER(TRIM(?))");
+            $buscarExistenteStmt = $db->prepare("SELECT id FROM $table WHERE $fdCsv AND LOWER(TRIM($nombreCampo)) = LOWER(TRIM(?))");
             $actualizarStmt = $db->prepare("UPDATE $table SET $nombreCampo = ?, distr = ?, preg = ?, ppromo = ?, pconf = ?, pctotal = ?, destino_id = ?, categoria_id = ? WHERE id = ?");
             $insertarStmt = $db->prepare("INSERT INTO $table ($nombreCampo, distr, preg, ppromo, pconf, pctotal, destino_id, categoria_id, creado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -1005,7 +1013,7 @@ try {
                     $claveNombre = mb_strtolower(trim($f['nombre']));
                     $id = $idsDeEsteLote[$claveNombre] ?? null;
                     if (!$id) {
-                        $buscarExistenteStmt->execute([$_SESSION['user_id'], $f['nombre']]);
+                        $buscarExistenteStmt->execute(array_merge($pdCsv, [$f['nombre']]));
                         $encontrado = $buscarExistenteStmt->fetchColumn();
                         $id = $encontrado !== false ? $encontrado : null;
                     }

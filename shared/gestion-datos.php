@@ -319,7 +319,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             <div id="gestion-cotizaciones" class="subtab-content hidden">
                 <div class="card p-6">
                     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <h2 class="text-base font-semibold text-slate-800"><?= is_admin() ? 'Cotizaciones Guardadas (todas)' : 'Mis Cotizaciones Guardadas' ?></h2>
+                        <h2 class="text-base font-semibold text-slate-800">Cotizaciones Guardadas de mi agencia</h2>
                         <div class="flex items-center gap-2 flex-wrap">
                             <div class="relative">
                                 <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">

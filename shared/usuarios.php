@@ -945,7 +945,7 @@ $heroPosY = resolverHeroPosY($db);
                         <td class="p-2 text-right">${fmtMoneda(c.moneda, c.total)}</td>
                         <td class="p-2">${c.creado_por_nombre || '<span class="text-slate-400">—</span>'}</td>
                         <td class="p-2 text-right">
-                            <a href="../${c.moneda}/index.php?cotizacion=${encodeURIComponent(c.id)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Abrir en el cotizador"><i class="fas fa-up-right-from-square"></i></a>
+                            <a href="../${c.moneda}/index.php?cotizacion=${encodeURIComponent(c.id)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Ver en el cotizador (solo lectura)"><i class="fas fa-up-right-from-square"></i></a>
                         </td>
                     `;
                     tbody.appendChild(tr);

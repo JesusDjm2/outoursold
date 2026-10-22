@@ -67,6 +67,9 @@ let paqueteEditandoNombre = '';
 // Paquete aplicado a la cotización en pantalla (chip #paquete-aplicado, con su lápiz).
 let paqueteAplicadoId = null;
 let paqueteAplicadoNombre = '';
+// Cotización de otra agencia abierta por el admin desde Agencias (la API la marca con el
+// cabecero X-Solo-Lectura): se ve y se descarga el PDF, pero no se guarda.
+let soloLectura = false;
 let pdfPreviewUrl = null;
 let pdfPreviewFilename = '';
 let pdfPreviewCotizacionId = null;
@@ -782,6 +785,7 @@ function calcularResumen() {
 // una plantilla reutilizable, no una cotización concreta. El nombre se pide al guardar
 // (precargado con el actual cuando se está editando uno).
 async function guardarComoPaquete() {
+    if (soloLectura) { notifyWarning('Esta cotización es de otra agencia: solo puedes verla y descargar su PDF.'); return; }
     const tours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
         .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value }))
         .filter(t => t.tour);
@@ -907,7 +911,19 @@ async function refrescarPaquetesData() {
 }
 
 // ===== COTIZACIONES =====
+// Modo solo lectura (ver soloLectura): banner con "Ver / descargar PDF" y Guardar /
+// Guardar como paquete deshabilitados. Solo toca los botones al entrar o salir del modo,
+// para no pisar lo que deja el modo edición de paquete.
+function activarSoloLectura(activo) {
+    if (soloLectura === activo) return;
+    soloLectura = activo;
+    document.getElementById('solo-lectura-banner').classList.toggle('hidden', !activo);
+    document.getElementById('guardar-cotizacion').disabled = activo;
+    document.getElementById('guardar-como-paquete').disabled = activo;
+}
+
 async function guardarCotizacion() {
+    if (soloLectura) { notifyWarning('Esta cotización es de otra agencia: solo puedes verla y descargar su PDF.'); return; }
     if (!validarFechas()) return;
     let id = currentCotizacionId || 'COT-' + Date.now();
     const form = document.getElementById('form-pax');
@@ -1006,6 +1022,7 @@ async function cargarCotizacion(id) {
         const data = await response.json();
         if (data.error) throw new Error(data.error);
         nuevaCotizacion(false);
+        activarSoloLectura(response.headers.get('X-Solo-Lectura') === '1');
         const form = document.getElementById('form-pax');
         Object.keys(data.pax).forEach(key => {
             const input = form.querySelector(`[name="${key}"]`);
@@ -1056,6 +1073,7 @@ function nuevaCotizacion(showAlert = true) {
     document.getElementById('notas_cotizacion').innerHTML = '';
     document.getElementById('porcentaje_reserva').value = 30;
     currentCotizacionId = null;
+    activarSoloLectura(false);
     document.getElementById('current-cot-id-display').textContent = 'Nueva';
     document.querySelector('input[name="fecha_cot"]').value = new Date().toISOString().split('T')[0];
     actualizarEstadosCamposFecha();
@@ -1465,6 +1483,8 @@ async function init() {
     inicializarAcordeones();
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.getElementById('guardar-como-paquete').addEventListener('click', guardarComoPaquete);
+    document.getElementById('solo-lectura-pdf').addEventListener('click', () => mostrarVistaPreviaPdf(currentCotizacionId));
+    document.getElementById('solo-lectura-salir').addEventListener('click', () => nuevaCotizacion(false));
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);
     document.querySelectorAll('.field-overlay input').forEach(input => {
         input.addEventListener('input', () => actualizarEstadoCampoFecha(input));

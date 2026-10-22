@@ -155,17 +155,18 @@ function borrarImagenSiSinReferencias($db, $tablaModulos, $idioma, $imagen) {
 try {
     switch ($path) {
         case 'modulos':
-            // Acotado a TU propio catálogo (admin incluido) — igual que shared/api.php.
+            // Acotado al catálogo de TU agencia (admin incluido) — igual que shared/api.php.
+            [$fd, $pd] = filtroDueno('m.creado_por');
             $stmt = $db->prepare(
                 "SELECT m.id, m.titulo, m.filename, m.imagen, m.lugares_visitar, m.incluye, m.no_incluye,
                         m.destino_id, m.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaModulos m
                  LEFT JOIN usuarios u ON u.id = m.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE m.creado_por = ?
+                 WHERE $fd
                  ORDER BY m.titulo"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             $modulos = $stmt->fetchAll();
             foreach ($modulos as &$m) {
                 $rutaPdf = __DIR__ . "/uploads/$idioma/" . $m['filename'];
@@ -179,15 +180,16 @@ try {
             break;
 
         case 'categorias-itinerarios':
+            [$fd, $pd] = filtroDueno('c.creado_por');
             $stmt = $db->prepare(
                 "SELECT c.id, c.destino_id, c.nombre, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM categorias_itinerarios c
                  LEFT JOIN usuarios u ON u.id = c.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE c.creado_por = ?
+                 WHERE $fd
                  ORDER BY c.nombre"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             echo json_encode($stmt->fetchAll());
             break;
 
@@ -205,6 +207,7 @@ try {
                 echo json_encode(['error' => 'El destino y el nombre de la categoría son obligatorios']);
                 break;
             }
+            if (idVinculoPropio($db, 'destinos', $destinoIdCatItin) === false) break;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, 'categorias_itinerarios', $data['id'])) break;
                 $stmt = $db->prepare("UPDATE categorias_itinerarios SET nombre = ?, destino_id = ? WHERE id = ?");
@@ -245,15 +248,16 @@ try {
             break;
 
         case 'paginas-fijas':
+            [$fd, $pd] = filtroDueno('p.creado_por');
             $stmt = $db->prepare(
                 "SELECT p.id, p.titulo, p.filename, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaPaginasFijas p
                  LEFT JOIN usuarios u ON u.id = p.creado_por
                  LEFT JOIN agencias ag ON ag.id = u.agencia_id
-                 WHERE p.creado_por = ?
+                 WHERE $fd
                  ORDER BY p.titulo"
             );
-            $stmt->execute([$_SESSION['user_id']]);
+            $stmt->execute($pd);
             $paginas = $stmt->fetchAll();
             foreach ($paginas as &$p) {
                 $p['archivo_existe'] = is_file(__DIR__ . "/uploads/$idioma/" . $p['filename']);
@@ -268,12 +272,10 @@ try {
                               FROM $tablaGenerados g
                               LEFT JOIN usuarios u ON u.id = g.generado_por
                               LEFT JOIN agencias ag ON ag.id = u.agencia_id";
-            if (is_admin()) {
-                $stmt = $db->query("$sqlGenerados ORDER BY g.generado_en DESC LIMIT 500");
-            } else {
-                $stmt = $db->prepare("$sqlGenerados WHERE g.generado_por = ? ORDER BY g.generado_en DESC LIMIT 500");
-                $stmt->execute([$_SESSION['user_id']]);
-            }
+            // Solo los de mi agencia, admin incluido (los de las demás, desde Agencias).
+            [$fd, $pd] = filtroDueno('g.generado_por');
+            $stmt = $db->prepare("$sqlGenerados WHERE $fd ORDER BY g.generado_en DESC LIMIT 500");
+            $stmt->execute($pd);
             $registros = [];
             while ($row = $stmt->fetch()) {
                 $row['modulos'] = $row['modulos'] !== null ? json_decode($row['modulos'], true) : [];
@@ -326,8 +328,9 @@ try {
             break;
 
         case 'paquetes':
-            $stmt = $db->prepare("SELECT id, nombre, modulos FROM $tablaPaquetes WHERE creado_por = ? ORDER BY nombre");
-            $stmt->execute([$_SESSION['user_id']]);
+            [$fd, $pd] = filtroDueno();
+            $stmt = $db->prepare("SELECT id, nombre, modulos FROM $tablaPaquetes WHERE $fd ORDER BY nombre");
+            $stmt->execute($pd);
             $paquetes = [];
             while ($row = $stmt->fetch()) {
                 $row['modulos'] = json_decode($row['modulos'], true);
@@ -355,12 +358,16 @@ try {
                 echo json_encode(['error' => 'Nombre de archivo no válido.']);
                 break;
             }
+            $destinoIdModulo = idVinculoPropio($db, 'destinos', $data['destino_id'] ?? null);
+            if ($destinoIdModulo === false) break;
+            $categoriaIdModulo = idVinculoPropio($db, 'categorias_itinerarios', $data['categoria_id'] ?? null);
+            if ($categoriaIdModulo === false) break;
             $stmt = $db->prepare("INSERT INTO $tablaModulos (titulo, filename, destino_id, categoria_id, creado_por) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([
                 $titulo,
                 $filename,
-                idOInt($data['destino_id'] ?? null),
-                idOInt($data['categoria_id'] ?? null),
+                $destinoIdModulo,
+                $categoriaIdModulo,
                 $_SESSION['user_id'],
             ]);
             $id = $db->lastInsertId();
@@ -462,12 +469,16 @@ try {
                 $valores[] = trim($data['titulo']);
             }
             if (array_key_exists('destino_id', $data)) {
+                $destinoIdModulo = idVinculoPropio($db, 'destinos', $data['destino_id']);
+                if ($destinoIdModulo === false) break;
                 $campos[] = 'destino_id = ?';
-                $valores[] = idOInt($data['destino_id']);
+                $valores[] = $destinoIdModulo;
             }
             if (array_key_exists('categoria_id', $data)) {
+                $categoriaIdModulo = idVinculoPropio($db, 'categorias_itinerarios', $data['categoria_id']);
+                if ($categoriaIdModulo === false) break;
                 $campos[] = 'categoria_id = ?';
-                $valores[] = idOInt($data['categoria_id']);
+                $valores[] = $categoriaIdModulo;
             }
             // Textos largos (migración 036): vacío = NULL.
             foreach (['lugares_visitar', 'incluye', 'no_incluye'] as $campoTexto) {
@@ -533,22 +544,17 @@ try {
                 echo json_encode(['error' => 'No hay cambios para guardar.']);
                 break;
             }
-            $esAdminClasifModulos = is_admin();
-            $stmt = $esAdminClasifModulos
-                ? $db->prepare("UPDATE $tablaModulos SET destino_id = ?, categoria_id = ? WHERE id = ?")
-                : $db->prepare("UPDATE $tablaModulos SET destino_id = ?, categoria_id = ? WHERE id = ? AND creado_por = ?");
+            // Solo módulos de mi agencia, y solo con destinos/categorías de mi agencia.
+            $cambios = validarCambiosClasificacion($db, $cambios, 'categorias_itinerarios');
+            if ($cambios === false) break;
+            [$fd, $pd] = filtroDueno();
+            $stmt = $db->prepare("UPDATE $tablaModulos SET destino_id = ?, categoria_id = ? WHERE id = ? AND $fd");
             $db->beginTransaction();
             try {
                 $actualizados = 0;
                 foreach ($cambios as $c) {
-                    $id = idOInt($c['id'] ?? null);
-                    if (!$id) continue;
-                    if ($esAdminClasifModulos) {
-                        $stmt->execute([idOInt($c['destino_id'] ?? null), idOInt($c['categoria_id'] ?? null), $id]);
-                    } else {
-                        $stmt->execute([idOInt($c['destino_id'] ?? null), idOInt($c['categoria_id'] ?? null), $id, $_SESSION['user_id']]);
-                    }
-                    $actualizados++;
+                    $stmt->execute(array_merge([$c['destino_id'], $c['categoria_id'], $c['id']], $pd));
+                    $actualizados += $stmt->rowCount() > 0 ? 1 : 0;
                 }
                 $db->commit();
                 echo json_encode(['success' => true, 'actualizados' => $actualizados]);
@@ -581,19 +587,17 @@ try {
                 break;
             }
             $filename = $moduloRow['filename'];
-            $duenoModulo = $moduloRow['creado_por'];
 
             $db->beginTransaction();
             try {
                 $db->prepare("DELETE FROM $tablaModulos WHERE id = ?")->execute([$id]);
 
-                // Limpia los paquetes del MISMO dueño del módulo que lo tuvieran incluido (un
-                // paquete de otro usuario no puede referenciarlo: sus módulos también son
-                // privados). No necesariamente es quien está borrando — un admin puede borrar
-                // el módulo de otro usuario.
+                // Limpia los paquetes de la agencia que lo tuvieran incluido (un paquete de
+                // otra agencia no puede referenciarlo: sus módulos también son privados).
                 $paquetesAfectados = 0;
-                $stmt = $db->prepare("SELECT id, modulos FROM $tablaPaquetes WHERE creado_por = ?");
-                $stmt->execute([$duenoModulo]);
+                [$fd, $pd] = filtroDueno();
+                $stmt = $db->prepare("SELECT id, modulos FROM $tablaPaquetes WHERE $fd");
+                $stmt->execute($pd);
                 $paquetesRows = $stmt->fetchAll();
                 $updPaquete = $db->prepare("UPDATE $tablaPaquetes SET modulos = ? WHERE id = ?");
                 foreach ($paquetesRows as $p) {

@@ -91,6 +91,15 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 <span class="small"><i class="fas fa-box-archive mr-2"></i>Editando el paquete predefinido: <strong id="paquete-edit-nombre"></strong></span>
                 <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar edición</button>
             </div>
+            <!-- Cotización de otra agencia abierta por el admin desde Agencias › Cotizaciones:
+                 solo lectura (ver activarSoloLectura en cotizador.js). -->
+            <div id="solo-lectura-banner" class="hidden mb-4 p-3 rounded-lg flex items-center justify-between flex-wrap gap-2" style="background:rgba(37,99,235,0.08)">
+                <span class="small"><i class="fas fa-eye mr-2"></i><strong>Solo lectura:</strong> esta cotización es de otra agencia. Puedes verla y descargar su PDF, pero no guardar cambios.</span>
+                <div class="flex gap-2 flex-wrap">
+                    <button type="button" id="solo-lectura-pdf" class="btn btn-primary small"><i class="fas fa-file-pdf mr-2"></i>Ver / descargar PDF</button>
+                    <button type="button" id="solo-lectura-salir" class="btn border small">Nueva cotización</button>
+                </div>
+            </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
                 <section id="datos-pax-section" class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
