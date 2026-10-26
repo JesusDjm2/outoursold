@@ -96,6 +96,13 @@
 .cat-field input[type="file"] { font-size: 0.8rem; color: #64748b; padding: 4px 0; }
 .cat-field input:focus, .cat-field select:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 0 3px rgba(187, 49, 53, 0.08); }
 .cat-field .sel-destino-tour, .cat-field .sel-categoria-tour { padding: 7px 10px; border-radius: 8px; font-size: 0.85rem; }
+@media (max-width: 767px) {
+    .cat-span-2 { grid-column: span 6; }
+    .cat-span-3 { grid-column: span 6; }
+    .cat-span-4 { grid-column: span 12; }
+    .cat-span-6 { grid-column: span 12; }
+    .cat-span-8 { grid-column: span 12; }
+}
 @media (min-width: 768px) {
     .cat-span-2 { grid-column: span 2; }
     .cat-span-3 { grid-column: span 3; }
@@ -109,8 +116,49 @@
 .cat-hint { margin: 14px 20px 0; }
 
 /* Tabla */
-.cat-table-wrap { overflow-x: auto; }
-.cat-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+.cat-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.cat-table { width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+
+/* Responsive Headers */
+@media (max-width: 640px) {
+    .cat-header {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+    .cat-tools {
+        width: 100%;
+        gap: 8px;
+        justify-content: flex-start;
+    }
+    .cat-search {
+        min-width: 100%;
+        max-width: 100%;
+        order: 1;
+    }
+    .cat-filter {
+        flex: 1 1 120px;
+        order: 2;
+        height: 36px;
+    }
+    .cat-new-btn {
+        width: 100%;
+        justify-content: center;
+        order: 4;
+        height: 38px;
+    }
+    .cat-tools .cat-icon-btn,
+    .cat-tools .relative {
+        order: 3;
+    }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+    .cat-header {
+        padding: 14px 16px;
+    }
+    .cat-search {
+        max-width: 240px;
+    }
+}
 .cat-table thead th {
     text-align: left;
     padding: 10px 14px;
@@ -381,3 +429,115 @@
 .ie-pdf-deshacer { width: 22px; height: 22px; border-radius: 6px; color: #94a3b8; }
 .ie-pdf-deshacer:hover { background: #f1f5f9; color: #0f172a; }
 .ie-pdf-reemplazo small { flex-basis: 100%; }
+
+/* Menú de 3 puntos (Acciones en Cotizaciones Guardadas) */
+.cot-actions-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.cot-action-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: #64748b;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.cot-action-trigger:hover,
+.cot-action-trigger.is-active {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+.cot-actions-menu {
+    position: fixed;
+    width: 250px;
+    max-width: calc(100vw - 20px);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    padding: 6px;
+    z-index: 9999;
+    text-align: left;
+    animation: cotFadeIn 0.12s ease-out;
+}
+@keyframes cotFadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+}
+.cot-actions-menu.hidden {
+    display: none;
+}
+.cot-action-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #334155;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.cot-action-item:hover:not(.is-disabled) {
+    background: #f8fafc;
+    color: #0f172a;
+}
+.cot-action-item.is-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.cot-action-item.is-danger {
+    color: #dc2626;
+}
+.cot-action-item.is-danger:hover {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+.cot-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    font-size: 0.82rem;
+}
+.cot-action-item-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.25;
+}
+.cot-action-title {
+    font-weight: 600;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.cot-action-desc {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cot-action-divider {
+    height: 1px;
+    background: #f1f5f9;
+    margin: 4px 6px;
+}
+

@@ -1028,7 +1028,10 @@ async function cargarCotizacion(id) {
             const input = form.querySelector(`[name="${key}"]`);
             if (input) input.value = data.pax[key];
         });
+        const idiomaCot = data.pax?.idioma || 'en';
+        document.querySelector('select[name="idioma"]').value = idiomaCot;
         sincronizarTabsIdioma();
+        if (typeof activarIdioma === 'function') await activarIdioma(idiomaCot);
         // El select de dpto necesita sus <option> del país guardado antes de que el
         // .value de arriba (que ya intentó fijarlo sin opciones cargadas) pueda "pegar".
         const paisGuardado = paisesData.find(p => p.nombre === data.pax.pais);
@@ -1571,14 +1574,24 @@ async function init() {
     initPaisAutocomplete();
 
     // Deep link desde fuera del cotizador (Gestión de Datos > Cotizaciones Guardadas, o el
-    // detalle de una agencia en Usuarios): ?cotizacion=ID la abre directo; con &ver=pdf de
-    // paso abre la vista previa del PDF (mismo criterio que antes el botón "Ver PDF" de
-    // Cotizaciones Guardadas, ahora en otra página).
+    // detalle de una agencia en Usuarios): ?cotizacion=ID la abre directo; con &ver=pdf
+    // abre la vista previa de cotización y con &ver=itinerario abre la del itinerario.
     const paramsUrl = new URLSearchParams(window.location.search);
     const cotizacionUrlId = paramsUrl.get('cotizacion');
     if (cotizacionUrlId) {
         await cargarCotizacion(cotizacionUrlId);
-        if (paramsUrl.get('ver') === 'pdf') await mostrarVistaPreviaPdf(cotizacionUrlId);
+        const verParam = paramsUrl.get('ver');
+        if (verParam === 'pdf') {
+            await mostrarVistaPreviaPdf(cotizacionUrlId);
+        } else if (verParam === 'itinerario') {
+            const cotData = cotizaciones[cotizacionUrlId];
+            const hayItinerario = (cotData?.itinerarioArmado?.modulos?.length || 0) > 0;
+            if (hayItinerario && typeof handleGenerateItinerary === 'function') {
+                await handleGenerateItinerary();
+            } else {
+                notifyWarning('Esta cotización no tiene módulos de itinerario armados.');
+            }
+        }
         history.replaceState(null, '', window.location.pathname);
     }
 

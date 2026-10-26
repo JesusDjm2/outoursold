@@ -115,6 +115,7 @@ async function cargarDatosIniciales() {
 // subpestañas: son vistas propias (pestañas superiores, ?vista=...), fuera de
 // #gestion-section.
 function irASubtabGestion(subtab) {
+    if (typeof cerrarDropdownCotizaciones === 'function') cerrarDropdownCotizaciones();
     const contenedor = document.getElementById('gestion-section');
     contenedor.querySelectorAll(':scope > div > .subnav-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.subtab === subtab);
@@ -1536,7 +1537,55 @@ const COT_PAGE_SIZE = 15;
 const cotState = { term: '', offset: 0, total: 0 };
 let cotSearchDebounce = null;
 
+let activeCotDropdown = null;
+
+function cerrarDropdownCotizaciones() {
+    if (activeCotDropdown) {
+        activeCotDropdown.menu.classList.add('hidden');
+        activeCotDropdown.triggerBtn.classList.remove('is-active');
+        activeCotDropdown = null;
+    }
+}
+
+function posicionarMenuCot(triggerBtn, menu) {
+    const rect = triggerBtn.getBoundingClientRect();
+    const menuWidth = Math.min(250, window.innerWidth - 20);
+    const menuHeight = 290;
+
+    let left = rect.right - menuWidth;
+    if (left < 10) left = 10;
+    if (left + menuWidth > window.innerWidth - 10) {
+        left = window.innerWidth - menuWidth - 10;
+    }
+
+    let top = rect.bottom + 4;
+    if (top + menuHeight > window.innerHeight - 10) {
+        top = Math.max(10, rect.top - menuHeight - 4);
+    }
+
+    menu.style.position = 'fixed';
+    menu.style.width = `${menuWidth}px`;
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.zIndex = '9999';
+}
+
+if (!window._cotDropdownWired) {
+    window._cotDropdownWired = true;
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.cot-actions-dropdown')) {
+            cerrarDropdownCotizaciones();
+        }
+    });
+    window.addEventListener('scroll', cerrarDropdownCotizaciones, true);
+    window.addEventListener('resize', cerrarDropdownCotizaciones);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') cerrarDropdownCotizaciones();
+    });
+}
+
 async function cargarCotizacionesGuardadas() {
+    cerrarDropdownCotizaciones();
     const tbody = document.getElementById('cot-table-body');
     tbody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
     try {
@@ -1565,6 +1614,10 @@ async function cargarCotizacionesGuardadas() {
 
 function buildCotRow(cot) {
     const pax = cot.data.pax || {};
+    const itinModulos = cot.data?.itinerarioArmado?.modulos || [];
+    const tieneItinerario = Array.isArray(itinModulos) && itinModulos.length > 0;
+    const cantModulos = tieneItinerario ? itinModulos.length : 0;
+
     const tr = document.createElement('tr');
     tr.className = 'border-t hover:bg-slate-50';
     tr.innerHTML = `
@@ -1580,35 +1633,141 @@ function buildCotRow(cot) {
     `;
     const actionsCell = tr.querySelector('td:last-child');
 
+    const dropdown = document.createElement('div');
+    dropdown.className = 'cot-actions-dropdown';
+
+    const triggerBtn = document.createElement('button');
+    triggerBtn.type = 'button';
+    triggerBtn.className = 'cot-action-trigger';
+    triggerBtn.title = 'Acciones de cotización';
+    triggerBtn.setAttribute('aria-label', 'Acciones');
+    triggerBtn.innerHTML = '<i class="fas fa-ellipsis-vertical"></i>';
+
+    const menu = document.createElement('div');
+    menu.className = 'cot-actions-menu hidden';
+
+    // 1. Abrir en Cotizador
     const abrirBtn = document.createElement('button');
-    abrirBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    abrirBtn.title = 'Abrir';
-    abrirBtn.innerHTML = '<i class="fas fa-folder-open"></i>';
-    abrirBtn.addEventListener('click', () => {
+    abrirBtn.type = 'button';
+    abrirBtn.className = 'cot-action-item';
+    abrirBtn.innerHTML = `
+        <span class="cot-action-icon" style="background:#eff6ff;color:#2563eb;">
+            <i class="fas fa-folder-open"></i>
+        </span>
+        <span class="cot-action-item-text">
+            <span class="cot-action-title">Abrir en Cotizador</span>
+            <span class="cot-action-desc">Editar datos, tours y hoteles</span>
+        </span>
+    `;
+    abrirBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cerrarDropdownCotizaciones();
         window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(cot.id)}`;
     });
 
-    const dupBtn = document.createElement('button');
-    dupBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    dupBtn.title = 'Duplicar';
-    dupBtn.innerHTML = '<i class="fas fa-copy"></i>';
-    dupBtn.addEventListener('click', () => duplicarCotizacionGuardada(cot.id));
-
-    const pdfBtn = document.createElement('button');
-    pdfBtn.className = 'text-slate-500 hover:text-slate-700 mr-2';
-    pdfBtn.title = 'Ver / Descargar PDF';
-    pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i>';
-    pdfBtn.addEventListener('click', () => {
+    // 2. Ver Cotización PDF
+    const pdfCotBtn = document.createElement('button');
+    pdfCotBtn.type = 'button';
+    pdfCotBtn.className = 'cot-action-item';
+    pdfCotBtn.innerHTML = `
+        <span class="cot-action-icon" style="background:#fef2f2;color:#dc2626;">
+            <i class="fas fa-file-pdf"></i>
+        </span>
+        <span class="cot-action-item-text">
+            <span class="cot-action-title">PDF de Cotización</span>
+            <span class="cot-action-desc">Ver o descargar presupuesto</span>
+        </span>
+    `;
+    pdfCotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cerrarDropdownCotizaciones();
         window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(cot.id)}&ver=pdf`;
     });
 
-    const delBtn = document.createElement('button');
-    delBtn.className = 'text-red-500 hover:text-red-700';
-    delBtn.title = 'Eliminar';
-    delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    delBtn.addEventListener('click', () => eliminarCotizacionGuardada(cot.id, pax.nombre_pax));
+    // 3. Ver Itinerario PDF
+    const itinBtn = document.createElement('button');
+    itinBtn.type = 'button';
+    itinBtn.className = 'cot-action-item' + (tieneItinerario ? '' : ' is-disabled');
+    itinBtn.innerHTML = `
+        <span class="cot-action-icon" style="background:#ecfdf5;color:#059669;">
+            <i class="fas fa-route"></i>
+        </span>
+        <span class="cot-action-item-text">
+            <span class="cot-action-title">
+                PDF de Itinerario
+                ${tieneItinerario ? `<span class="text-[10px] font-normal px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 ml-1">${cantModulos} d.</span>` : ''}
+            </span>
+            <span class="cot-action-desc">${tieneItinerario ? `${cantModulos} módulo(s) armado(s)` : 'Sin itinerario armado'}</span>
+        </span>
+    `;
+    itinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cerrarDropdownCotizaciones();
+        if (!tieneItinerario) {
+            notifyWarning('Esta cotización no tiene módulos de itinerario armados.');
+            return;
+        }
+        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(cot.id)}&ver=itinerario`;
+    });
 
-    actionsCell.append(abrirBtn, dupBtn, pdfBtn, delBtn);
+    // 4. Duplicar
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button';
+    dupBtn.className = 'cot-action-item';
+    dupBtn.innerHTML = `
+        <span class="cot-action-icon" style="background:#fffbeb;color:#d97706;">
+            <i class="fas fa-copy"></i>
+        </span>
+        <span class="cot-action-item-text">
+            <span class="cot-action-title">Duplicar Cotización</span>
+            <span class="cot-action-desc">Crear una copia como nueva</span>
+        </span>
+    `;
+    dupBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cerrarDropdownCotizaciones();
+        duplicarCotizacionGuardada(cot.id);
+    });
+
+    // Separador
+    const divider = document.createElement('div');
+    divider.className = 'cot-action-divider';
+
+    // 5. Eliminar
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'cot-action-item is-danger';
+    delBtn.innerHTML = `
+        <span class="cot-action-icon" style="background:#fef2f2;color:#ef4444;">
+            <i class="fas fa-trash-can"></i>
+        </span>
+        <span class="cot-action-item-text">
+            <span class="cot-action-title">Eliminar</span>
+            <span class="cot-action-desc">Borrar permanentemente</span>
+        </span>
+    `;
+    delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cerrarDropdownCotizaciones();
+        eliminarCotizacionGuardada(cot.id, pax.nombre_pax);
+    });
+
+    menu.append(abrirBtn, pdfCotBtn, itinBtn, dupBtn, divider, delBtn);
+
+    triggerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !menu.classList.contains('hidden');
+        cerrarDropdownCotizaciones();
+        if (!isOpen) {
+            menu.classList.remove('hidden');
+            triggerBtn.classList.add('is-active');
+            posicionarMenuCot(triggerBtn, menu);
+            activeCotDropdown = { menu, triggerBtn };
+        }
+    });
+
+    dropdown.append(triggerBtn, menu);
+    actionsCell.appendChild(dropdown);
     return tr;
 }
 

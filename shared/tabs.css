@@ -29,14 +29,43 @@
 
 .subnav-tab {
     transition: all 0.2s;
-    padding: 6px 16px;
+    padding: 6px 14px;
     border-radius: 6px;
     font-weight: 500;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: #64748b;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 .subnav-tab:hover { background: #f1f5f9; }
 .subnav-tab.active {
     background: linear-gradient(90deg, var(--accent-1), var(--accent-2));
     color: white;
+}
+
+/* Contenedores de subpestañas: swipe horizontal táctil en pantallas chicas */
+#idioma-tabs,
+#itinerario-idioma-tabs,
+#itin-grupos-tabs,
+#itinerario-gestion-subtabs,
+.subnav-tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+}
+#idioma-tabs::-webkit-scrollbar,
+#itinerario-idioma-tabs::-webkit-scrollbar,
+#itin-grupos-tabs::-webkit-scrollbar,
+#itinerario-gestion-subtabs::-webkit-scrollbar,
+.subnav-tabs-bar::-webkit-scrollbar {
+    display: none;
 }

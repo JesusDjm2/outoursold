@@ -369,3 +369,35 @@ input[readonly] {
 .estado-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
 .estado-dot.en-linea { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
 .estado-dot.desconectado { background: #cbd5e1; }
+
+/* ===== Mejoras Responsive para Tablets y Celulares ===== */
+.overflow-x-auto table { min-width: 640px; }
+#tours-table { min-width: 680px; }
+#hotels-table { min-width: 780px; }
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+@media (max-width: 1279px) {
+    #resumen-campos .col-costo {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    #guardar-cotizacion,
+    #guardar-como-paquete,
+    #limpiar-todo {
+        width: 100%;
+        justify-content: center;
+    }
+    .modal-content {
+        padding: 16px;
+        width: 95%;
+        max-height: 90vh;
+    }
+}

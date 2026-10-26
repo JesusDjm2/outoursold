@@ -75,7 +75,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
         <div id="gestion-section" class="<?= $vista === 'moneda' ? '' : 'hidden' ?>">
-            <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit">
+            <div class="subnav-tabs-bar gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit">
                 <button class="subnav-tab active" data-subtab="clasificacion">
                     <i class="fas fa-tags mr-1"></i> Destinos y Categorías
                 </button>
@@ -283,8 +283,8 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                 <div class="card p-6">
                     <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
                     <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántas actividades y hoteles tiene; elige uno a la izquierda para ver y gestionar sus categorías. Las categorías de itinerarios y los grupos Con / Sin hotel se gestionan en la pestaña <a href="gestion.php?vista=itinerarios" class="underline">Itinerarios</a>.</p>
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div class="md:col-span-4 border rounded-lg p-3">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <div class="lg:col-span-4 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
                             <div class="flex gap-2 mb-3">
                                 <input id="destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
@@ -292,7 +292,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             </div>
                             <div id="destinos-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
                         </div>
-                        <div class="md:col-span-8 border rounded-lg p-3">
+                        <div class="lg:col-span-8 border rounded-lg p-3">
                             <div class="flex items-center gap-3 mb-3 flex-wrap">
                                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
                                 <div class="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 sm:ml-auto">
@@ -331,7 +331,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         </div>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full small">
+                        <table class="w-full small" style="min-width:640px">
                             <thead>
                                 <tr>
                                     <th class="text-left p-3">ID</th>
@@ -340,7 +340,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                     <th class="text-left p-3">Fecha Cot.</th>
                                     <th class="text-left p-3">N° PAX</th>
                                     <th class="text-left p-3">Paquete</th>
-                                    <th class="text-right p-3">Acciones</th>
+                                    <th class="text-right p-3 w-14">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="cot-table-body"></tbody>
@@ -382,8 +382,8 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                 <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
                 <div class="card p-6">
                     <p class="text-sm text-slate-500 mb-4"><strong>Con hotel</strong> y <strong>Sin hotel</strong> tienen cada uno sus propios destinos y categorías (puede haber un mismo nombre, como "Cusco", en los dos). Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
-                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                        <div class="md:col-span-5 border rounded-lg p-3">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                        <div class="lg:col-span-5 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
                             <div id="itin-destino-new-wrap" class="flex gap-2 mb-3">
                                 <input id="itin-destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
@@ -391,7 +391,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             </div>
                             <div id="itin-destinos-table-body" class="divide-y" style="max-height:480px; overflow-y:auto"></div>
                         </div>
-                        <div class="md:col-span-7 border rounded-lg p-3">
+                        <div class="lg:col-span-7 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Categorías de itinerarios <span id="itin-categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
                             <p id="itin-categorias-sin-destino" class="text-sm text-slate-500 hidden">Elige o crea un destino para empezar a agregar categorías.</p>
                             <div id="itin-categorias-table-wrap">

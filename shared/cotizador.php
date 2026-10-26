@@ -110,7 +110,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
                     </div>
                     <div class="accordion-body">
-                    <form id="form-pax" class="grid grid-cols-1 gap-2 small">
+                    <form id="form-pax" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 small">
                         <!-- El idioma ahora se elige con las pestañas de arriba (#idioma-tabs)
                              — este <select> se queda oculto como única fuente de verdad: todo
                              cotizador.js (guardado, paquetes, itinerario embebido) ya lee/
@@ -289,8 +289,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <h3 class="text-white font-semibold">Resumen de Factura</h3>
                         </div>
                         <div class="p-4 small">
-                            <div id="resumen-campos" class="grid grid-cols-1 md:grid-cols-10 gap-4">
-                                <div class="md:col-span-7 flex flex-col">
+                            <div id="resumen-campos" class="grid grid-cols-1 xl:grid-cols-10 gap-4">
+                                <div class="xl:col-span-6 flex flex-col">
                                     <label class="block text-slate-700 font-medium mb-1">Notas Adicionales</label>
                                     <div class="rte">
                                         <div class="rte-toolbar" role="toolbar" aria-label="Formato de texto">
@@ -303,7 +303,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <div id="notas_cotizacion" class="rte-editor flex-1" contenteditable="true" data-placeholder="Cualquier nota para el cliente..."></div>
                                     </div>
                                 </div>
-                                <div class="md:col-span-3 col-costo">
+                                <div class="xl:col-span-4 col-costo">
                                     <div class="grid grid-cols-2 gap-2 items-center">
                                         <div class="text-slate-600">P.V. Regular</div>
                                         <div class="text-right font-semibold" id="pv-regular"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
