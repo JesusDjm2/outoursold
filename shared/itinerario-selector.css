@@ -42,6 +42,25 @@
     transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 .itin-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -10px rgba(15, 23, 42, 0.4); }
+/* Arrastrar para reordenar (ver activarArrastreGrilla): sin selección ni menú del sistema al
+   mantener presionado con el dedo. */
+.itin-card { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.itin-card img { -webkit-user-drag: none; }
+.itin-grilla.is-ordenando, .itin-grilla.is-ordenando * { cursor: grabbing !important; }
+.itin-card.is-arrastrando, .itin-libre-card.is-arrastrando { opacity: 0.3; transform: scale(0.94); box-shadow: none; }
+.itin-libre-card.is-movible { cursor: grab; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.itin-libre-card.is-movible button { cursor: pointer; }
+.itin-card.is-drop-antes { box-shadow: -6px 0 0 -1px var(--ia-accent), 0 4px 12px -6px rgba(15, 23, 42, 0.2); }
+.itin-card.is-drop-despues { box-shadow: 6px 0 0 -1px var(--ia-accent), 0 4px 12px -6px rgba(15, 23, 42, 0.2); }
+.itin-card-fantasma {
+    position: fixed; left: 0; top: 0; z-index: 1200;
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.95;
+    box-shadow: 0 22px 40px -12px rgba(15, 23, 42, 0.55), 0 0 0 3px var(--ia-accent);
+    transition: none;
+}
+.itin-card-fantasma .itin-card-quitar { display: none; }
 .itin-card.is-fuera { outline: 2px dashed #f59e0b; outline-offset: -2px; }
 .itin-card.is-reemplazando { box-shadow: 0 0 0 3px #1e293b, 0 0 0 7px rgba(30, 41, 59, 0.15); }
 .itin-card.is-nueva { animation: ia-pop 0.5s ease; }
@@ -321,8 +340,21 @@
     transition: opacity 0.15s, transform 0.15s, background 0.15s, color 0.15s;
 }
 .ipc:hover .ipc-info, .ipc:focus-within .ipc-info { opacity: 1; transform: none; }
-.ipc-info:hover, .ipc-info:focus-visible { background: var(--ia-accent); color: #fff; transform: scale(1.08); }
-@media (hover: none) { .ipc-info { opacity: 1; transform: none; } }
+.ipc-info:focus-visible, .ipc-info.is-abierto { background: var(--ia-accent); color: #fff; transform: scale(1.08); }
+@media (hover: hover) and (min-width: 1024px) { .ipc-info:hover { background: var(--ia-accent); color: #fff; transform: scale(1.08); } }
+/* Tablets y celulares: siempre visible, icono blanco sobre fondo translúcido; al tocarlo (y
+   mientras su popup está abierto) toma el color de la agencia. */
+@media (max-width: 1023px), (hover: none) {
+    .ipc-info {
+        opacity: 1; transform: none;
+        background: rgba(15, 23, 42, 0.42);
+        color: #fff;
+        box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85), 0 2px 6px rgba(15, 23, 42, 0.25);
+        -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+        -webkit-tap-highlight-color: transparent;
+    }
+    .ipc-info:active, .ipc-info.is-abierto { background: var(--ia-accent); color: #fff; transform: scale(1.08); }
+}
 
 /* ===== Popup de detalles / edición ===== */
 html.idet-abierto, html.idet-abierto body { overflow: hidden; }
@@ -380,7 +412,7 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .idet-fecha input[type="number"] { width: 80px; }
 .idet-fecha input:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
 .idet-fecha-dia { align-self: center; font-size: 0.8rem; font-weight: 600; color: #334155; text-transform: capitalize; }
-.idet-fecha .idet-btn { margin-left: auto; }
+.idet-fecha-acciones { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .idet-body section { margin-top: 16px; }
 .idet-body h4 { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
 .idet-body h4 i { color: #94a3b8; }
@@ -467,15 +499,26 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .if-pdf-nuevo i { margin-right: 4px; }
 
 /* ===== Responsive ===== */
+/* Tablets y celulares: grilla pareja de tarjetas que llenan el ancho, en vez de la fila
+   flexible del escritorio. Cada tarjeta es una celda (los bloques de un mismo día se
+   disuelven; el "Día N" de cada tarjeta ya dice a qué día pertenece) y el "+" junto a cada
+   día se oculta: otro itinerario en el mismo día se agrega desde el popup ("Otro en este
+   día") o eligiendo el día en "Agregando al". */
+@media (max-width: 1023px) {
+    .itin-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: stretch; }
+    .itin-dia-grupo, .itin-dia-grupo.is-varios { display: contents; }
+    .itin-card-mas { display: none; }
+    .itin-card { width: auto; }
+    .itin-card-nuevo { width: auto; height: auto; aspect-ratio: 1; }
+    .itin-libre-card { width: auto; min-height: 0; aspect-ratio: 1; }
+    .itin-dia-grupo.is-destino .itin-card { box-shadow: 0 0 0 2px var(--ia-accent), 0 0 0 5px var(--ia-accent-soft); }
+    .itin-card-quitar { width: 28px; height: 28px; font-size: 0.78rem; opacity: 1; }
+    .itin-card-titulo { font-size: 0.8rem; }
+    .itin-card:hover { transform: none; }
+}
 @media (max-width: 639px) {
-    .itin-armado { --ia-card: 100px; }
-    .itin-grilla { gap: 8px; }
-    .itin-libre-card { width: 96px; }
-    .itin-card-mas { width: 26px; }
-    .itin-card-fecha { top: 6px; left: 6px; max-width: calc(100% - 12px); gap: 2px; }
-    .itin-card-badge-dia, .itin-card-badge-fecha { font-size: 0.6rem; padding: 1px 5px; }
-    .itin-libre-card-fechas { display: none !important; }
-    .itin-card-titulo { font-size: 0.7rem; left: 7px; right: 7px; bottom: 6px; }
+    .itin-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .itin-card-titulo { font-size: 0.76rem; left: 8px; right: 8px; bottom: 7px; }
     .itin-vacio-cta { margin-left: 0; }
     .itin-panel { margin-left: -6px; margin-right: -6px; padding: 12px 10px; }
     .itin-panel-destino { width: 100%; flex-wrap: wrap; }
@@ -495,7 +538,8 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .idet-acciones .idet-btn { flex: 1; padding: 0 10px; }
     .idet-acciones .idet-btn:first-child { margin-right: 0; flex-basis: 100%; }
     .idet-campos-2 { grid-template-columns: 1fr; }
-    .idet-fecha .idet-btn { margin-left: 0; }
+    .idet-fecha-acciones { margin-left: 0; width: 100%; }
+    .idet-fecha-acciones .idet-btn { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

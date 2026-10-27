@@ -1797,11 +1797,12 @@ document.getElementById('historial-filtro-limpiar')?.addEventListener('click', (
 // ===== Sellos de cada página del itinerario =====
 // Número del día (a la derecha de "DÍA", donde siempre estuvo), fecha corta en un chip bajo
 // la cabecera y, si corresponde, la etiqueta de días libres a su lado — en la franja libre
-// que dejan las plantillas entre la cabecera y la línea de tiempo.
+// que dejan las plantillas entre la cabecera y la línea de tiempo. El número cuenta solo los
+// días con itinerario (Día 1, 2, 3...); los días libres no suman y se muestran por su fecha.
 const TEXTOS_DIAS_LIBRES = {
-    es: { uno: d => `Día ${d} libre`, varios: (a, b) => `Días ${a}-${b} libres`, cuantos: n => `${n} días libres`, locale: 'es-PE' },
-    en: { uno: d => `Free day ${d}`, varios: (a, b) => `Free days ${a}-${b}`, cuantos: n => `${n} free days`, locale: 'en-US' },
-    pt: { uno: d => `Dia ${d} livre`, varios: (a, b) => `Dias ${a}-${b} livres`, cuantos: n => `${n} dias livres`, locale: 'pt-BR' }
+    es: { uno: 'Día libre', cuantos: n => `${n} días libres`, locale: 'es-PE' },
+    en: { uno: 'Free day', cuantos: n => `${n} free days`, locale: 'en-US' },
+    pt: { uno: 'Dia livre', cuantos: n => `${n} dias livres`, locale: 'pt-BR' }
 };
 
 function sumarDiasFechaISO(fechaISO, dias) {
@@ -1851,18 +1852,19 @@ function crearSellosDiaPdf(idioma, fLlegada, font, rgb) {
     const chipFecha = (page, texto) => texto ? chip(page, CHIP_X, texto.toUpperCase(), CHIP_FECHA, BLANCO, 9.5) + 6 : CHIP_X;
 
     return {
-        dia(page, dia) {
-            numero(page, String(dia));
+        // dia: día del calendario (da la fecha); n: número que se imprime (sin contar libres).
+        dia(page, dia, n = dia) {
+            numero(page, String(n));
             page._finChipFecha = chipFecha(page, fecha(dia));
         },
         etiquetaLibre(page, dia, { desde, hasta }) {
             const texto = desde === hasta
-                ? [t.uno(desde), fecha(desde)].filter(Boolean).join(' · ')
-                : [t.varios(desde, hasta), rango(desde, hasta)].filter(Boolean).join(' · ');
+                ? [t.uno, fecha(desde)].filter(Boolean).join(' · ')
+                : [t.cuantos(hasta - desde + 1), rango(desde, hasta)].filter(Boolean).join(' · ');
             chip(page, page._finChipFecha ?? CHIP_X, texto, CHIP_LIBRE, TEXTO_LIBRE, 8.5);
         },
+        // Página de varios días libres: sin número de día (no cuentan), solo fechas y cuántos.
         bloqueLibre(page, { desde, hasta }) {
-            numero(page, `${desde}-${hasta}`);
             const x = chipFecha(page, rango(desde, hasta));
             chip(page, x, t.cuantos(hasta - desde + 1), CHIP_LIBRE, TEXTO_LIBRE, 8.5);
         }
@@ -1911,6 +1913,7 @@ async function handleGenerateItinerary() {
         const plantillaLibre = modulosActivos().find(m => esModuloDiaLibre(m) && m.archivo_existe !== false) || null;
         const allFilesToProcess = startFiles.map(filename => ({ filename, type: 'start' }));
         let diaAnterior = null;
+        const diasOcupados = [...new Set(armado.map(x => x.dia))];
         armado.forEach(x => {
             let libreAntes = null;
             if (diaAnterior !== null && x.dia - diaAnterior > 1) {
@@ -1918,7 +1921,7 @@ async function handleGenerateItinerary() {
                 if (bloque.hasta > bloque.desde && plantillaLibre) allFilesToProcess.push({ filename: plantillaLibre.filename, type: 'libre', ...bloque });
                 else libreAntes = bloque;
             }
-            allFilesToProcess.push({ filename: x.filename, type: 'body', dia: x.dia, primeraDelDia: x.dia !== diaAnterior, libreAntes });
+            allFilesToProcess.push({ filename: x.filename, type: 'body', dia: x.dia, numeroDia: diasOcupados.indexOf(x.dia) + 1, primeraDelDia: x.dia !== diaAnterior, libreAntes });
             diaAnterior = x.dia;
         });
         endFiles.forEach(filename => allFilesToProcess.push({ filename, type: 'end' }));
@@ -1974,7 +1977,7 @@ async function handleGenerateItinerary() {
                 }
 
                 if (type === 'body') {
-                    sellos.dia(page, fileInfo.dia);
+                    sellos.dia(page, fileInfo.dia, fileInfo.numeroDia);
                     if (fileInfo.primeraDelDia && fileInfo.libreAntes && indicePagina === 0) sellos.etiquetaLibre(page, fileInfo.dia, fileInfo.libreAntes);
                 } else if (type === 'libre') {
                     sellos.bloqueLibre(page, fileInfo);
