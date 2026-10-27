@@ -101,7 +101,18 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
             </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
-                <section id="datos-pax-section" class="lg:col-span-1 card p-3 accordion-section" data-accordion-key="datos-pax">
+                <div class="lg:col-span-1 space-y-3">
+                <!-- Historial de cotizaciones guardadas (actividades, hoteles e itinerarios para
+                     reusar en esta): es de toda la cotización, por eso va sobre Datos Pax. -->
+                <button id="historial-tours-btn" type="button" class="solo-cotizacion historial-cta" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
+                    <span class="historial-cta-icono"><i class="fas fa-clock-rotate-left"></i></span>
+                    <span class="historial-cta-texto">
+                        <strong>Historial</strong>
+                        <small>Reusa lo de cotizaciones guardadas</small>
+                    </span>
+                    <i class="fas fa-chevron-right historial-cta-flecha"></i>
+                </button>
+                <section id="datos-pax-section" class="card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
                         <button type="button" class="accordion-toggle" aria-expanded="true">
                             <i class="fas fa-chevron-down accordion-caret"></i>
@@ -152,6 +163,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                     </form>
                     </div>
                 </section>
+                </div>
                 <section id="cotizador-main-col" class="lg:col-span-3 space-y-4">
                     <div class="card p-3 accordion-section" data-accordion-key="itinerario">
                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -212,14 +224,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <i class="fas fa-chevron-down accordion-caret"></i>
                                 <span class="accordion-label-collapsed">Actividades</span>
                             </button>
-                            <div class="flex items-center gap-2">
-                                <button id="historial-tours-btn" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
-                                    <i class="fas fa-clock-rotate-left mr-1"></i>Historial
-                                </button>
-                                <button id="toggle-conf-tours" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
-                                    <i class="fas fa-eye mr-1"></i>Precios confid.
-                                </button>
-                            </div>
                         </div>
                         <div class="accordion-body">
                         <div class="overflow-x-auto">
@@ -242,8 +246,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <tbody id="tours-body" class="small"></tbody>
                             </table>
                         </div>
-                        <div class="mt-2">
+                        <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
                             <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                            <button id="toggle-conf-tours" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                <i class="fas fa-eye mr-1"></i>Precios confid.
+                            </button>
                         </div>
                         </div>
                     </div>
@@ -253,11 +260,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <i class="fas fa-chevron-down accordion-caret"></i>
                                 <span class="accordion-label-collapsed">Hoteles</span>
                             </button>
-                            <div class="flex items-center gap-2">
-                                <button id="toggle-conf-hoteles" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
-                                    <i class="fas fa-eye mr-1"></i>Precios confid.
-                                </button>
-                            </div>
                         </div>
                         <div class="accordion-body">
                         <div class="overflow-x-auto">
@@ -281,8 +283,11 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <tbody id="hotels-body" class="small"></tbody>
                             </table>
                         </div>
-                        <div class="mt-2">
+                        <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
                             <button id="add-hotel" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                            <button id="toggle-conf-hoteles" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
+                                <i class="fas fa-eye mr-1"></i>Precios confid.
+                            </button>
                         </div>
                         </div>
                     </div>

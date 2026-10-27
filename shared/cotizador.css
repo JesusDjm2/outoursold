@@ -401,3 +401,38 @@ input[readonly] {
         max-height: 90vh;
     }
 }
+
+/* Historial (sobre Datos Pax): tarjeta-botón con icono, título y ayuda; al pasar se tiñe
+   con el acento de la agencia. */
+.historial-cta {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--muted-border);
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
+    text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.historial-cta-icono {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-1, #e80c13) 10%, white);
+    color: var(--accent-1, #e80c13);
+    font-size: 0.95rem;
+    transition: background 0.15s, color 0.15s;
+}
+.historial-cta-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.historial-cta-texto strong { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
+.historial-cta-texto small { font-size: 0.72rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.historial-cta-flecha { flex-shrink: 0; font-size: 0.7rem; color: #94a3b8; transition: transform 0.15s, color 0.15s; }
+.historial-cta:hover, .historial-cta:focus-visible {
+    border-color: var(--accent-1, #e80c13);
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.08);
+    outline: none;
+}
+.historial-cta:hover .historial-cta-icono, .historial-cta:focus-visible .historial-cta-icono { background: var(--accent-1, #e80c13); color: white; }
+.historial-cta:hover .historial-cta-flecha { color: var(--accent-1, #e80c13); transform: translateX(3px); }
