@@ -52,6 +52,8 @@
 .itin-libre-card.is-movible button { cursor: pointer; }
 .itin-card.is-drop-antes { box-shadow: -6px 0 0 -1px var(--ia-accent), 0 4px 12px -6px rgba(15, 23, 42, 0.2); }
 .itin-card.is-drop-despues { box-shadow: 6px 0 0 -1px var(--ia-accent), 0 4px 12px -6px rgba(15, 23, 42, 0.2); }
+/* Itinerario soltado sobre un bloque de días libres: pasa a uno de esos días. */
+.itin-libre-card.is-drop-antes, .itin-libre-card.is-drop-despues { border-style: solid; border-color: var(--ia-accent); background: var(--ia-accent-soft); box-shadow: 0 0 0 4px var(--ia-accent-soft); }
 .itin-card-fantasma {
     position: fixed; left: 0; top: 0; z-index: 1200;
     margin: 0;
@@ -60,7 +62,7 @@
     box-shadow: 0 22px 40px -12px rgba(15, 23, 42, 0.55), 0 0 0 3px var(--ia-accent);
     transition: none;
 }
-.itin-card-fantasma .itin-card-quitar { display: none; }
+.itin-card-fantasma .itin-card-quitar, .itin-card-fantasma .itin-card-editar { display: none; }
 .itin-card.is-fuera { outline: 2px dashed #f59e0b; outline-offset: -2px; }
 .itin-card.is-reemplazando { box-shadow: 0 0 0 3px #1e293b, 0 0 0 7px rgba(30, 41, 59, 0.15); }
 .itin-card.is-nueva { animation: ia-pop 0.5s ease; }
@@ -109,20 +111,26 @@
 .itin-card:hover .itin-card-quitar, .itin-card:focus-within .itin-card-quitar { opacity: 1; }
 .itin-card-quitar:hover { background: #dc2626; }
 @media (hover: none) { .itin-card-quitar { opacity: 0.9; } }
-/* Con la X visible, el badge de "Día N" (a su altura) le deja lugar. */
-.itin-card:hover .itin-card-badge-dia, .itin-card:focus-within .itin-card-badge-dia { max-width: calc(var(--ia-card) - 52px); }
-
-.itin-card-mas {
-    flex-shrink: 0;
-    width: 30px;
-    border: 1.5px dashed #cbd5e1;
-    border-radius: 12px;
-    color: var(--ia-faint);
-    font-size: 0.7rem;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+/* Lápiz: siempre visible, para que se note que el itinerario agregado se puede editar. Abre
+   el popup directo en modo edición (al tocar la tarjeta se abren los detalles, con "Otro en
+   este día", Editar, Quitar y Cambiar). Con la X visible se corre a su izquierda. */
+.itin-card-editar {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    width: 24px; height: 24px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #334155;
+    font-size: 0.62rem;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+    transition: right 0.15s, background 0.15s, color 0.15s;
 }
-.itin-card-mas:hover { border-color: var(--ia-accent); color: var(--ia-accent); background: var(--ia-accent-soft); }
-.itin-dia-grupo:not(:hover):not(:focus-within):not(.is-destino) .itin-card-mas { opacity: 0.45; }
+.itin-card:hover .itin-card-editar, .itin-card:focus-within .itin-card-editar { right: 34px; }
+.itin-card-editar:hover, .itin-card-editar:focus-visible { background: var(--ia-accent); color: #fff; }
+@media (hover: none) { .itin-card-editar { right: 34px; } }
+/* El badge de "Día N" (a su altura) les deja lugar a los botones. */
+.itin-card .itin-card-badge-dia { max-width: calc(var(--ia-card) - 44px); }
+.itin-card:hover .itin-card-badge-dia, .itin-card:focus-within .itin-card-badge-dia { max-width: calc(var(--ia-card) - 74px); }
 
 /* Días libres entre días: − / + cambia cuántos (corre los días siguientes). */
 .itin-libre-card {
@@ -501,18 +509,19 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 /* ===== Responsive ===== */
 /* Tablets y celulares: grilla pareja de tarjetas que llenan el ancho, en vez de la fila
    flexible del escritorio. Cada tarjeta es una celda (los bloques de un mismo día se
-   disuelven; el "Día N" de cada tarjeta ya dice a qué día pertenece) y el "+" junto a cada
-   día se oculta: otro itinerario en el mismo día se agrega desde el popup ("Otro en este
-   día") o eligiendo el día en "Agregando al". */
+   disuelven; el "Día N" de cada tarjeta ya dice a qué día pertenece). Otro itinerario en el
+   mismo día se agrega desde el popup ("Otro en este día") o eligiendo el día en
+   "Agregando al". */
 @media (max-width: 1023px) {
     .itin-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: stretch; }
     .itin-dia-grupo, .itin-dia-grupo.is-varios { display: contents; }
-    .itin-card-mas { display: none; }
     .itin-card { width: auto; }
     .itin-card-nuevo { width: auto; height: auto; aspect-ratio: 1; }
     .itin-libre-card { width: auto; min-height: 0; aspect-ratio: 1; }
     .itin-dia-grupo.is-destino .itin-card { box-shadow: 0 0 0 2px var(--ia-accent), 0 0 0 5px var(--ia-accent-soft); }
     .itin-card-quitar { width: 28px; height: 28px; font-size: 0.78rem; opacity: 1; }
+    .itin-card-editar, .itin-card:hover .itin-card-editar { width: 28px; height: 28px; font-size: 0.72rem; right: 40px; }
+    .itin-card .itin-card-badge-dia, .itin-card:hover .itin-card-badge-dia { max-width: none; }
     .itin-card-titulo { font-size: 0.8rem; }
     .itin-card:hover { transform: none; }
 }

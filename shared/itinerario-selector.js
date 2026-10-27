@@ -110,14 +110,10 @@ function iselRangoFechas(desde, hasta) {
     if (!a) return '';
     return desde === hasta ? a : `${a} – ${iselFechaCorta(hasta)}`;
 }
-// Número de día que se muestra: cuenta solo los días con itinerario. Los días libres no
-// suman (sus fechas ya los reflejan): Día 1, Día 2, [2 días libres], Día 3... El `dia` de
-// cada fila sigue siendo el día del calendario (Día 1 = F. Llegada), que da las fechas.
-function iselDiasOcupados() {
-    return [...new Set(itemsArmado().map(x => x.dia))];
-}
-function iselNumeroDia(dia, ocupados = iselDiasOcupados()) {
-    return ocupados.filter(d => d < dia).length + 1;
+// "Día N" es el día del viaje (Día 1 = F. Llegada) y los días libres cuentan: Día 3,
+// [Días 4–5 libres], Día 6.
+function iselTextoDiasRango(desde, hasta) {
+    return desde === hasta ? `Día ${desde}` : `Días ${desde}–${hasta}`;
 }
 
 // ===== Enganches con itinerario.js (addItineraryBuilderRow / recalculateDayNumbers) =====
@@ -207,13 +203,12 @@ function renderGrilla() {
     const esDestino = (d) => armadoUI.panelAbierto && !armadoUI.reemplazar && d === diaDestino();
     let html = '';
     let anterior = null;
-    dias.forEach((dia, i) => {
-        if (anterior !== null && dia - anterior > 1) html += tarjetaLibreHtml(anterior + 1, dia - 1, esDestino(anterior + 1));
+    let bloques = 0;
+    dias.forEach(dia => {
+        if (anterior !== null && dia - anterior > 1) html += tarjetaLibreHtml(anterior + 1, dia - 1, esDestino(anterior + 1), bloques++);
         const grupo = porDia.get(dia);
-        const n = i + 1;
         html += `<div class="itin-dia-grupo${grupo.length > 1 ? ' is-varios' : ''}${esDestino(dia) ? ' is-destino' : ''}" data-dia="${dia}">
-            ${grupo.map(x => tarjetaElegidaHtml(x, n)).join('')}
-            <button type="button" class="itin-card-mas" data-accion="agregar-en" data-dia="${dia}" title="Agregar otro itinerario al Día ${n}" aria-label="Agregar otro itinerario al Día ${n}"><i class="fas fa-plus"></i></button>
+            ${grupo.map(x => tarjetaElegidaHtml(x)).join('')}
         </div>`;
         anterior = dia;
     });
@@ -222,19 +217,20 @@ function renderGrilla() {
         const fecha = iselFechaCorta(max + s);
         html += `<div class="itin-libre-card is-pendiente">
             <span class="itin-libre-card-icono"><i class="fas fa-mug-hot"></i></span>
-            <strong>Día libre</strong>${fecha ? `<small>${escapeHtml(fecha)}</small>` : ''}
+            <strong>Día libre</strong><small>${iselTextoDiasRango(max + s, max + s)}${fecha ? ` · ${escapeHtml(fecha)}` : ''}</small>
             <button type="button" class="itin-libre-card-quitar" data-accion="quitar-salto" aria-label="Quitar este día libre"><i class="fas fa-xmark"></i></button>
         </div>`;
     }
-    const fechaNuevo = iselFechaCorta(diaNuevo());
+    const nuevo = diaNuevo();
+    const fechaNuevo = iselFechaCorta(nuevo);
     html += `<button type="button" class="itin-card-nuevo${armadoUI.panelAbierto && !armadoUI.reemplazar && armadoUI.destino === null ? ' is-destino' : ''}" data-accion="abrir-nuevo">
-        <i class="fas fa-plus"></i><strong>Día ${dias.length + 1}</strong>${fechaNuevo ? `<small>${escapeHtml(fechaNuevo)}</small>` : ''}
+        <i class="fas fa-plus"></i><strong>Día ${nuevo}</strong>${fechaNuevo ? `<small>${escapeHtml(fechaNuevo)}</small>` : ''}
     </button>`;
     cont.innerHTML = html;
 }
 
-// n: número de día que se muestra (ver iselNumeroDia).
-function tarjetaElegidaHtml(x, n) {
+function tarjetaElegidaHtml(x) {
+    const n = x.dia;
     const e = iselEntradaDe(x.filename);
     const titulo = e ? e.m.titulo : x.filename;
     const fecha = iselFechaCorta(x.dia);
@@ -248,18 +244,20 @@ function tarjetaElegidaHtml(x, n) {
             </span>
             <span class="itin-card-titulo">${escapeHtml(titulo)}</span>
         </button>
+        <button type="button" class="itin-card-editar" data-accion="editar" title="Editar itinerario" aria-label="Editar ${escapeHtml(titulo)}"><i class="fas fa-pen"></i></button>
         <button type="button" class="itin-card-quitar" data-accion="quitar" title="Quitar" aria-label="Quitar ${escapeHtml(titulo)} del Día ${n}"><i class="fas fa-xmark"></i></button>
     </div>`;
 }
 
-// Bloque de días libres: sin número de día (no cuentan), solo cuántos y sus fechas.
-function tarjetaLibreHtml(desde, hasta, esDestino) {
+// Bloque de días libres: cuántos, qué días del viaje ocupan y sus fechas.
+// indice: posición del bloque entre los bloques libres (ver moverDiasLibres).
+function tarjetaLibreHtml(desde, hasta, esDestino, indice) {
     const n = hasta - desde + 1;
     const fechas = iselRangoFechas(desde, hasta);
-    return `<div class="itin-libre-card is-movible${esDestino ? ' is-destino' : ''}" data-desde="${desde}" data-hasta="${hasta}" title="Arrastra para mover ${n === 1 ? 'el día libre' : 'los días libres'}">
+    return `<div class="itin-libre-card is-movible${esDestino ? ' is-destino' : ''}" data-desde="${desde}" data-hasta="${hasta}" data-bloque="${indice}" title="Arrastra para mover ${n === 1 ? 'el día libre' : 'los días libres'}">
         <span class="itin-libre-card-icono"><i class="fas fa-mug-hot"></i></span>
         <strong>${n === 1 ? 'Día libre' : `${n} días libres`}</strong>
-        ${fechas ? `<small class="itin-libre-card-fechas">${escapeHtml(fechas)}</small>` : ''}
+        <small>${iselTextoDiasRango(desde, hasta)}${fechas ? `<span class="itin-libre-card-fechas">${escapeHtml(fechas)}</span>` : ''}</small>
         <span class="itin-libre-card-ctrl" role="group" aria-label="Cantidad de días libres">
             <button type="button" data-accion="libre-menos" data-correr="${hasta + 1}" title="${n === 1 ? 'Quitar el día libre' : 'Un día libre menos'}" aria-label="${n === 1 ? 'Quitar el día libre' : 'Un día libre menos'}"><i class="fas fa-minus"></i></button>
             <button type="button" data-accion="libre-mas" data-correr="${hasta + 1}" title="Un día libre más" aria-label="Un día libre más"><i class="fas fa-plus"></i></button>
@@ -274,6 +272,7 @@ document.getElementById('itin-grilla')?.addEventListener('click', (ev) => {
     const card = btn.closest('.itin-card');
     switch (btn.dataset.accion) {
         case 'detalle': abrirDetalleItinerario({ uid: card.dataset.uid }); break;
+        case 'editar': abrirDetalleItinerario({ uid: card.dataset.uid, editar: true }); break;
         case 'quitar': quitarFila(card.dataset.uid); break;
         case 'agregar-en': abrirPanelItinerarios({ destino: Number(btn.dataset.dia) }); break;
         case 'abrir-nuevo': abrirPanelItinerarios({ destino: null }); break;
@@ -284,51 +283,99 @@ document.getElementById('itin-grilla')?.addEventListener('click', (ev) => {
 });
 
 // ===== Arrastrar para reordenar (mouse, y dedo en tablets/celulares) =====
-// Lo que se mueve es el itinerario; los días quedan donde estaban (días libres, varios
-// itinerarios en un día). Al soltar, la lista en su nuevo orden vuelve a ocupar los mismos
-// días en el mismo orden. Con mouse arranca al mover unos px; con el dedo, tras mantener
-// presionada la tarjeta un instante, así deslizar sobre las tarjetas sigue haciendo scroll.
-function reordenarItinerario(uid, destinoUid, antes) {
-    const items = itemsArmado();
-    const dias = items.map(x => x.dia);
-    const movido = items.find(x => x.uid === uid);
-    const resto = items.filter(x => x.uid !== uid);
-    let i = resto.findIndex(x => x.uid === destinoUid);
-    if (!movido || i < 0) return;
-    resto.splice(antes ? i : i + 1, 0, movido);
-    if (resto.every((x, k) => x === items[k])) return;
+// El itinerario se ve como una línea de tiempo: días con itinerario y bloques de días
+// libres, uno tras otro. Arrastrar mueve un itinerario (o un bloque de libres) a otro lugar
+// de esa línea y los días se recalculan recorriéndola desde el Día 1, contando los libres.
+// Con mouse arranca al mover unos px; con el dedo, tras mantener presionada la tarjeta un
+// instante, así deslizar sobre las tarjetas sigue haciendo scroll.
+
+// [{ tipo: 'dia', filas: [tr, ...] } | { tipo: 'libre', n }] en orden.
+function iselLineaDeTiempo() {
+    const linea = [];
+    let anterior = null;
+    itemsArmado().forEach(x => {
+        if (anterior === x.dia) { linea[linea.length - 1].filas.push(x.tr); return; }
+        if (anterior !== null && x.dia - anterior > 1) linea.push({ tipo: 'libre', n: x.dia - anterior - 1 });
+        linea.push({ tipo: 'dia', filas: [x.tr] });
+        anterior = x.dia;
+    });
+    return linea;
+}
+// Vuelve a numerar los días recorriendo la línea desde `inicio`. Antes se limpia: sin días
+// vacíos, libres seguidos juntos en un bloque y sin libres al principio ni al final (el Día
+// 1 es la llegada y un libre siempre va entre dos días).
+function iselAplicarLineaDeTiempo(linea, inicio) {
+    const limpia = [];
+    linea.forEach(u => {
+        if (u.tipo === 'dia' && !u.filas.length) return;
+        if (u.tipo === 'libre' && u.n < 1) return;
+        const ultimo = limpia[limpia.length - 1];
+        if (u.tipo === 'libre' && ultimo?.tipo === 'libre') ultimo.n += u.n;
+        else limpia.push(u);
+    });
+    while (limpia[0]?.tipo === 'libre') limpia.shift();
+    while (limpia[limpia.length - 1]?.tipo === 'libre') limpia.pop();
     const body = document.getElementById('itinerary-builder-body');
-    resto.forEach((x, k) => { x.tr.dataset.dia = String(dias[k]); body.appendChild(x.tr); });
+    let dia = inicio;
+    limpia.forEach(u => {
+        if (u.tipo === 'libre') { dia += u.n; return; }
+        u.filas.forEach(tr => { tr.dataset.dia = String(dia); body.appendChild(tr); });
+        dia++;
+    });
     refrescarArmadoItinerario();
-    resaltarTarjeta(uid);
-    const titulo = iselEntradaDe(movido.filename)?.m.titulo || movido.filename;
-    iselToast(`${titulo} ahora es el Día ${iselNumeroDia(Number(movido.tr.dataset.dia))}`);
+}
+function iselIndiceDeFila(linea, tr) {
+    return linea.findIndex(u => u.tipo === 'dia' && u.filas.includes(tr));
 }
 
-// Mueve un bloque de días libres (desde..hasta) para que quede antes o después del día de la
-// tarjeta destino. Los días se corren y las fechas se recalculan solas. Un día libre siempre
-// va entre dos días con itinerario: no antes del primero ni después del último.
-function moverDiasLibres(desde, hasta, destinoUid, antes) {
-    const n = hasta - desde + 1;
-    const filas = filasArmado();
+// Suelto junto a una tarjeta: el itinerario pasa a su propio día justo antes o después del
+// día de esa tarjeta, y los días siguientes se corren (los libres se mantienen).
+// Suelto sobre un bloque de días libres: el itinerario pasa a ese día libre (el primero del
+// bloque si se suelta en su mitad izquierda, el último si en la derecha) y los demás no se
+// mueven; si su día queda vacío, pasa a ser libre. Si era el único del Día 1, todo se
+// adelanta para que el viaje siga empezando el día de llegada.
+function moverItinerario(uid, destino, antes) {
+    const tr = filaPorUid(uid);
+    if (!tr) return;
+    const inicio = itemsArmado()[0]?.dia ?? 1;
+    if (destino.tipo === 'libre') {
+        tr.dataset.dia = String(antes ? destino.desde : destino.hasta);
+        const primero = Math.min(...filasArmado().map(f => Number(f.dataset.dia)));
+        if (primero > inicio) filasArmado().forEach(f => { f.dataset.dia = String(Number(f.dataset.dia) - (primero - inicio)); });
+        refrescarArmadoItinerario();
+    } else {
+        const linea = iselLineaDeTiempo();
+        const origen = linea[iselIndiceDeFila(linea, tr)];
+        origen.filas = origen.filas.filter(f => f !== tr);
+        const i = iselIndiceDeFila(linea, filaPorUid(destino.uid));
+        if (i < 0) return;
+        linea.splice(antes ? i : i + 1, 0, { tipo: 'dia', filas: [tr] });
+        iselAplicarLineaDeTiempo(linea, inicio);
+    }
+    resaltarTarjeta(uid);
+    const titulo = iselEntradaDe(filenameDeFila(tr))?.m.titulo || filenameDeFila(tr);
+    iselToast(`${titulo} ahora es el Día ${tr.dataset.dia}`);
+}
+
+// Mueve un bloque de días libres para que quede antes o después del día de la tarjeta
+// destino. Un día libre siempre va entre dos días con itinerario: no antes del primero ni
+// después del último.
+function moverDiasLibres(indiceBloque, destinoUid, antes) {
+    const inicio = itemsArmado()[0]?.dia ?? 1;
+    const linea = iselLineaDeTiempo();
+    const bloque = linea.filter(u => u.tipo === 'libre')[indiceBloque];
     const trDestino = filaPorUid(destinoUid);
-    if (!trDestino || n < 1) return;
-    // 1. Se quita el bloque: lo que está después se adelanta n días.
-    filas.forEach(tr => { const d = Number(tr.dataset.dia); if (d > hasta) tr.dataset.dia = String(d - n); });
-    // 2. Se inserta antes del día elegido (o antes del siguiente, si se soltó "después").
-    const ocupados = [...new Set(filas.map(tr => Number(tr.dataset.dia)))].sort((x, y) => x - y);
-    const diaDestino = Number(trDestino.dataset.dia);
-    const desdeNuevo = antes ? diaDestino : ocupados.find(d => d > diaDestino);
-    const deshacer = () => filas.forEach(tr => { const d = Number(tr.dataset.dia); if (d >= desde) tr.dataset.dia = String(d + n); });
-    if (desdeNuevo === undefined || desdeNuevo === ocupados[0]) {
-        deshacer();
-        iselToast(n === 1 ? 'El día libre debe quedar entre dos días' : 'Los días libres deben quedar entre dos días', 'info');
+    if (!bloque || !trDestino) return;
+    linea.splice(linea.indexOf(bloque), 1);
+    const i = iselIndiceDeFila(linea, trDestino);
+    const pos = antes ? i : i + 1;
+    if (pos <= 0 || pos >= linea.length) {
+        iselToast(bloque.n === 1 ? 'El día libre debe quedar entre dos días' : 'Los días libres deben quedar entre dos días', 'info');
         return;
     }
-    filas.forEach(tr => { const d = Number(tr.dataset.dia); if (d >= desdeNuevo) tr.dataset.dia = String(d + n); });
-    if (desdeNuevo === desde) { refrescarArmadoItinerario(); return; } // quedó donde estaba
-    refrescarArmadoItinerario();
-    iselToast(n === 1 ? 'Día libre movido: las fechas se actualizaron' : `${n} días libres movidos: las fechas se actualizaron`);
+    linea.splice(pos, 0, bloque);
+    iselAplicarLineaDeTiempo(linea, inicio);
+    iselToast(bloque.n === 1 ? 'Día libre movido: los días y fechas se actualizaron' : `${bloque.n} días libres movidos: los días y fechas se actualizaron`);
 }
 
 (function activarArrastreGrilla() {
@@ -348,7 +395,7 @@ function moverDiasLibres(desde, hasta, destinoUid, antes) {
     // botones − / + / "+ Itinerario").
     grilla.addEventListener('pointerdown', (ev) => {
         const card = ev.target.closest('.itin-card, .itin-libre-card.is-movible');
-        if (!card || ev.target.closest('.itin-card-quitar, .itin-libre-card button') || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+        if (!card || ev.target.closest('.itin-card-quitar, .itin-card-editar, .itin-libre-card button') || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
         const libre = card.classList.contains('itin-libre-card');
         if (!libre && itemsArmado().length < 2) return;
         a = { card, uid: card.dataset.uid, libre, id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, tactil: ev.pointerType !== 'mouse', activo: false };
@@ -398,7 +445,7 @@ function moverDiasLibres(desde, hasta, destinoUid, antes) {
         const w = a.fantasma.offsetWidth, h = a.fantasma.offsetHeight;
         a.fantasma.style.transform = `translate(${a.x - w / 2}px, ${a.y - h / 2}px) rotate(-3deg) scale(1.04)`;
         let mejor = null, distMejor = Infinity;
-        grilla.querySelectorAll('.itin-card').forEach(c => {
+        grilla.querySelectorAll(a.libre ? '.itin-card' : '.itin-card, .itin-libre-card.is-movible').forEach(c => {
             if (c === a.card) return;
             const r = c.getBoundingClientRect();
             const dist = Math.hypot(a.x - (r.left + r.width / 2), a.y - (r.top + r.height / 2));
@@ -407,7 +454,9 @@ function moverDiasLibres(desde, hasta, destinoUid, antes) {
         grilla.querySelectorAll('.is-drop-antes, .is-drop-despues').forEach(c => c.classList.remove('is-drop-antes', 'is-drop-despues'));
         a.destino = null;
         if (!mejor || distMejor > mejor.r.width * 1.3) return;
-        a.destino = mejor.c.dataset.uid;
+        a.destino = mejor.c.classList.contains('itin-libre-card')
+            ? { tipo: 'libre', desde: Number(mejor.c.dataset.desde), hasta: Number(mejor.c.dataset.hasta) }
+            : { tipo: 'card', uid: mejor.c.dataset.uid };
         a.antes = a.x < mejor.r.left + mejor.r.width / 2;
         mejor.c.classList.add(a.antes ? 'is-drop-antes' : 'is-drop-despues');
     }
@@ -442,8 +491,11 @@ function moverDiasLibres(desde, hasta, destinoUid, antes) {
         if (!activo) return;
         sinClickHasta = performance.now() + 400;
         if (!soltar || !destino) return;
-        if (libre) moverDiasLibres(Number(card.dataset.desde), Number(card.dataset.hasta), destino, antes);
-        else reordenarItinerario(uid, destino, antes);
+        if (libre) {
+            if (destino.tipo === 'card') moverDiasLibres(Number(card.dataset.bloque), destino.uid, antes);
+        } else {
+            moverItinerario(uid, destino, antes);
+        }
     }
 })();
 
@@ -451,7 +503,7 @@ function quitarFila(uid) {
     const tr = filaPorUid(uid);
     if (!tr) return;
     const titulo = iselEntradaDe(filenameDeFila(tr))?.m.titulo || filenameDeFila(tr);
-    const dia = iselNumeroDia(Number(tr.dataset.dia));
+    const dia = tr.dataset.dia;
     tr.remove();
     if (armadoUI.reemplazar === uid) armadoUI.reemplazar = null;
     refrescarArmadoItinerario();
@@ -662,7 +714,7 @@ function renderPanelCabecera() {
         cab.innerHTML = `
             <div class="itin-panel-destino is-cambio">
                 <i class="fas fa-arrows-rotate"></i>
-                <span>Cambiando el <strong>Día ${iselNumeroDia(dia)}</strong>${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}: ${escapeHtml(e?.m.titulo || filenameDeFila(tr))}. Toca el itinerario nuevo.</span>
+                <span>Cambiando el <strong>Día ${dia}</strong>${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}: ${escapeHtml(e?.m.titulo || filenameDeFila(tr))}. Toca el itinerario nuevo.</span>
             </div>
             <div class="itin-panel-acciones">
                 <button type="button" class="itin-panel-btn" data-accion="cancelar-cambio">Cancelar cambio</button>
@@ -675,15 +727,13 @@ function renderPanelCabecera() {
     const conteo = (d) => items.filter(x => x.dia === d).length;
     const opciones = [];
     let anterior = null;
-    // Los días libres no tienen número (no cuentan): se nombran por su fecha, o por el día
-    // después del cual están si todavía no hay F. Llegada.
-    dias.forEach((d, i) => {
-        for (let l = (anterior ?? d) + 1; anterior !== null && l < d; l++) opciones.push({ v: l, t: `Libre · ${iselFechaCorta(l) || `después del Día ${i}`}` });
-        opciones.push({ v: d, t: `Día ${i + 1}${iselFechaCorta(d) ? ` · ${iselFechaCorta(d)}` : ''} (${conteo(d)})` });
+    dias.forEach(d => {
+        for (let l = (anterior ?? d) + 1; anterior !== null && l < d; l++) opciones.push({ v: l, t: `Día ${l}${iselFechaCorta(l) ? ` · ${iselFechaCorta(l)}` : ''} (libre)` });
+        opciones.push({ v: d, t: `Día ${d}${iselFechaCorta(d) ? ` · ${iselFechaCorta(d)}` : ''} (${conteo(d)})` });
         anterior = d;
     });
     const nuevo = diaNuevo();
-    opciones.push({ v: 'nuevo', t: `Nuevo: Día ${dias.length + 1}${iselFechaCorta(nuevo) ? ` · ${iselFechaCorta(nuevo)}` : ''}` });
+    opciones.push({ v: 'nuevo', t: `Nuevo: Día ${nuevo}${iselFechaCorta(nuevo) ? ` · ${iselFechaCorta(nuevo)}` : ''}` });
     const actual = armadoUI.destino ?? 'nuevo';
     cab.innerHTML = `
         <label class="itin-panel-destino">
@@ -776,12 +826,11 @@ function renderPanelCatalogo() {
 // Insignia "Día 1, 3" en las tarjetas del panel que ya están en el itinerario.
 function pintarEstadoTarjetasPanel() {
     const items = itemsArmado();
-    const ocupados = iselDiasOcupados();
     const actual = armadoUI.reemplazar ? filenameDeFila(filaPorUid(armadoUI.reemplazar)) : null;
-    const destino = iselNumeroDia(diaDestino(), ocupados);
+    const destino = diaDestino();
     document.querySelectorAll('#itin-panel .ipc').forEach(card => {
         const f = card.dataset.filename;
-        const dias = [...new Set(items.filter(x => x.filename === f).map(x => iselNumeroDia(x.dia, ocupados)))];
+        const dias = [...new Set(items.filter(x => x.filename === f).map(x => x.dia))];
         const badge = card.querySelector('.ipc-badge');
         const main = card.querySelector('.ipc-main');
         const titulo = card.querySelector('.ipc-titulo').textContent;
@@ -802,7 +851,7 @@ function elegirDesdePanel(filename) {
         const tr = filaPorUid(armadoUI.reemplazar);
         if (tr) {
             tr.querySelector('.module-filename').value = filename;
-            iselToast(`Día ${iselNumeroDia(Number(tr.dataset.dia))}: ${titulo}`);
+            iselToast(`Día ${tr.dataset.dia}: ${titulo}`);
         }
         armadoUI.reemplazar = null;
         refrescarArmadoItinerario();
@@ -812,7 +861,7 @@ function elegirDesdePanel(filename) {
     }
     const dia = diaDestino();
     if (itemsArmado().some(x => x.dia === dia && x.filename === filename)) {
-        iselToast(`${titulo} ya está en el Día ${iselNumeroDia(dia)}`, 'info');
+        iselToast(`${titulo} ya está en el Día ${dia}`, 'info');
         return;
     }
     const esNuevo = armadoUI.destino === null;
@@ -836,11 +885,12 @@ document.querySelector('input[name="f_llegada"]')?.addEventListener('change', re
 // ===== Popup de detalles (y edición) =====
 let detalleActual = null; // { uid?, filename, editando }
 
-function abrirDetalleItinerario({ uid = null, filename = null }) {
+// editar: abre directo en modo edición (lápiz de la tarjeta); "Cancelar" vuelve a los detalles.
+function abrirDetalleItinerario({ uid = null, filename = null, editar = false }) {
     if (uid) filename = filenameDeFila(filaPorUid(uid));
     if (!filename) return;
     document.getElementById('idet')?.remove();
-    detalleActual = { uid, filename, editando: false, focoPrevio: document.activeElement };
+    detalleActual = { uid, filename, editando: editar, focoPrevio: document.activeElement };
     const overlay = document.createElement('div');
     overlay.id = 'idet';
     overlay.className = 'idet-overlay';
@@ -923,12 +973,12 @@ function renderDetalle() {
             ${tr ? `
             <div class="idet-fecha">
                 <label>
-                    <span>${llegada ? 'Fecha' : 'Día del viaje (con libres)'}</span>
+                    <span>${llegada ? 'Fecha' : 'Día'}</span>
                     ${llegada
                         ? `<input type="date" class="idet-fecha-input" value="${iselFechaDia(dia)}" min="${llegada}">`
                         : `<input type="number" class="idet-dia-input" value="${dia}" min="1" max="366">`}
                 </label>
-                <span class="idet-fecha-dia">Día ${iselNumeroDia(dia, diasDelItinerario)}${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}</span>
+                <span class="idet-fecha-dia">Día ${dia}${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}</span>
                 <span class="idet-fecha-acciones">
                     <button type="button" class="idet-btn is-suave" data-accion="mismo-dia" title="Agregar otro itinerario a este mismo día"><i class="fas fa-plus"></i>Otro en este día</button>
                     ${!esPrimerDia ? '<button type="button" class="idet-btn is-suave" data-accion="libre-antes" title="Corre este día y los siguientes un día"><i class="fas fa-mug-hot"></i>Día libre antes</button>' : ''}
@@ -948,7 +998,7 @@ function renderDetalle() {
             ${tr ? `
                 <button type="button" class="idet-btn is-peligro" data-accion="quitar"><i class="fas fa-trash"></i>Quitar</button>
                 <button type="button" class="idet-btn is-primario" data-accion="cambiar"><i class="fas fa-arrows-rotate"></i>Cambiar</button>`
-            : `<button type="button" class="idet-btn is-primario" data-accion="agregar"><i class="fas fa-plus"></i>${armadoUI.reemplazar ? 'Usar en lugar del actual' : `Agregar al Día ${iselNumeroDia(diaDestino())}`}</button>`}
+            : `<button type="button" class="idet-btn is-primario" data-accion="agregar"><i class="fas fa-plus"></i>${armadoUI.reemplazar ? 'Usar en lugar del actual' : `Agregar al Día ${diaDestino()}`}</button>`}
         </div>`;
     enlazarDetalle(caja, e);
 }
@@ -956,18 +1006,37 @@ function renderDetalle() {
 function enlazarDetalle(caja, e) {
     caja.querySelector('.idet-cerrar')?.addEventListener('click', cerrarDetalleItinerario);
     const tr = detalleActual.uid ? filaPorUid(detalleActual.uid) : null;
-    const cambiarDia = (dia) => {
-        if (!tr || !Number.isFinite(dia)) return;
+    // reenfocar: volver al campo tras aplicar (no cuando se aplicó porque el usuario salió de él).
+    const cambiarDia = (dia, reenfocar = true) => {
+        if (!tr || !Number.isFinite(dia) || !detalleActual) return;
         if (dia < 1) { notifyWarning('La fecha no puede ser anterior a la Fecha de llegada.'); renderDetalle(); return; }
         tr.dataset.dia = String(dia);
         refrescarArmadoItinerario();
         renderDetalle();
-        caja.querySelector('.idet-fecha-input, .idet-dia-input')?.focus();
+        if (reenfocar) caja.querySelector('.idet-fecha-input, .idet-dia-input')?.focus();
     };
-    caja.querySelector('.idet-fecha-input')?.addEventListener('change', (ev) => {
-        if (!ev.target.value) return;
-        cambiarDia(Math.round((Date.parse(ev.target.value + 'T00:00:00Z') - Date.parse(iselLlegada() + 'T00:00:00Z')) / 86400000) + 1);
-    });
+    // Fecha: al escribirla, el navegador avisa un cambio por cada parte (día, mes y cada
+    // dígito del año: 0002, 0020, 0202...), así que una fecha a medio escribir parece anterior
+    // a la llegada. Lo escrito se aplica (y se valida) recién al terminar: Enter o al salir
+    // del campo; Escape lo descarta. Lo elegido en el calendario, sin teclear, va al momento.
+    const inputFecha = caja.querySelector('.idet-fecha-input');
+    if (inputFecha) {
+        let tecleando = false;
+        const aplicarFecha = (reenfocar) => {
+            tecleando = false;
+            if (!detalleActual) return;
+            if (!inputFecha.value) { renderDetalle(); return; } // incompleta: vuelve a la que tenía
+            const dia = Math.round((Date.parse(inputFecha.value + 'T00:00:00Z') - Date.parse(iselLlegada() + 'T00:00:00Z')) / 86400000) + 1;
+            if (dia !== Number(tr?.dataset.dia)) cambiarDia(dia, reenfocar);
+        };
+        inputFecha.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); aplicarFecha(true); return; }
+            if (ev.key === 'Escape') { tecleando = false; return; }
+            if (ev.key !== 'Tab' && ev.key !== 'Shift') tecleando = true;
+        });
+        inputFecha.addEventListener('change', () => { if (!tecleando) aplicarFecha(true); });
+        inputFecha.addEventListener('blur', () => { if (tecleando) aplicarFecha(false); });
+    }
     caja.querySelector('.idet-dia-input')?.addEventListener('change', (ev) => cambiarDia(Number(ev.target.value)));
     caja.querySelector('.idet-acciones')?.addEventListener('click', (ev) => {
         const btn = ev.target.closest('[data-accion]');
@@ -983,8 +1052,7 @@ function enlazarDetalle(caja, e) {
         iselDesplazarDiasDesde(Number(tr.dataset.dia), 1);
         renderDetalle();
     });
-    // Sumar otro itinerario al mismo día (en tablets/celulares reemplaza al "+" junto a la
-    // tarjeta, que ahí no se muestra).
+    // Sumar otro itinerario al mismo día (es la forma de hacerlo: al tocar la tarjeta).
     caja.querySelector('[data-accion="mismo-dia"]')?.addEventListener('click', () => {
         const dia = Number(tr.dataset.dia);
         cerrarDetalleItinerario();
