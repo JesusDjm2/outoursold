@@ -1869,12 +1869,430 @@ function crearSellosDiaPdf(idioma, fLlegada, font, rgb) {
     };
 }
 
+// ===== Páginas finales del PDF: Lugares a visitar e Incluye / No incluye =====
+// Van después de los días (antes de las páginas fijas de cierre), con los datos que cada
+// itinerario trae del catálogo (migración 036) y los colores y el logo de la agencia.
+// Solo se agrega la página que tenga algo que mostrar.
+const TEXTOS_RESUMEN_PDF = {
+    es: {
+        lugaresSup: 'Tu recorrido, día a día', lugares: 'Lugares a visitar',
+        incluyeSup: 'Todo lo que contempla tu viaje', incluyeTitulo: 'Qué incluye tu viaje',
+        incluye: 'Incluye', noIncluye: 'No incluye', dia: 'Día', dias: 'Días',
+        libre: 'Día libre', libres: 'Días libres', libreDetalle: 'Tiempo para descansar o explorar a tu ritmo.',
+        continua: 'continuación', tituloPorDefecto: p => `Itinerario de ${p}`
+    },
+    en: {
+        lugaresSup: 'Your journey, day by day', lugares: 'Places to visit',
+        incluyeSup: 'Everything your trip covers', incluyeTitulo: "What's included",
+        incluye: 'Included', noIncluye: 'Not included', dia: 'Day', dias: 'Days',
+        libre: 'Free day', libres: 'Free days', libreDetalle: 'Time to rest or explore at your own pace.',
+        continua: 'continued', tituloPorDefecto: p => `Itinerary for ${p}`
+    },
+    pt: {
+        lugaresSup: 'Seu roteiro, dia a dia', lugares: 'Lugares a visitar',
+        incluyeSup: 'Tudo o que sua viagem contempla', incluyeTitulo: 'O que sua viagem inclui',
+        incluye: 'Inclui', noIncluye: 'Não inclui', dia: 'Dia', dias: 'Dias',
+        libre: 'Dia livre', libres: 'Dias livres', libreDetalle: 'Tempo para descansar ou explorar no seu ritmo.',
+        continua: 'continuação', tituloPorDefecto: p => `Roteiro de ${p}`
+    }
+};
+
+// Las fuentes estándar del PDF (Helvetica) solo codifican WinAnsi: lo demás se cambia por
+// su letra base (sin el acento que no existe) o se quita, para que el PDF nunca falle.
+const PDF_WINANSI_EXTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
+function textoPdfSeguro(texto) {
+    return Array.from(String(texto ?? '').replace(/[‐-‒]/g, '-').replace(/\s+/g, ' ').trim()).map(ch => {
+        const cp = ch.codePointAt(0);
+        if ((cp >= 0x20 && cp < 0x7f) || (cp >= 0xa0 && cp <= 0xff) || PDF_WINANSI_EXTRA.includes(ch)) return ch;
+        const base = ch.normalize('NFD')[0];
+        return base.codePointAt(0) < 0x7f ? base : '';
+    }).join('');
+}
+
+// Un ítem por línea; si es una sola línea con comas ("Plaza de Armas, Qorikancha"), por comas.
+function listaResumenPdf(texto) {
+    const lineas = String(texto || '').split(/\r?\n/).map(s => s.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+    const items = lineas.length === 1 && /[,;]/.test(lineas[0]) ? lineas[0].split(/[,;]/) : lineas;
+    return items.map(textoPdfSeguro).filter(Boolean);
+}
+
+function envolverTextoPdf(texto, font, size, ancho) {
+    const cabe = t => font.widthOfTextAtSize(t, size) <= ancho;
+    const lineas = [];
+    let actual = '';
+    for (let palabra of texto.split(' ').filter(Boolean)) {
+        // Una palabra más ancha que la línea se corta.
+        while (!cabe(palabra)) {
+            let k = palabra.length - 1;
+            while (k > 1 && !cabe(palabra.slice(0, k))) k--;
+            if (actual) { lineas.push(actual); actual = ''; }
+            lineas.push(palabra.slice(0, k));
+            palabra = palabra.slice(k);
+        }
+        const prueba = actual ? `${actual} ${palabra}` : palabra;
+        if (cabe(prueba)) actual = prueba;
+        else { lineas.push(actual); actual = palabra; }
+    }
+    if (actual) lineas.push(actual);
+    return lineas;
+}
+
+function recortarTextoPdf(texto, font, size, ancho) {
+    if (font.widthOfTextAtSize(texto, size) <= ancho) return texto;
+    let t = texto;
+    while (t.length > 1 && font.widthOfTextAtSize(t + '…', size) > ancho) t = t.slice(0, -1);
+    return t.trimEnd() + '…';
+}
+
+// #rrggbb → [r, g, b] en 0..1 (respaldo si la agencia no configuró el color).
+function colorHexPdf(hex, respaldo) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    const h = m ? m[1] : respaldo;
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+}
+const mezclarColorPdf = (c, con, t) => c.map((v, i) => v + (con[i] - v) * t);
+const luminanciaPdf = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+
+// drawSvgPath usa coordenadas SVG: (x, yTop) es la esquina superior izquierda y la y crece hacia abajo.
+function rectRedondeadoPdf(page, x, yTop, w, h, r, opciones) {
+    r = Math.min(r, w / 2, h / 2);
+    page.drawSvgPath(`M ${r} 0 H ${w - r} A ${r} ${r} 0 0 1 ${w} ${r} V ${h - r} A ${r} ${r} 0 0 1 ${w - r} ${h} H ${r} A ${r} ${r} 0 0 1 0 ${h - r} V ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`, { x, y: yTop, ...opciones });
+}
+
+// Agencia cuya marca lleva el PDF: la de la cotización abierta en el Cotizador (también
+// cuando el admin la ve en solo lectura); si no hay cotización guardada, o en la vista
+// standalone, la del usuario.
+async function agenciaParaItinerario() {
+    try {
+        if (typeof obtenerAgenciaDeCotizacion === 'function' && typeof currentCotizacionId !== 'undefined' && currentCotizacionId) {
+            const agencia = await obtenerAgenciaDeCotizacion(currentCotizacionId);
+            if (agencia) return agencia;
+        }
+        const res = await fetch(`${ITINERARIO_API_BASE}../shared/mi-empresa-api.php?path=mi-agencia`);
+        return res.ok ? ((await res.json()).agencia || null) : null;
+    } catch (e) {
+        console.warn('No se pudo obtener la agencia para el itinerario.', e);
+        return null;
+    }
+}
+
+// Logo de la agencia como PNG (pasa por un canvas: así también sirven WEBP y SVG, que
+// pdf-lib no incrusta).
+async function logoAgenciaPngPdf(logo) {
+    if (!logo) return null;
+    try {
+        const res = await fetch(`${ITINERARIO_API_BASE}../shared/uploads/agencias/${encodeURIComponent(logo)}`);
+        if (!res.ok) return null;
+        const url = URL.createObjectURL(await res.blob());
+        try {
+            const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = url; });
+            const w = img.naturalWidth || 600, h = img.naturalHeight || 300;
+            const escala = Math.min(4, 1200 / Math.max(w, h));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(w * escala);
+            canvas.height = Math.round(h * escala);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const blob = await new Promise(ok => canvas.toBlob(ok, 'image/png'));
+            return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+        } finally {
+            URL.revokeObjectURL(url);
+        }
+    } catch (e) {
+        console.warn('No se pudo cargar el logo de la agencia para el itinerario.', e);
+        return null;
+    }
+}
+
+// Datos de las páginas finales a partir del armado: la línea de tiempo (días con sus
+// itinerarios y lugares, y los bloques de días libres entre ellos) y las listas de
+// Incluye / No incluye sin repetidos (en el orden en que aparecen en el viaje).
+function datosResumenPdf(armado, idioma) {
+    const modulos = new Map((idiomaCache[idioma]?.modules || []).map(m => [m.filename, m]));
+    const linea = [];
+    const incluye = new Map(), noIncluye = new Map();
+    const clave = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[.\s]+$/, '');
+    const sumar = (mapa, texto) => listaResumenPdf(texto).forEach(item => { if (!mapa.has(clave(item))) mapa.set(clave(item), item); });
+    let hayLugares = false;
+    armado.forEach(x => {
+        const m = modulos.get(x.filename);
+        let ultimo = linea[linea.length - 1];
+        if (ultimo && ultimo.dia !== x.dia && x.dia - (ultimo.hasta ?? ultimo.dia) > 1) {
+            linea.push({ tipo: 'libre', desde: (ultimo.hasta ?? ultimo.dia) + 1, hasta: x.dia - 1 });
+            ultimo = null;
+        }
+        if (esFilenameDiaLibre(x.filename, idioma)) {
+            if (!ultimo || ultimo.tipo !== 'libre' || ultimo.hasta !== x.dia - 1) linea.push({ tipo: 'libre', desde: x.dia, hasta: x.dia });
+            else ultimo.hasta = x.dia;
+            return;
+        }
+        if (!ultimo || ultimo.tipo !== 'dia' || ultimo.dia !== x.dia) linea.push(ultimo = { tipo: 'dia', dia: x.dia, items: [] });
+        const lugares = listaResumenPdf(m?.lugares_visitar);
+        if (lugares.length) hayLugares = true;
+        ultimo.items.push({ titulo: textoPdfSeguro(m?.titulo || x.filename.replace(/\.pdf$/i, '')), lugares });
+        sumar(incluye, m?.incluye);
+        sumar(noIncluye, m?.no_incluye);
+    });
+    return { linea: hayLugares ? linea : [], incluye: [...incluye.values()], noIncluye: [...noIncluye.values()] };
+}
+
+async function agregarPaginasResumenPdf(pdfDoc, { idioma, armado, titulo, fLlegada, agencia, logoPng, fuenteTitulo, tamano }) {
+    const datos = datosResumenPdf(armado, idioma);
+    if (!datos.linea.length && !datos.incluye.length && !datos.noIncluye.length) return;
+
+    const { rgb, StandardFonts, LineCapStyle } = PDFLib;
+    const t = TEXTOS_RESUMEN_PDF[idioma] || TEXTOS_RESUMEN_PDF.es;
+    const [helv, helvB, helvI] = await Promise.all([
+        pdfDoc.embedFont(StandardFonts.Helvetica), pdfDoc.embedFont(StandardFonts.HelveticaBold), pdfDoc.embedFont(StandardFonts.HelveticaOblique)
+    ]);
+    let logo = null;
+    if (logoPng) {
+        try { logo = await pdfDoc.embedPng(logoPng); } catch (e) { console.warn('Logo no incrustable en el PDF.', e); }
+    }
+
+    // Paleta: principal y secundario de la agencia; los textos de color sobre blanco se
+    // oscurecen si el color es muy claro, y sobre la banda el texto pasa a oscuro.
+    const BLANCO = [1, 1, 1], NEGRO = [0, 0, 0];
+    const TINTA = [0.11, 0.13, 0.19], GRIS = [0.42, 0.45, 0.52], LINEA = [0.89, 0.9, 0.93];
+    const prim = colorHexPdf(agencia?.color_principal, 'ff5432');
+    const sec = colorHexPdf(agencia?.color_secundario, '0566cf');
+    const legible = c => luminanciaPdf(c) > 0.6 ? mezclarColorPdf(c, NEGRO, 0.45) : c;
+    const primTexto = legible(prim), secTexto = legible(sec);
+    const sobrePrim = luminanciaPdf(prim) > 0.62 ? TINTA : BLANCO;
+    const c = arr => rgb(arr[0], arr[1], arr[2]);
+
+    const [W, H] = tamano;
+    const s = Math.min(W / 595, H / 842); // diseño a escala A4
+    const M = 48 * s;
+    const BANDA = 168 * s;
+    const Y_MIN = 72 * s;
+    const Y_TOP = H - BANDA - 4 * s - 34 * s;
+    const tituloPdf = textoPdfSeguro(titulo);
+    const nombreAgencia = textoPdfSeguro(agencia?.nombre || '');
+    const contactos = [agencia?.telefono2 || agencia?.telefono, agencia?.whatsapp && `WhatsApp ${agencia.whatsapp}`]
+        .filter(v => v && String(v).replace(/\D/g, '').length >= 6).map(textoPdfSeguro).join('   ·   ');
+
+    const espaciado = (page, texto, x, y, font, size, esp, color, opacity = 1) => {
+        for (const ch of texto) {
+            page.drawText(ch, { x, y, size, font, color, opacity });
+            x += font.widthOfTextAtSize(ch, size) + esp;
+        }
+        return x;
+    };
+    const anchoEspaciado = (texto, font, size, esp) => Array.from(texto).reduce((a, ch) => a + font.widthOfTextAtSize(ch, size) + esp, 0);
+
+    // Página con la banda de marca (antetítulo, título, nombre del itinerario y logo) y el pie
+    // con los datos de la agencia.
+    const nuevaPagina = (sup, tituloPagina, continua) => {
+        const page = pdfDoc.addPage([W, H]);
+        page.drawRectangle({ x: 0, y: H - BANDA, width: W, height: BANDA, color: c(prim) });
+        page.drawCircle({ x: W - 30 * s, y: H + 6 * s, size: 128 * s, color: c(sec), opacity: 0.4 });
+        page.drawCircle({ x: W - 210 * s, y: H - BANDA + 4 * s, size: 54 * s, color: c(BLANCO), opacity: 0.07 });
+        page.drawRectangle({ x: 0, y: H - BANDA - 4 * s, width: W, height: 4 * s, color: c(sec) });
+
+        const conLogo = !!(logo || nombreAgencia);
+        const CARD_W = 124 * s, CARD_H = 76 * s;
+        const anchoTexto = W - 2 * M - (conLogo ? CARD_W + 20 * s : 0);
+        const supTexto = (continua ? `${sup} · ${t.continua}` : sup).toUpperCase();
+        page.drawRectangle({ x: M, y: H - 58 * s + 2.5 * s, width: 18 * s, height: 1.6 * s, color: c(sobrePrim), opacity: 0.8 });
+        espaciado(page, supTexto, M + 26 * s, H - 58 * s, helvB, 8.5 * s, 1.4 * s, c(sobrePrim), 0.85);
+        let tam = 31 * s;
+        while (tam > 18 * s && fuenteTitulo.widthOfTextAtSize(tituloPagina, tam) > anchoTexto) tam -= 1;
+        page.drawText(tituloPagina, { x: M, y: H - 98 * s, size: tam, font: fuenteTitulo, color: c(sobrePrim) });
+        if (tituloPdf) {
+            page.drawText(recortarTextoPdf(tituloPdf, helv, 12 * s, anchoTexto), { x: M, y: H - 124 * s, size: 12 * s, font: helv, color: c(sobrePrim), opacity: 0.9 });
+        }
+
+        if (conLogo) {
+            const cx = W - M - CARD_W, cTop = H - (BANDA - CARD_H) / 2;
+            rectRedondeadoPdf(page, cx, cTop + 3 * s, CARD_W, CARD_H, 12 * s, { color: c(NEGRO), opacity: 0.08 });
+            rectRedondeadoPdf(page, cx, cTop, CARD_W, CARD_H, 12 * s, { color: c(BLANCO) });
+            if (logo) {
+                const PAD = 12 * s;
+                const k = Math.min((CARD_W - 2 * PAD) / logo.width, (CARD_H - 2 * PAD) / logo.height);
+                const lw = logo.width * k, lh = logo.height * k;
+                page.drawImage(logo, { x: cx + (CARD_W - lw) / 2, y: cTop - CARD_H + (CARD_H - lh) / 2, width: lw, height: lh });
+            } else {
+                const lineas = envolverTextoPdf(nombreAgencia, helvB, 10 * s, CARD_W - 20 * s).slice(0, 3);
+                const alto = lineas.length * 12.5 * s;
+                lineas.forEach((l, i) => page.drawText(l, {
+                    x: cx + (CARD_W - helvB.widthOfTextAtSize(l, 10 * s)) / 2,
+                    y: cTop - (CARD_H - alto) / 2 - 10 * s - i * 12.5 * s, size: 10 * s, font: helvB, color: c(primTexto)
+                }));
+            }
+        }
+
+        page.drawLine({ start: { x: M, y: 46 * s }, end: { x: W - M, y: 46 * s }, thickness: 0.7 * s, color: c(LINEA) });
+        if (nombreAgencia) page.drawText(recortarTextoPdf(nombreAgencia, helvB, 8.5 * s, (W - 2 * M) / 2), { x: M, y: 30 * s, size: 8.5 * s, font: helvB, color: c(primTexto) });
+        if (contactos) page.drawText(contactos, { x: W - M - helv.widthOfTextAtSize(contactos, 8 * s), y: 30 * s, size: 8 * s, font: helv, color: c(GRIS) });
+        return page;
+    };
+
+    const rangoDias = (a, b) => a === b ? `${t.dia} ${a}` : `${t.dias} ${a}-${b}`;
+    const fechaDia = d => fechaCortaDia(fLlegada, d, idioma);
+
+    // ----- Lugares a visitar: línea de tiempo vertical, un nodo por día -----
+    if (datos.linea.length) {
+        const LINEA_X = M + 16 * s, NODO_R = 15 * s;
+        const TX = M + 48 * s, TW = W - TX - M;
+        const CHIP_H = 19 * s, CHIP_F = 8.8 * s, CHIP_PAD = 9 * s, CHIP_GAP = 6 * s;
+
+        // Chips de lugares en filas que ocupan el ancho disponible.
+        const filasChips = lugares => {
+            const filas = [[]];
+            let x = 0;
+            lugares.forEach(l => {
+                const texto = recortarTextoPdf(l, helv, CHIP_F, TW - 2 * CHIP_PAD - 8 * s);
+                const w = helv.widthOfTextAtSize(texto, CHIP_F) + 2 * CHIP_PAD + 8 * s;
+                if (x > 0 && x + w > TW) { filas.push([]); x = 0; }
+                filas[filas.length - 1].push({ texto, x, w });
+                x += w + CHIP_GAP;
+            });
+            return filas;
+        };
+
+        // Cada bloque se mide antes de dibujarse, para paginar sin cortarlo.
+        const bloques = datos.linea.map(u => {
+            if (u.tipo === 'libre') {
+                const etiqueta = textoPdfSeguro(rangoDias(u.desde, u.hasta).toUpperCase());
+                const fecha = u.desde === u.hasta ? fechaDia(u.desde) : [fechaDia(u.desde), fechaDia(u.hasta)].filter(Boolean).join(' - ');
+                return { tipo: 'libre', etiqueta, fecha: fecha && textoPdfSeguro(fecha.toUpperCase()), titulo: u.desde === u.hasta ? t.libre : t.libres, alto: 70 * s };
+            }
+            const items = u.items.map(it => ({
+                lineas: envolverTextoPdf(it.titulo, helvB, 12.5 * s, TW),
+                filas: it.lugares.length ? filasChips(it.lugares) : []
+            }));
+            const alto = 18 * s + items.reduce((a, it) => a + it.lineas.length * 16 * s + (it.filas.length ? 4 * s + it.filas.length * (CHIP_H + CHIP_GAP) : 0) + 8 * s, 0) + 18 * s;
+            const fecha = fechaDia(u.dia);
+            return { tipo: 'dia', numero: String(u.dia), etiqueta: textoPdfSeguro(`${t.dia} ${u.dia}`.toUpperCase()), fecha: fecha && textoPdfSeguro(fecha.toUpperCase()), items, alto };
+        });
+
+        const paginas = [];
+        let actual = null, y = 0;
+        bloques.forEach(b => {
+            if (!actual || (y - b.alto < Y_MIN && actual.length)) { actual = []; paginas.push(actual); y = Y_TOP; }
+            actual.push({ b, y });
+            y -= b.alto;
+        });
+
+        paginas.forEach((enPagina, iPag) => {
+            const page = nuevaPagina(t.lugaresSup, t.lugares, iPag > 0);
+            const nodoY = p => p.y - 6 * s;
+            const desde = iPag > 0 ? Y_TOP + 20 * s : nodoY(enPagina[0]);
+            const hasta = iPag < paginas.length - 1 ? Y_MIN - 10 * s : nodoY(enPagina[enPagina.length - 1]);
+            page.drawLine({ start: { x: LINEA_X, y: desde }, end: { x: LINEA_X, y: hasta }, thickness: 1.6 * s, color: c(mezclarColorPdf(prim, BLANCO, 0.55)) });
+
+            enPagina.forEach(({ b, y: yb }) => {
+                const ny = nodoY({ y: yb });
+                // Encabezado: "DÍA 3" + fecha, alineado con el nodo.
+                const xFin = espaciado(page, b.etiqueta, TX, yb - 9 * s, helvB, 9 * s, 1.1 * s, c(b.tipo === 'dia' ? secTexto : GRIS));
+                if (b.fecha) {
+                    page.drawCircle({ x: xFin + 6 * s, y: yb - 6 * s, size: 1.4 * s, color: c(GRIS) });
+                    espaciado(page, b.fecha, xFin + 12 * s, yb - 9 * s, helv, 8.5 * s, 0.8 * s, c(GRIS));
+                }
+
+                if (b.tipo === 'libre') {
+                    page.drawCircle({ x: LINEA_X, y: ny, size: NODO_R * 0.62, color: c(BLANCO), borderColor: c(mezclarColorPdf(prim, BLANCO, 0.35)), borderWidth: 1.6 * s });
+                    page.drawCircle({ x: LINEA_X, y: ny, size: 2.6 * s, color: c(mezclarColorPdf(prim, BLANCO, 0.35)) });
+                    page.drawText(b.titulo, { x: TX, y: yb - 29 * s, size: 12 * s, font: helvI, color: c(TINTA) });
+                    page.drawText(t.libreDetalle, { x: TX, y: yb - 44 * s, size: 9 * s, font: helv, color: c(GRIS) });
+                    return;
+                }
+
+                page.drawCircle({ x: LINEA_X, y: ny, size: NODO_R + 3 * s, color: c(BLANCO) });
+                page.drawCircle({ x: LINEA_X, y: ny, size: NODO_R, color: c(prim) });
+                let tamN = 12 * s;
+                while (tamN > 7 * s && helvB.widthOfTextAtSize(b.numero, tamN) > NODO_R * 1.5) tamN -= 0.5 * s;
+                page.drawText(b.numero, { x: LINEA_X - helvB.widthOfTextAtSize(b.numero, tamN) / 2, y: ny - tamN * 0.36, size: tamN, font: helvB, color: c(sobrePrim) });
+
+                let yy = yb - 18 * s;
+                b.items.forEach(it => {
+                    it.lineas.forEach(l => { page.drawText(l, { x: TX, y: yy - 12.5 * s, size: 12.5 * s, font: helvB, color: c(TINTA) }); yy -= 16 * s; });
+                    if (it.filas.length) yy -= 4 * s;
+                    it.filas.forEach(fila => {
+                        fila.forEach(ch => {
+                            rectRedondeadoPdf(page, TX + ch.x, yy, ch.w, CHIP_H, CHIP_H / 2, { color: c(mezclarColorPdf(prim, BLANCO, 0.88)) });
+                            page.drawCircle({ x: TX + ch.x + CHIP_PAD + 1.5 * s, y: yy - CHIP_H / 2, size: 2.2 * s, color: c(prim) });
+                            page.drawText(ch.texto, { x: TX + ch.x + CHIP_PAD + 8 * s, y: yy - CHIP_H / 2 - CHIP_F * 0.34, size: CHIP_F, font: helv, color: c(TINTA) });
+                        });
+                        yy -= CHIP_H + CHIP_GAP;
+                    });
+                    yy -= 8 * s;
+                });
+            });
+        });
+    }
+
+    // ----- Incluye / No incluye: dos tarjetas lado a lado (una sola a todo el ancho si la
+    // otra no tiene nada); lo que no entra sigue en otra página. -----
+    if (datos.incluye.length || datos.noIncluye.length) {
+        const GAP = 18 * s, PAD = 18 * s, CAB = 58 * s, ICONO_R = 7.5 * s;
+        const LH = 13.5 * s, F = 10 * s, SEP = 10 * s;
+        const columnas = [
+            { titulo: t.incluye, items: datos.incluye, color: prim, marca: 'check' },
+            { titulo: t.noIncluye, items: datos.noIncluye, color: sec, marca: 'x' }
+        ].filter(col => col.items.length);
+        const colW = (W - 2 * M - GAP * (columnas.length - 1)) / columnas.length;
+        const textoW = colW - 2 * PAD - 2 * ICONO_R - 10 * s;
+        const disponible = Y_TOP - Y_MIN - CAB - PAD;
+
+        // Reparte los ítems de cada columna en páginas.
+        columnas.forEach(col => {
+            col.paginas = [[]];
+            let usado = 0;
+            col.items.forEach(item => {
+                const lineas = envolverTextoPdf(item, helv, F, textoW);
+                const alto = Math.max(lineas.length * LH, 2 * ICONO_R) + SEP;
+                if (usado + alto > disponible && col.paginas[col.paginas.length - 1].length) { col.paginas.push([]); usado = 0; }
+                col.paginas[col.paginas.length - 1].push({ lineas, alto });
+                usado += alto;
+            });
+        });
+
+        const marca = (page, tipo, x, y, r, color) => {
+            const o = { x, y, borderColor: c(color), borderWidth: r * 0.26, borderLineCap: LineCapStyle.Round };
+            if (tipo === 'check') page.drawSvgPath(`M ${-0.42 * r} ${0.02 * r} L ${-0.12 * r} ${0.34 * r} L ${0.44 * r} ${-0.3 * r}`, o);
+            else page.drawSvgPath(`M ${-0.3 * r} ${-0.3 * r} L ${0.3 * r} ${0.3 * r} M ${0.3 * r} ${-0.3 * r} L ${-0.3 * r} ${0.3 * r}`, o);
+        };
+
+        const totalPaginas = Math.max(...columnas.map(col => col.paginas.length));
+        for (let iPag = 0; iPag < totalPaginas; iPag++) {
+            const page = nuevaPagina(t.incluyeSup, t.incluyeTitulo, iPag > 0);
+            columnas.forEach((col, iCol) => {
+                const items = col.paginas[iPag];
+                if (!items?.length) return;
+                const x = M + iCol * (colW + GAP);
+                const alto = CAB + items.reduce((a, it) => a + it.alto, 0) + PAD - SEP + 6 * s;
+                const colorTexto = legible(col.color);
+                rectRedondeadoPdf(page, x, Y_TOP, colW, alto, 14 * s, { color: c(mezclarColorPdf(col.color, BLANCO, 0.94)) });
+                rectRedondeadoPdf(page, x, Y_TOP - 16 * s, 3.5 * s, alto - 32 * s, 1.75 * s, { color: c(col.color) });
+
+                // Cabecera: icono grande + título + filete.
+                const iy = Y_TOP - 28 * s;
+                page.drawCircle({ x: x + PAD + 13 * s, y: iy, size: 13 * s, color: c(col.color) });
+                marca(page, col.marca, x + PAD + 13 * s, iy, 13 * s, luminanciaPdf(col.color) > 0.62 ? TINTA : BLANCO);
+                const tituloCol = (iPag > 0 ? `${col.titulo} (${t.continua})` : col.titulo);
+                page.drawText(recortarTextoPdf(tituloCol, helvB, 14 * s, colW - 2 * PAD - 34 * s), { x: x + PAD + 34 * s, y: iy - 5 * s, size: 14 * s, font: helvB, color: c(TINTA) });
+                page.drawRectangle({ x: x + PAD, y: Y_TOP - CAB + 6 * s, width: colW - 2 * PAD, height: 0.8 * s, color: c(mezclarColorPdf(col.color, BLANCO, 0.7)) });
+
+                let yy = Y_TOP - CAB - 8 * s;
+                items.forEach(it => {
+                    const cy = yy - ICONO_R + 1 * s;
+                    page.drawCircle({ x: x + PAD + ICONO_R, y: cy, size: ICONO_R, color: c(mezclarColorPdf(col.color, BLANCO, 0.78)) });
+                    marca(page, col.marca, x + PAD + ICONO_R, cy, ICONO_R, colorTexto);
+                    it.lineas.forEach((l, i) => page.drawText(l, { x: x + PAD + 2 * ICONO_R + 10 * s, y: yy - F * 0.95 - i * LH, size: F, font: helv, color: c(TINTA) }));
+                    yy -= it.alto;
+                });
+            });
+        }
+    }
+}
+
 async function handleGenerateItinerary() {
     const passengerName = document.getElementById('itinerary-passenger').value || 'Viajero';
-    // Embebido en Cotizador, el título ya se autogenera a partir del Nombre PAX (el campo
-    // queda oculto, ver cotizador.js) — el fallback acá es solo para el caso standalone si
-    // alguien lo deja en blanco a mano, en vez de bloquear la generación con una advertencia.
-    const packageTitle = document.getElementById('itinerary-title').value || `Itinerario de ${passengerName}`;
+    // Nombre del itinerario (portada y páginas finales); vacío, "Itinerario de <pasajero>"
+    // en el idioma del PDF.
+    const packageTitle = document.getElementById('itinerary-title').value.trim()
+        || (TEXTOS_RESUMEN_PDF[idiomaActivo] || TEXTOS_RESUMEN_PDF.es).tituloPorDefecto(passengerName);
 
     showLoadingModal();
     updateProgress(10, 'Preparando PDF...');
@@ -1938,10 +2356,27 @@ async function handleGenerateItinerary() {
         let isFirstPageOfAll = true;
         let totalFiles = allFilesToProcess.length;
 
+        // Lugares a visitar e Incluye / No incluye: después del último día, antes del cierre.
+        updateProgress(25, 'Cargando datos de la agencia...');
+        const agenciaPdf = await agenciaParaItinerario();
+        const logoPdf = await logoAgenciaPngPdf(agenciaPdf?.logo);
+        let resumenAgregado = false;
+        const agregarResumen = async () => {
+            resumenAgregado = true;
+            const n = pdfDoc.getPageCount();
+            if (!armado.length || !n) return;
+            updateProgress(94, 'Agregando lugares a visitar e incluye...');
+            await agregarPaginasResumenPdf(pdfDoc, {
+                idioma: idiomaPdf, armado, titulo: packageTitle, fLlegada, agencia: agenciaPdf, logoPng: logoPdf,
+                fuenteTitulo: janoFont, tamano: Object.values(pdfDoc.getPage(n - 1).getSize())
+            });
+        };
+
         // Bucle único que procesa un archivo a la vez de forma garantizada
         for (let i = 0; i < totalFiles; i++) {
             const fileInfo = allFilesToProcess[i];
             const { filename, type } = fileInfo;
+            if (type === 'end' && !resumenAgregado) await agregarResumen();
             // La plantilla de días libres aporta solo su primera página.
             const soloPrimera = type === 'libre';
             const progress = 30 + (i / totalFiles * 65);
@@ -1983,6 +2418,7 @@ async function handleGenerateItinerary() {
                 pdfDoc.addPage(page);
             }
         }
+        if (!resumenAgregado) await agregarResumen();
 
         updateProgress(95, 'Finalizando PDF...');
         const pdfBytes = await pdfDoc.save();

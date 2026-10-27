@@ -88,7 +88,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <input type="text" id="itinerary-passenger" placeholder="Ej: Juan Perez" class="w-full border rounded p-2 mt-1">
                     </div>
                     <div>
-                        <label for="itinerary-title" class="font-medium text-slate-700">Título del Paquete</label>
+                        <label for="itinerary-title" class="font-medium text-slate-700">Nombre del itinerario</label>
                         <input type="text" id="itinerary-title" placeholder="Ej: Cusco Mágico 4 Días" class="w-full border rounded p-2 mt-1">
                     </div>
                 </div>

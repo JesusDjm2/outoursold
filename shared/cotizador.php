@@ -174,12 +174,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             </div>
                         </div>
                         <div class="accordion-body">
-                        <!-- Pasajero y título ya quedan ligados a la cotización (Nombre PAX y un título
-                             autogenerado a partir de este, ver el listener de nombre_pax en cotizador.js)
-                             en vez de pedirlos aparte acá; los inputs se mantienen ocultos porque
-                             itinerario.js (compartido con la vista standalone) sigue leyéndolos. -->
+                        <!-- El pasajero sale del Nombre PAX (input oculto, lo lee itinerario.js). El
+                             nombre del itinerario va en la portada y en las páginas finales del PDF;
+                             vacío, el PDF usa "Itinerario de <pasajero>". -->
                         <input type="text" id="itinerary-passenger" class="hidden">
-                        <input type="text" id="itinerary-title" class="hidden">
+                        <div class="field field-prefix itin-nombre-campo">
+                            <span class="field-prefix-label">Nombre del itinerario</span>
+                            <input type="text" id="itinerary-title" maxlength="120" placeholder="Ej.: Perú Mágico 8 días / 7 noches" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
+                        </div>
                         <!-- El "aplicar itinerario predeterminado" viejo (solo itinerario) se quitó: el
                              selector "Aplicar paquete..." de arriba ya cubre itinerario junto con
                              actividades y hoteles (ver #aplicar-paquete-select). -->
