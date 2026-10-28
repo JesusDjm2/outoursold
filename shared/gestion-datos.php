@@ -381,7 +381,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             <div id="itin-clasificacion">
                 <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
                 <div class="card p-6">
-                    <p class="text-sm text-slate-500 mb-4"><strong>Con hotel</strong> y <strong>Sin hotel</strong> tienen cada uno sus propios destinos y categorías (puede haber un mismo nombre, como "Cusco", en los dos). Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
+                    <p class="text-sm text-slate-500 mb-4">Cada grupo (<strong>Con hotel</strong>, <strong>Sin hotel</strong> y los que crees con «Nuevo grupo») tiene sus propios destinos y categorías; puede haber un mismo nombre, como "Cusco", en varios. Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
                         <div class="lg:col-span-5 border rounded-lg p-3">
                             <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
@@ -470,6 +470,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                 <!-- Mismo componente que Tours / Hoteles (shared/catalogo.css); mismos ids que
                      lee itinerario.js. -->
                 <div id="itinerario-gestion-modulos" class="itin-panel hidden">
+                    <!-- Primera clasificación, igual que en Destinos y Categorías: el grupo
+                         (pestañas que arma renderModulosGrupos en itinerario.js). -->
+                    <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit max-w-full" id="itinerario-modulos-grupos"></div>
                     <div class="card cat-card">
                         <div class="cat-header">
                             <div>

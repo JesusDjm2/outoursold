@@ -572,3 +572,7 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 /* Nombre del itinerario (portada y páginas finales del PDF), sobre las tarjetas. */
 .itin-nombre-campo { margin-bottom: 12px; max-width: 560px; }
 .itin-nombre-campo .field-prefix-label { color: #64748b; font-weight: 600; }
+
+/* Clasificación del popup de edición: Con / Sin hotel primero, luego destino y categoría. */
+.if-clasif { margin: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.if-clasif legend { padding: 0 6px; margin-left: -6px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; }

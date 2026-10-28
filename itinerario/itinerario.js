@@ -29,7 +29,11 @@ let janoFontBytes = null;
 // clásicos de la misma página revienta con SyntaxError al parsear el segundo.
 let itinDestinosData = [];
 let itinCategoriasData = [];
+let itinGruposData = []; // grupos de destino visibles: los base y los de la agencia (migración 039)
 let modulosFiltro = '';
+// Pestaña de grupo abierta en la lista de itinerarios de cada idioma (Gestión de Datos).
+const MODULOS_SIN_GRUPO = 'sin-clasificar';
+let modulosGrupo = null;
 let itinerarioPaqueteEditandoId = null;
 let historialFiltro = { texto: '', agencia: '', desde: '', hasta: '' };
 
@@ -64,16 +68,33 @@ function nombreCategoria(id) { return itinCategoriasData.find(c => c.id === id)?
 // de Actividades / Hoteles). Como cada grupo puede tener su propio "Cusco", el nombre lleva
 // el grupo ("Cusco · Con pernocte") para distinguirlos en selects y en el desplegable del
 // armador. Copias nuevas: no se toca el destinosData compartido con la página.
-const GRUPOS_DESTINO_NOMBRE = { 1: 'Con hotel', 2: 'Sin hotel' }; // ids fijos (migración 032; nombres, 037)
+// `nombreBase` guarda el nombre sin el grupo, para los selects ya filtrados por grupo.
+function iconoGrupoDestino(g) {
+    if (g?.clave === 'con_pernocte') return 'fa-hotel';
+    if (g?.clave === 'sin_pernocte') return 'fa-sun';
+    return 'fa-layer-group';
+}
+function nombreGrupoDestino(id) {
+    return itinGruposData.find(g => Number(g.id) === Number(id))?.nombre || 'Otro grupo';
+}
 function destinosDeItinerarios(lista) {
     return (Array.isArray(lista) ? lista : [])
         .filter(d => d.grupo_id != null)
-        .map(d => ({ ...d, nombre: `${d.nombre} · ${GRUPOS_DESTINO_NOMBRE[d.grupo_id] || 'Grupo ' + d.grupo_id}` }));
+        .map(d => ({ ...d, nombreBase: d.nombre, nombre: `${d.nombre} · ${nombreGrupoDestino(d.grupo_id)}` }));
+}
+async function cargarGruposDestino() {
+    try {
+        const grupos = await fetch(`${ITINERARIO_API_BASE}../usd/api.php?path=grupos-destino`).then(r => r.json());
+        itinGruposData = Array.isArray(grupos) ? grupos : [];
+    } catch (error) {
+        console.error('Error al cargar los grupos de destino:', error);
+    }
 }
 
 async function cargarDestinosYCategorias() {
     try {
         const categoriasPromise = fetch(`${ITINERARIO_API_BASE}api.php?path=categorias-itinerarios`).then(r => r.json());
+        await cargarGruposDestino(); // antes de destinosDeItinerarios: el nombre lleva el grupo
         // Itinerarios usa solo los destinos de Con / Sin pernocte (con grupo); los sin grupo
         // son de Actividades / Hoteles.
         if (typeof destinosData !== 'undefined' && Array.isArray(destinosData)) {
@@ -184,9 +205,52 @@ function habilitarCreacionCategoria(categoriaSelect, destinoSelect) {
     });
 }
 
-function llenarDestinosSelect(destinoSelect, selectedId = null) {
-    destinoSelect.innerHTML = '<option value="">Sin clasificar</option>' +
-        itinDestinosData.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${d.nombre}</option>`).join('');
+// Con `grupoId`, solo los destinos de ese grupo (sin el sufijo del grupo y en el orden de
+// los chips del Cotizador); sin él, todos con su grupo ("Cusco · Con hotel").
+function llenarDestinosSelect(destinoSelect, selectedId = null, grupoId = null) {
+    const lista = grupoId == null ? itinDestinosData
+        : itinDestinosData.filter(d => String(d.grupo_id) === String(grupoId))
+            .sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0) || a.nombreBase.localeCompare(b.nombreBase));
+    const vacio = grupoId != null && !lista.length ? 'Aún no hay destinos en este grupo' : 'Sin clasificar';
+    destinoSelect.innerHTML = `<option value="">${vacio}</option>` +
+        lista.map(d => `<option value="${d.id}" ${selectedId != null && d.id === Number(selectedId) ? 'selected' : ''}>${escapeHtml(grupoId == null ? d.nombre : d.nombreBase)}</option>`).join('');
+}
+
+// Clasificación en cascada de un itinerario: grupo (Con hotel / Sin hotel / los propios) →
+// destino de ese grupo → categoría. La usan el editor de Gestión de Datos y el popup del
+// Cotizador. Al cambiar de grupo se busca el destino (y la categoría) del mismo nombre en el
+// otro: pasar "Cusco · Ruinas" de Con hotel a Sin hotel no obliga a volver a elegirlos.
+function enlazarClasificacionItinerario({ contGrupos, destinoSel, categoriaSel, destinoId = null, categoriaId = null, grupoPreferido = null }) {
+    const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+    const actual = itinDestinosData.find(d => d.id === Number(destinoId));
+    const existe = v => itinGruposData.some(g => String(g.id) === String(v));
+    let grupo = actual ? String(actual.grupo_id) : existe(grupoPreferido) ? String(grupoPreferido) : String(itinGruposData[0]?.id ?? '');
+    contGrupos.classList.add('clasif-grupos');
+    contGrupos.setAttribute('role', 'radiogroup');
+    contGrupos.setAttribute('aria-label', 'Grupo');
+    contGrupos.innerHTML = itinGruposData.map(g => `<button type="button" role="radio" class="clasif-grupo" data-grupo="${g.id}"><i class="fas ${iconoGrupoDestino(g)}"></i><span>${escapeHtml(g.nombre)}</span></button>`).join('');
+    const pintar = () => contGrupos.querySelectorAll('.clasif-grupo').forEach(b => {
+        const activo = b.dataset.grupo === grupo;
+        b.classList.toggle('is-activo', activo);
+        b.setAttribute('aria-checked', String(activo));
+    });
+    pintar();
+    llenarDestinosSelect(destinoSel, destinoId, grupo);
+    llenarCategoriasSelect(categoriaSel, destinoSel.value, categoriaId);
+    contGrupos.addEventListener('click', (ev) => {
+        const boton = ev.target.closest('.clasif-grupo');
+        if (!boton || boton.dataset.grupo === grupo) return;
+        const destinoAntes = itinDestinosData.find(d => String(d.id) === destinoSel.value);
+        const categoriaAntes = itinCategoriasData.find(c => String(c.id) === categoriaSel.value);
+        grupo = boton.dataset.grupo;
+        pintar();
+        const par = destinoAntes && itinDestinosData.find(d => String(d.grupo_id) === grupo && norm(d.nombreBase) === norm(destinoAntes.nombreBase));
+        llenarDestinosSelect(destinoSel, par?.id ?? null, grupo);
+        const categoriaPar = par && categoriaAntes && itinCategoriasData.find(c => c.destino_id === par.id && norm(c.nombre) === norm(categoriaAntes.nombre));
+        llenarCategoriasSelect(categoriaSel, destinoSel.value, categoriaPar?.id ?? null);
+    });
+    destinoSel.addEventListener('change', () => llenarCategoriasSelect(categoriaSel, destinoSel.value, null));
+    habilitarCreacionCategoria(categoriaSel, destinoSel);
 }
 
 function showLoadingModal() { document.getElementById('loading-modal').style.display = 'block'; }
@@ -336,11 +400,39 @@ function actualizarBotonGuardarModulos() {
     document.getElementById('modulos-guardar-count').textContent = n;
 }
 
+// Grupo de un itinerario: el de su destino ("Sin clasificar" si no tiene destino).
+function grupoDeModulo(it) {
+    const d = itinDestinosData.find(x => x.id === Number(it.destino_id));
+    return d ? String(d.grupo_id) : MODULOS_SIN_GRUPO;
+}
+
+// Pestañas Con hotel / Sin hotel / propios (+ Sin clasificar si hay) sobre la lista de
+// itinerarios del idioma: la misma primera clasificación que Destinos y Categorías.
+function renderModulosGrupos() {
+    const cont = document.getElementById('itinerario-modulos-grupos');
+    if (!cont) return;
+    const conteo = v => modulosActivos().filter(it => grupoDeModulo(it) === v).length;
+    const tabs = itinGruposData.map(g => ({ valor: String(g.id), nombre: g.nombre, icono: iconoGrupoDestino(g) }));
+    if (conteo(MODULOS_SIN_GRUPO) > 0) tabs.push({ valor: MODULOS_SIN_GRUPO, nombre: 'Sin clasificar', icono: 'fa-folder-open' });
+    if (!tabs.some(t => t.valor === modulosGrupo)) modulosGrupo = tabs[0]?.valor ?? null;
+    cont.innerHTML = tabs.map(t => `<button type="button" class="subnav-tab${t.valor === modulosGrupo ? ' active' : ''}" data-grupo="${t.valor}"><i class="fas ${t.icono} mr-1"></i>${escapeHtml(t.nombre)}<span class="conteo-badge">${conteo(t.valor)}</span></button>`).join('');
+    // El alta en lote clasifica dentro del grupo abierto.
+    const selAlta = document.getElementById('itinerary-module-destino');
+    const grupoAlta = modulosGrupo && modulosGrupo !== MODULOS_SIN_GRUPO ? modulosGrupo : null;
+    if (selAlta && selAlta.dataset.grupo !== String(grupoAlta)) {
+        selAlta.dataset.grupo = String(grupoAlta);
+        llenarDestinosSelect(selAlta, null, grupoAlta);
+        llenarCategoriasSelect(document.getElementById('itinerary-module-categoria'), '', null);
+    }
+}
+
 function renderModulosTable() {
     const tbody = document.getElementById('itinerario-modulos-table-body');
     if (!tbody) return; // no existe en Cotizador — la gestión de módulos vive en Gestión de Datos
+    renderModulosGrupos();
     const term = modulosFiltro.trim().toLowerCase();
     const visibles = modulosActivos().filter(it => {
+        if (modulosGrupo && grupoDeModulo(it) !== modulosGrupo) return false;
         if (term && !it.titulo.toLowerCase().includes(term)) return false;
         return true;
     });
@@ -350,7 +442,8 @@ function renderModulosTable() {
     const contador = document.getElementById('itinerario-modulos-count');
     if (contador) contador.textContent = modulosActivos().length;
     if (visibles.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : 'Aún no tienes itinerarios en este idioma. Usa «Nuevo itinerario» para subir el primero.'}</td></tr>`;
+        const enGrupo = modulosGrupo === MODULOS_SIN_GRUPO ? ' sin clasificar' : modulosGrupo ? ` en ${nombreGrupoDestino(modulosGrupo)}` : '';
+        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : `Aún no tienes itinerarios${enGrupo} en este idioma. Súbelos con «Subir PDFs» o clasifícalos con su destino.`}</td></tr>`;
         return;
     }
     visibles.forEach(it => tbody.appendChild(buildModuloRow(it)));
@@ -387,7 +480,8 @@ function buildModuloRow(it) {
     `;
     const destinoSel = tr.querySelector('.module-destino-select');
     const categoriaSel = tr.querySelector('.module-categoria-select');
-    llenarDestinosSelect(destinoSel, it.destino_id);
+    // En la pestaña de un grupo, solo sus destinos; en "Sin clasificar", todos con su grupo.
+    llenarDestinosSelect(destinoSel, it.destino_id, modulosGrupo && modulosGrupo !== MODULOS_SIN_GRUPO ? modulosGrupo : null);
     llenarCategoriasSelect(categoriaSel, it.destino_id, it.categoria_id);
 
     const marcarPendiente = () => {
@@ -514,6 +608,10 @@ function abrirEditorItinerario(it) {
                             <small class="text-slate-400">Las cotizaciones y paquetes que ya usan este itinerario pasan a usar el PDF nuevo.</small>
                         </div>
                     </div>
+                    <div class="cat-field">
+                        <label>Clasificación</label>
+                        <div class="ie-grupos"></div>
+                    </div>
                     <div class="cat-field cat-span-6">
                         <label for="ie-destino">Destino</label>
                         <select id="ie-destino"></select>
@@ -576,10 +674,11 @@ function abrirEditorItinerario(it) {
     });
     const destinoSel = $('#ie-destino');
     const categoriaSel = $('#ie-categoria');
-    llenarDestinosSelect(destinoSel, it.destino_id);
-    llenarCategoriasSelect(categoriaSel, destinoSel.value, it.categoria_id);
-    destinoSel.addEventListener('change', () => llenarCategoriasSelect(categoriaSel, destinoSel.value, null));
-    habilitarCreacionCategoria(categoriaSel, destinoSel);
+    enlazarClasificacionItinerario({
+        contGrupos: $('.ie-grupos'), destinoSel, categoriaSel,
+        destinoId: it.destino_id, categoriaId: it.categoria_id,
+        grupoPreferido: modulosGrupo !== MODULOS_SIN_GRUPO ? modulosGrupo : null
+    });
 
     // Imagen: 'actual' (sin cambios), un File nuevo, o null (quitada).
     let imagenElegida = 'actual';
@@ -653,6 +752,13 @@ if (document.getElementById('itinerary-module-destino')) {
 
 document.getElementById('itinerario-modulos-search')?.addEventListener('input', (e) => {
     modulosFiltro = e.target.value;
+    renderModulosTable();
+});
+document.getElementById('itinerario-modulos-grupos')?.addEventListener('click', async (e) => {
+    const tab = e.target.closest('[data-grupo]');
+    if (!tab || tab.dataset.grupo === modulosGrupo) return;
+    if (modulosCambiosPendientes.size && !(await confirmAction('Tienes cambios de clasificación sin guardar en esta pestaña. ¿Descartarlos?', 'Sí, descartar'))) return;
+    modulosGrupo = tab.dataset.grupo;
     renderModulosTable();
 });
 
@@ -2533,8 +2639,9 @@ async function initItinerario(idiomaInicial) {
     // El select de Destino del formulario "Subir Nuevo Itinerario" existe en la standalone
     // y en Gestión de Datos, pero no en Cotizador (ahí no hay gestión de módulos, solo el
     // armador día-a-día).
+    // (en Gestión de Datos lo llena renderModulosGrupos con los destinos del grupo abierto).
     const selectDestinoModulo = document.getElementById('itinerary-module-destino');
-    if (selectDestinoModulo) llenarDestinosSelect(selectDestinoModulo);
+    if (selectDestinoModulo && !document.getElementById('itinerario-modulos-grupos')) llenarDestinosSelect(selectDestinoModulo);
     resetItinerarioPaqueteBuilder();
     await activarIdioma(idiomaInicial || 'en');
     loadFonts(false);

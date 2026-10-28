@@ -544,26 +544,94 @@ function renderDestinosCtx(ctx) {
     renderCategorias(ctx);
 }
 
-// Subpestañas Con pernocte / Sin pernocte (Itinerarios > Destinos y Categorías), con
-// cuántos destinos tiene cada una.
+// Subpestañas de grupo (Itinerarios > Destinos y Categorías): Con hotel / Sin hotel (base) y
+// los grupos propios de la agencia, con cuántos destinos tiene cada uno. Al final, "Nuevo
+// grupo" y, para el grupo abierto, renombrar / eliminar según lo permita (ver grupos-destino
+// en shared/api.php).
 function renderGruposTabs() {
     const cont = document.getElementById('itin-grupos-tabs');
     if (!cont) return;
     const ctx = CLASIF_CTX.itin;
-    const tabs = gruposDestinoData.map(g => ({ valor: String(g.id), label: g.nombre, n: destinosData.filter(d => String(d.grupo_id) === String(g.id)).length, icono: g.clave === 'con_pernocte' ? 'fa-bed' : 'fa-sun' }));
+    if (!gruposDestinoData.some(g => String(g.id) === ctx.grupoActivo)) ctx.grupoActivo = String(gruposDestinoData[0]?.id ?? '');
     cont.innerHTML = '';
-    tabs.forEach(t => {
+    gruposDestinoData.forEach(g => {
+        const valor = String(g.id);
+        const n = destinosData.filter(d => String(d.grupo_id) === valor).length;
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = `subnav-tab${ctx.grupoActivo === t.valor ? ' active' : ''}`;
-        btn.innerHTML = `<i class="fas ${t.icono} mr-1"></i>${escapeHtml(t.label)}<span class="conteo-badge">${t.n}</span>`;
+        btn.className = `subnav-tab${ctx.grupoActivo === valor ? ' active' : ''}`;
+        btn.title = Number(g.es_base) ? 'Grupo base, común a todas las agencias' : 'Grupo propio de tu agencia';
+        btn.innerHTML = `<i class="fas ${iconoGrupoDestino(g)} mr-1"></i>${escapeHtml(g.nombre)}<span class="conteo-badge">${n}</span>`;
         btn.addEventListener('click', () => {
-            ctx.grupoActivo = t.valor;
+            ctx.grupoActivo = valor;
             ctx.destinoSeleccionadoId = null;
             renderDestinos();
         });
         cont.appendChild(btn);
     });
+    const activo = gruposDestinoData.find(g => String(g.id) === ctx.grupoActivo);
+    const acciones = document.createElement('span');
+    acciones.className = 'grupos-acciones';
+    acciones.innerHTML = `
+        ${activo?.editable ? `<button type="button" class="grupo-accion" data-accion="renombrar" title="Renombrar «${escapeHtml(activo.nombre)}»"><i class="fas fa-pen"></i></button>` : ''}
+        ${activo?.eliminable ? `<button type="button" class="grupo-accion is-peligro" data-accion="eliminar" title="Eliminar «${escapeHtml(activo.nombre)}»"><i class="fas fa-trash"></i></button>` : ''}
+        <button type="button" class="grupo-nuevo" data-accion="nuevo" title="Crear un grupo propio de tu agencia"><i class="fas fa-plus"></i>Nuevo grupo</button>`;
+    acciones.addEventListener('click', (e) => {
+        const accion = e.target.closest('[data-accion]')?.dataset.accion;
+        if (accion === 'nuevo') guardarGrupoDestino(null);
+        else if (accion === 'renombrar') guardarGrupoDestino(activo);
+        else if (accion === 'eliminar') eliminarGrupoDestino(activo);
+    });
+    cont.appendChild(acciones);
+}
+
+// Recarga los grupos (Gestión de Datos y la copia de itinerario.js) y todo lo que muestra
+// su nombre: pestañas, selects de destinos y la lista de itinerarios de cada idioma.
+async function refrescarGruposDestino() {
+    const grupos = await fetch(`${API_URL}?path=grupos-destino`).then(r => r.json());
+    gruposDestinoData = Array.isArray(grupos) ? grupos : [];
+    itinGruposData = gruposDestinoData;
+    await refrescarDestinosCategorias();
+}
+
+// Crea un grupo propio (grupo null) o renombra uno existente.
+async function guardarGrupoDestino(grupo) {
+    const nombre = (await promptText(grupo ? 'Renombrar grupo' : 'Nuevo grupo de destinos', 'ej. Full Day', grupo?.nombre || ''))?.trim();
+    if (!nombre || nombre === grupo?.nombre) return;
+    try {
+        const res = await fetch(`${API_URL}?path=guardar-grupo-destino`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: grupo?.id || null, nombre })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        if (!grupo) {
+            CLASIF_CTX.itin.grupoActivo = String(result.id);
+            CLASIF_CTX.itin.destinoSeleccionadoId = null;
+        }
+        await refrescarGruposDestino();
+        notifySuccess(grupo ? `Grupo renombrado a "${nombre}".` : `Grupo "${nombre}" creado. Ya puedes agregarle destinos.`);
+    } catch (e) {
+        notifyError(e.message);
+    }
+}
+
+async function eliminarGrupoDestino(grupo) {
+    if (!(await confirmAction(`¿Eliminar el grupo "${grupo.nombre}"? Solo se puede si no tiene destinos.`, 'Sí, eliminar'))) return;
+    try {
+        const res = await fetch(`${API_URL}?path=eliminar-grupo-destino`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: grupo.id })
+        });
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error || 'Error desconocido');
+        await refrescarGruposDestino();
+        notifySuccess(`Grupo "${grupo.nombre}" eliminado.`);
+    } catch (e) {
+        notifyError(e.message);
+    }
 }
 
 async function asignarGrupoDestino(d, grupoId) {

@@ -50,6 +50,7 @@
 #idioma-tabs,
 #itinerario-idioma-tabs,
 #itin-grupos-tabs,
+#itinerario-modulos-grupos,
 #itinerario-gestion-subtabs,
 .subnav-tabs-bar {
     display: flex;
@@ -65,6 +66,7 @@
 #idioma-tabs::-webkit-scrollbar,
 #itinerario-idioma-tabs::-webkit-scrollbar,
 #itin-grupos-tabs::-webkit-scrollbar,
+#itinerario-modulos-grupos::-webkit-scrollbar,
 #itinerario-gestion-subtabs::-webkit-scrollbar,
 .subnav-tabs-bar::-webkit-scrollbar {
     display: none;

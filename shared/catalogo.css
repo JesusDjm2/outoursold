@@ -247,8 +247,17 @@
 .cat-field input[type="file"]::file-selector-button:hover { background: #f1f5f9; }
 
 /* Itinerarios > Destinos y Categorías: subpestañas Con pernocte / Sin pernocte. */
-#itin-grupos-tabs .subnav-tab .conteo-badge { background: rgba(255, 255, 255, 0.25); color: inherit; }
-#itin-grupos-tabs .subnav-tab:not(.active) .conteo-badge { background: #f1f5f9; color: #64748b; }
+#itin-grupos-tabs .subnav-tab .conteo-badge,
+#itinerario-modulos-grupos .subnav-tab .conteo-badge { background: rgba(255, 255, 255, 0.25); color: inherit; }
+#itin-grupos-tabs .subnav-tab:not(.active) .conteo-badge,
+#itinerario-modulos-grupos .subnav-tab:not(.active) .conteo-badge { background: #f1f5f9; color: #64748b; }
+/* CRUD de grupos: renombrar / eliminar el abierto y "Nuevo grupo", al final de las pestañas. */
+.grupos-acciones { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid #e2e8f0; }
+.grupo-accion { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: #94a3b8; font-size: 0.75rem; transition: background 0.15s, color 0.15s; }
+.grupo-accion:hover { background: #f1f5f9; color: #334155; }
+.grupo-accion.is-peligro:hover { background: #fef2f2; color: #dc2626; }
+.grupo-nuevo { display: inline-flex; align-items: center; gap: 6px; margin-left: 2px; padding: 5px 12px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 500; color: #64748b; white-space: nowrap; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.grupo-nuevo:hover { border-color: var(--accent-1, #e80c13); color: var(--accent-1, #e80c13); background: #fff5f5; }
 .destino-grupo-select { background: #fff; max-width: 130px; }
 
 /* Subida en lote de PDFs (Itinerarios > Páginas Fijas / Itinerarios, ver initSubidaMasiva

@@ -41,12 +41,14 @@ function normalizarNumeroCsv($valor) {
 }
 
 // grupo_id de destino tal como llega del cliente: null/'' = "Sin asignar"; si viene un id,
-// debe existir en grupos_destino. Devuelve el id (int) o null; false si es inválido (ya
-// respondió el error HTTP y el caller debe hacer `break`).
+// debe ser un grupo que el usuario ve (base o de su agencia, ver grupos-destino). Devuelve
+// el id (int) o null; false si es inválido (ya respondió el error HTTP y el caller debe
+// hacer `break`).
 function grupoDestinoValido($db, $grupoId) {
     if ($grupoId === null || $grupoId === '') return null;
-    $stmt = $db->prepare("SELECT id FROM grupos_destino WHERE id = ?");
-    $stmt->execute([(int) $grupoId]);
+    [$fg, $pg] = filtroDueno('creado_por');
+    $stmt = $db->prepare("SELECT id FROM grupos_destino WHERE id = ? AND (es_base = 1 OR $fg)");
+    $stmt->execute(array_merge([(int) $grupoId], $pg));
     if (!$stmt->fetch()) {
         http_response_code(400);
         echo json_encode(['error' => 'Grupo de destino no válido.']);
@@ -185,9 +187,104 @@ try {
             }
             break;
 
-        // Catálogo fijo de grupos de destino (migración 032): Con pernocte / Sin pernocte.
+        // Grupos de destino de Itinerarios (migraciones 032 y 039): los base (Con hotel / Sin
+        // hotel, comunes a todas las agencias) y los propios de la agencia. `editable`: un
+        // base solo lo renombra el admin; `eliminable`: solo los propios.
         case 'grupos-destino':
-            echo json_encode($db->query("SELECT id, clave, nombre FROM grupos_destino ORDER BY orden")->fetchAll());
+            [$fg, $pg] = filtroDueno('creado_por');
+            $stmt = $db->prepare("SELECT id, clave, nombre, es_base FROM grupos_destino
+                                  WHERE es_base = 1 OR $fg ORDER BY es_base DESC, orden, id");
+            $stmt->execute($pg);
+            $grupos = array_map(fn($g) => $g + [
+                'editable' => !$g['es_base'] || is_admin(),
+                'eliminable' => !$g['es_base']
+            ], $stmt->fetchAll());
+            echo json_encode($grupos);
+            break;
+
+        case 'guardar-grupo-destino':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $nombreGrupo = trim($data['nombre'] ?? '');
+            $idGrupo = (int) ($data['id'] ?? 0);
+            if ($nombreGrupo === '' || mb_strlen($nombreGrupo) > 50) {
+                http_response_code(400);
+                echo json_encode(['error' => 'El nombre del grupo es obligatorio (máximo 50 caracteres).']);
+                break;
+            }
+            [$fg, $pg] = filtroDueno('creado_por');
+            if ($idGrupo) {
+                $stmt = $db->prepare("SELECT es_base FROM grupos_destino WHERE id = ? AND (es_base = 1 OR $fg)");
+                $stmt->execute(array_merge([$idGrupo], $pg));
+                $esBase = $stmt->fetchColumn();
+                if ($esBase === false) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Grupo no encontrado.']);
+                    break;
+                }
+                if ($esBase && !is_admin()) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Los grupos base (Con hotel / Sin hotel) solo los renombra el administrador.']);
+                    break;
+                }
+            }
+            // Sin nombres repetidos entre los grupos que ve esta agencia.
+            $stmt = $db->prepare("SELECT 1 FROM grupos_destino WHERE LOWER(TRIM(nombre)) = LOWER(?) AND id <> ? AND (es_base = 1 OR $fg)");
+            $stmt->execute(array_merge([$nombreGrupo, $idGrupo], $pg));
+            if ($stmt->fetchColumn()) {
+                http_response_code(409);
+                echo json_encode(['error' => "Ya existe un grupo llamado \"$nombreGrupo\"."]);
+                break;
+            }
+            if ($idGrupo) {
+                $db->prepare("UPDATE grupos_destino SET nombre = ? WHERE id = ?")->execute([$nombreGrupo, $idGrupo]);
+            } else {
+                $orden = (int) $db->query("SELECT COALESCE(MAX(orden), 0) + 1 FROM grupos_destino")->fetchColumn();
+                $db->prepare("INSERT INTO grupos_destino (clave, nombre, orden, es_base, creado_por) VALUES (NULL, ?, ?, 0, ?)")
+                   ->execute([$nombreGrupo, $orden, $_SESSION['user_id']]);
+                $idGrupo = (int) $db->lastInsertId();
+            }
+            echo json_encode(['success' => true, 'id' => $idGrupo]);
+            break;
+
+        // Solo grupos propios y vacíos: borrar uno con destinos los dejaría sin grupo, y un
+        // destino sin grupo pasa a ser de Actividades / Hoteles.
+        case 'eliminar-grupo-destino':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $idGrupo = (int) ($data['id'] ?? 0);
+            [$fg, $pg] = filtroDueno('creado_por');
+            $stmt = $db->prepare("SELECT es_base FROM grupos_destino WHERE id = ? AND (es_base = 1 OR $fg)");
+            $stmt->execute(array_merge([$idGrupo], $pg));
+            $esBase = $stmt->fetchColumn();
+            if ($esBase === false) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Grupo no encontrado.']);
+                break;
+            }
+            if ($esBase) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Con hotel y Sin hotel son grupos base: no se pueden eliminar.']);
+                break;
+            }
+            $stmt = $db->prepare("SELECT COUNT(*) FROM destinos WHERE grupo_id = ?");
+            $stmt->execute([$idGrupo]);
+            $nDestinos = (int) $stmt->fetchColumn();
+            if ($nDestinos > 0) {
+                http_response_code(409);
+                echo json_encode(['error' => "El grupo tiene $nDestinos destino" . ($nDestinos === 1 ? '' : 's') . ': muévelos a otro grupo o elimínalos antes de eliminarlo.']);
+                break;
+            }
+            $db->prepare("DELETE FROM grupos_destino WHERE id = ?")->execute([$idGrupo]);
+            echo json_encode(['success' => true]);
             break;
 
         // Guarda el orden de los destinos propios arrastrado en el panel de itinerarios del

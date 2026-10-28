@@ -13,10 +13,11 @@
 // itinerario con su filename (.module-filename) y su día (tr.dataset.dia). Así guardar la
 // cotización, paquetes, historial y el PDF (itinerario.js / cotizador.js) no cambian.
 
-const ISEL_GRUPOS = [
-    { valor: '1', nombre: 'Con hotel', icono: 'fa-hotel' },
-    { valor: '2', nombre: 'Sin hotel', icono: 'fa-sun' }
-];
+// Grupos de destino (Con hotel / Sin hotel y los propios de la agencia), los que carga
+// itinerario.js en itinGruposData.
+function iselGrupos() {
+    return itinGruposData.map(g => ({ valor: String(g.id), nombre: g.nombre, icono: iconoGrupoDestino(g) }));
+}
 const ISEL_SIN_CLASIFICAR = 'sin-clasificar';
 const ISEL_GRUPO_STORAGE = 'cotizador.iselGrupo';
 
@@ -73,7 +74,7 @@ function iselEntradaDe(filename) {
     return iselCatalogo().find(e => e.m.filename === filename) || null;
 }
 function iselNombreGrupo(valor) {
-    return ISEL_GRUPOS.find(g => g.valor === valor)?.nombre || 'Sin clasificar';
+    return iselGrupos().find(g => g.valor === valor)?.nombre || 'Sin clasificar';
 }
 function iselRuta(e) {
     if (!e.destino) return 'Sin clasificar';
@@ -556,7 +557,7 @@ function grupoInicialPanel(filenameActual) {
     try { g = localStorage.getItem(ISEL_GRUPO_STORAGE); } catch (_) { g = null; }
     const conItems = (v) => catalogo.some(e => e.grupo === v);
     if (g && conItems(g)) return g;
-    return [...ISEL_GRUPOS.map(x => x.valor), ISEL_SIN_CLASIFICAR].find(conItems) || ISEL_GRUPOS[0].valor;
+    return [...iselGrupos().map(x => x.valor), ISEL_SIN_CLASIFICAR].find(conItems) || iselGrupos()[0]?.valor || ISEL_SIN_CLASIFICAR;
 }
 
 function construirPanel(panel) {
@@ -755,13 +756,13 @@ function iselEntradasFiltradas(grupo) {
 function renderPanelGrupos() {
     const cont = document.querySelector('#itin-panel .itin-panel-grupos');
     if (!cont) return;
-    const grupos = [...ISEL_GRUPOS];
+    const grupos = iselGrupos();
     if (iselCatalogo().some(e => e.grupo === ISEL_SIN_CLASIFICAR)) grupos.push({ valor: ISEL_SIN_CLASIFICAR, nombre: 'Sin clasificar', icono: 'fa-folder-open' });
     cont.innerHTML = grupos.map(g => {
         const n = iselEntradasFiltradas(g.valor).length;
         const activo = g.valor === armadoUI.grupo;
         return `<button type="button" role="tab" class="itin-panel-grupo${activo ? ' is-activo' : ''}${n ? '' : ' is-vacio'}" data-grupo="${g.valor}" aria-selected="${activo}">
-            <i class="fas ${g.icono}" aria-hidden="true"></i>${g.nombre}<span>${n}</span>
+            <i class="fas ${g.icono}" aria-hidden="true"></i>${escapeHtml(g.nombre)}<span>${n}</span>
         </button>`;
     }).join('');
 }
@@ -794,7 +795,7 @@ function renderPanelCatalogo() {
             || a.m.titulo.localeCompare(b.m.titulo));
 
     if (!visibles.length) {
-        const otros = [...ISEL_GRUPOS.map(g => g.valor), ISEL_SIN_CLASIFICAR].filter(g => g !== armadoUI.grupo)
+        const otros = [...iselGrupos().map(g => g.valor), ISEL_SIN_CLASIFICAR].filter(g => g !== armadoUI.grupo)
             .map(g => ({ g, n: iselEntradasFiltradas(g).length })).filter(x => x.n);
         grid.innerHTML = `<div class="itin-panel-vacio">
             <i class="fas ${armadoUI.busqueda ? 'fa-magnifying-glass' : 'fa-route'}"></i>
@@ -1071,10 +1072,14 @@ function renderDetalleEdicion(caja, e) {
         <div class="idet-body idet-form">
             <p class="idet-aviso"><i class="fas fa-circle-info"></i>Los cambios se guardan en el catálogo: se verán en todas las cotizaciones y paquetes que usan este itinerario.</p>
             <label class="idet-campo"><span>Título</span><input type="text" class="if-titulo" value="${escapeHtml(m.titulo)}"></label>
-            <div class="idet-campos-2">
-                <label class="idet-campo"><span>Destino</span><select class="if-destino"></select></label>
-                <label class="idet-campo"><span>Categoría</span><select class="if-categoria" disabled></select></label>
-            </div>
+            <fieldset class="if-clasif">
+                <legend>Clasificación</legend>
+                <div class="if-grupos"></div>
+                <div class="idet-campos-2">
+                    <label class="idet-campo"><span>Destino</span><select class="if-destino"></select></label>
+                    <label class="idet-campo"><span>Categoría</span><select class="if-categoria" disabled></select></label>
+                </div>
+            </fieldset>
             <div class="idet-campo">
                 <span>Imagen</span>
                 <div class="if-imagen">
@@ -1105,14 +1110,13 @@ function renderDetalleEdicion(caja, e) {
             <button type="button" class="idet-btn is-primario if-guardar"><i class="fas fa-save"></i>Guardar</button>
         </div>`;
     const $ = (s) => caja.querySelector(s);
-    // Destino (con su grupo Con / Sin hotel) y categoría: mismos selectores que el editor de
-    // Gestión de Datos (itinerario.js), incluido "+ Crear nueva categoría...".
+    // Clasificación en cascada: grupo → destino de ese grupo → categoría (itinerario.js).
     const destinoSel = $('.if-destino');
     const categoriaSel = $('.if-categoria');
-    llenarDestinosSelect(destinoSel, m.destino_id);
-    llenarCategoriasSelect(categoriaSel, destinoSel.value, m.categoria_id);
-    destinoSel.addEventListener('change', () => llenarCategoriasSelect(categoriaSel, destinoSel.value, null));
-    habilitarCreacionCategoria(categoriaSel, destinoSel);
+    enlazarClasificacionItinerario({
+        contGrupos: $('.if-grupos'), destinoSel, categoriaSel,
+        destinoId: m.destino_id, categoriaId: m.categoria_id, grupoPreferido: armadoUI.grupo
+    });
     let imagen = 'actual';
     let pdf = null;
     const pintarImagen = () => {
