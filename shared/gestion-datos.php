@@ -385,7 +385,6 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
 
             <div class="itin-layout" id="itinerario-seccion-bar">
                 <nav class="itin-menu" aria-label="Secciones de Itinerarios">
-                    <div class="itin-menu-titulo" id="itin-menu-idioma"></div>
                     <button type="button" class="itin-menu-item is-activo" data-itin-seccion="modulos"><i class="fas fa-route"></i><span>Itinerarios</span><span class="itin-menu-n" data-conteo-seccion="modulos"></span></button>
                     <button type="button" class="itin-menu-item" data-itin-seccion="paginas"><i class="fas fa-file-alt"></i><span>Páginas fijas</span><span class="itin-menu-n" data-conteo-seccion="paginas"></span></button>
                     <div class="itin-menu-sep"><i class="fas fa-globe"></i>Común a los 3 idiomas</div>

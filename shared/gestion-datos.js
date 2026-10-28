@@ -1854,7 +1854,7 @@ async function mostrarSeccionItinerarios(seccion) {
     }
 }
 
-// Pestaña de idioma activa, el título del menú y la bandera en el título de cada tarjeta
+// Pestaña de idioma activa y la bandera en el título de cada tarjeta
 // ("Itinerarios 🇺🇸 English"); el cambio de idioma en sí lo hace itinerario.js (.idioma-tab).
 function pintarIdiomaItinerarios(idioma) {
     document.querySelectorAll('#vista-itinerarios .itin-idioma').forEach(b => {
@@ -1865,8 +1865,6 @@ function pintarIdiomaItinerarios(idioma) {
     const b = (window.BANDERAS_IDIOMA || {})[idioma];
     const etiqueta = b ? `<span class="titulo-bandera">${b.svg}</span>${escapeHtml(b.nombre)}` : escapeHtml(idioma);
     document.querySelectorAll('#vista-itinerarios .cat-title-idioma').forEach(s => { s.innerHTML = etiqueta; });
-    const titulo = document.getElementById('itin-menu-idioma');
-    if (titulo) titulo.innerHTML = etiqueta;
 }
 
 // Conteos del menú: itinerarios y páginas fijas del idioma activo.

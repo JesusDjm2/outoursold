@@ -825,14 +825,6 @@
     background: #fff;
     box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
 }
-.itin-menu-titulo {
-    display: flex; align-items: center;
-    margin-bottom: 6px; padding: 4px 8px 10px;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 0.8rem; font-weight: 700; color: #0f172a;
-    transition: opacity 0.15s;
-}
-.itin-layout.is-comun .itin-menu-titulo { opacity: 0.4; }
 .itin-menu-item {
     display: flex; align-items: center; gap: 10px;
     width: 100%; padding: 9px 10px;
@@ -871,7 +863,6 @@
         padding: 5px; overflow-x: auto; scrollbar-width: none;
     }
     .itin-menu::-webkit-scrollbar { display: none; }
-    .itin-menu-titulo { display: none; }
     .itin-menu-item { width: auto; flex-shrink: 0; padding: 7px 12px; }
     .itin-menu-sep { flex-shrink: 0; margin: 0 2px; padding: 0 8px; border-top: 0; border-left: 1px dashed #cbd5e1; align-self: stretch; }
     .itin-menu-sep { font-size: 0; gap: 0; }
