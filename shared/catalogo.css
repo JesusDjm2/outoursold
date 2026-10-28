@@ -811,8 +811,14 @@
     background: linear-gradient(90deg, var(--accent-1, #e80c13), var(--accent-2, #bb3135));
 }
 .itin-idioma:focus-visible { outline: 2px solid var(--accent-1, #e80c13); outline-offset: -2px; border-radius: 6px; }
-/* En Destinos y Categorías el idioma no aplica: las pestañas se atenúan. */
-#vista-itinerarios:has(.itin-layout.is-comun) .itin-idiomas { opacity: 0.5; }
+/* Destinos y Categorías (común a los 3): primera pestaña, separada de los idiomas. Mientras
+   está abierta, ningún idioma se marca y no hay menú lateral. */
+.itin-tab-comun i { font-size: 0.82rem; }
+.itin-idiomas-sep { flex-shrink: 0; width: 1px; margin: 10px 8px; background: #e2e8f0; }
+.itin-idiomas.is-comun .itin-idioma[data-idioma].active { color: #64748b; }
+.itin-idiomas.is-comun .itin-idioma[data-idioma].active::after { display: none; }
+.itin-layout.is-comun { grid-template-columns: minmax(0, 1fr); }
+.itin-layout.is-comun .itin-menu { display: none; }
 
 .itin-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
 .itin-contenido { min-width: 0; }
@@ -849,12 +855,7 @@
 }
 .itin-menu-n:empty { display: none; }
 .itin-menu-item.is-activo .itin-menu-n { background: rgba(255, 255, 255, 0.25); color: #fff; }
-.itin-menu-sep {
-    display: flex; align-items: center; gap: 6px;
-    margin: 10px 4px 4px; padding: 10px 4px 2px;
-    border-top: 1px dashed #e2e8f0;
-    font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #94a3b8;
-}
+
 
 @media (max-width: 1279px) {
     .itin-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
@@ -864,9 +865,7 @@
     }
     .itin-menu::-webkit-scrollbar { display: none; }
     .itin-menu-item { width: auto; flex-shrink: 0; padding: 7px 12px; }
-    .itin-menu-sep { flex-shrink: 0; margin: 0 2px; padding: 0 8px; border-top: 0; border-left: 1px dashed #cbd5e1; align-self: stretch; }
-    .itin-menu-sep { font-size: 0; gap: 0; }
-    .itin-menu-sep i { font-size: 0.8rem; }
+
 }
 @media (max-width: 640px) {
     .itin-idioma { padding: 9px 12px 11px; font-size: 0.86rem; }

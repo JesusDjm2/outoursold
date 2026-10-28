@@ -363,9 +363,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
              standalone de Itinerario (itinerario/index.php); sus paneles internos usan
              itin-panel en vez de subtab-content para no chocar con las subpestañas de moneda. -->
         <div id="vista-itinerarios" class="<?= $vista === 'itinerarios' ? '' : 'hidden' ?>">
-            <!-- Primero el idioma (pestañas con bandera) y, dentro, un menú lateral: Itinerarios y
-                 Páginas fijas son del idioma; Destinos y Categorías es común a los 3 (una sola
-                 clasificación para English, Español y Português). Ver initPestanasItinerarios en
+            <!-- Primera pestaña: Destinos y Categorías, común a los 3 idiomas (una sola
+                 clasificación para English, Español y Português). Después, una pestaña por
+                 idioma con un menú lateral: Itinerarios y Páginas fijas de ese idioma. Ver initPestanasItinerarios en
                  gestion-datos.js; los botones .idioma-tab los maneja itinerario.js. -->
             <?php
             $banderasIdioma = [
@@ -375,7 +375,11 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             ];
             ?>
             <script>window.BANDERAS_IDIOMA = <?= json_encode(array_map(fn($b) => ['nombre' => $b[0], 'svg' => $b[1]], $banderasIdioma), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
-            <div class="itin-idiomas" role="tablist" aria-label="Idioma del catálogo">
+            <div class="itin-idiomas" role="tablist" aria-label="Clasificación e idioma del catálogo">
+                <button type="button" role="tab" class="itin-idioma itin-tab-comun" data-itin-seccion="clasificacion" aria-selected="false" title="Comunes a los 3 idiomas">
+                    <i class="fas fa-tags"></i>Destinos y Categorías
+                </button>
+                <span class="itin-idiomas-sep" aria-hidden="true"></span>
                 <?php foreach ($banderasIdioma as $cod => [$nombre, $svg]): ?>
                 <button type="button" role="tab" class="idioma-tab itin-idioma<?= $cod === 'en' ? ' active' : '' ?>" data-idioma="<?= $cod ?>" aria-selected="<?= $cod === 'en' ? 'true' : 'false' ?>">
                     <span class="idioma-bandera"><?= $svg ?></span><?= $nombre ?>
@@ -387,8 +391,6 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                 <nav class="itin-menu" aria-label="Secciones de Itinerarios">
                     <button type="button" class="itin-menu-item is-activo" data-itin-seccion="modulos"><i class="fas fa-route"></i><span>Itinerarios</span><span class="itin-menu-n" data-conteo-seccion="modulos"></span></button>
                     <button type="button" class="itin-menu-item" data-itin-seccion="paginas"><i class="fas fa-file-alt"></i><span>Páginas fijas</span><span class="itin-menu-n" data-conteo-seccion="paginas"></span></button>
-                    <div class="itin-menu-sep"><i class="fas fa-globe"></i>Común a los 3 idiomas</div>
-                    <button type="button" class="itin-menu-item" data-itin-seccion="clasificacion"><i class="fas fa-tags"></i><span>Destinos y Categorías</span></button>
                 </nav>
                 <div class="itin-contenido">
             <div id="gestion-itinerarios">

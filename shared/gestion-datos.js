@@ -1822,14 +1822,26 @@ function actualizarUrlItinerarios(cambios) {
     history.replaceState(null, '', url);
 }
 
-function seccionItinActual() {
-    return document.querySelector('#itinerario-seccion-bar .itin-menu-item.is-activo')?.dataset.itinSeccion || 'modulos';
-}
+// Sección abierta y la última de un idioma (para volver a ella al pasar de Destinos y
+// Categorías a una pestaña de idioma).
+let seccionItin = 'modulos';
+let ultimaSeccionIdioma = 'modulos';
+function seccionItinActual() { return seccionItin; }
 
 async function mostrarSeccionItinerarios(seccion) {
     const layout = document.getElementById('itinerario-seccion-bar');
     if (!layout) return;
     if (!ITIN_SECCIONES.includes(seccion)) seccion = 'modulos';
+    seccionItin = seccion;
+    if (seccion !== 'clasificacion') ultimaSeccionIdioma = seccion;
+    // Pestañas de arriba: Destinos y Categorías o el idioma activo.
+    const pestanas = document.querySelector('#vista-itinerarios .itin-idiomas');
+    pestanas.classList.toggle('is-comun', seccion === 'clasificacion');
+    pestanas.querySelectorAll('.itin-idioma').forEach(b => {
+        const activa = b.classList.contains('itin-tab-comun') ? seccion === 'clasificacion' : seccion !== 'clasificacion' && b.classList.contains('active');
+        if (b.classList.contains('itin-tab-comun')) b.classList.toggle('active', activa);
+        b.setAttribute('aria-selected', String(activa));
+    });
     layout.querySelectorAll('.itin-menu-item').forEach(b => {
         const activa = b.dataset.itinSeccion === seccion;
         b.classList.toggle('is-activo', activa);
@@ -1857,10 +1869,10 @@ async function mostrarSeccionItinerarios(seccion) {
 // Pestaña de idioma activa y la bandera en el título de cada tarjeta
 // ("Itinerarios 🇺🇸 English"); el cambio de idioma en sí lo hace itinerario.js (.idioma-tab).
 function pintarIdiomaItinerarios(idioma) {
-    document.querySelectorAll('#vista-itinerarios .itin-idioma').forEach(b => {
+    document.querySelectorAll('#vista-itinerarios .itin-idioma[data-idioma]').forEach(b => {
         const activo = b.dataset.idioma === idioma;
         b.classList.toggle('active', activo);
-        b.setAttribute('aria-selected', String(activo));
+        b.setAttribute('aria-selected', String(activo && seccionItin !== 'clasificacion'));
     });
     const b = (window.BANDERAS_IDIOMA || {})[idioma];
     const etiqueta = b ? `<span class="titulo-bandera">${b.svg}</span>${escapeHtml(b.nombre)}` : escapeHtml(idioma);
@@ -1877,9 +1889,12 @@ function initPestanasItinerarios() {
     const layout = document.getElementById('itinerario-seccion-bar');
     if (!layout) return;
     layout.querySelectorAll('.itin-menu-item').forEach(btn => btn.addEventListener('click', () => mostrarSeccionItinerarios(btn.dataset.itinSeccion)));
-    document.querySelectorAll('#vista-itinerarios .itin-idioma').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelector('#vista-itinerarios .itin-tab-comun').addEventListener('click', () => mostrarSeccionItinerarios('clasificacion'));
+    // Una pestaña de idioma abre su última sección (Itinerarios o Páginas fijas).
+    document.querySelectorAll('#vista-itinerarios .itin-idioma[data-idioma]').forEach(btn => btn.addEventListener('click', () => {
         pintarIdiomaItinerarios(btn.dataset.idioma);
         actualizarUrlItinerarios({ idioma: btn.dataset.idioma });
+        if (seccionItin === 'clasificacion') mostrarSeccionItinerarios(ultimaSeccionIdioma);
     }));
     initArbolItinerarios();
     initClasificacionItin();
