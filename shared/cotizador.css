@@ -143,7 +143,7 @@ tr.draggable:active { cursor: grabbing; }
     transition: background 0.15s;
 }
 .destino-item:hover, .categoria-item:hover { background: #f8fafc; }
-.destino-item.active { background: rgba(187,49,53,0.08); }
+.destino-item.active { background: color-mix(in srgb, var(--accent-1, #e80c13) 9%, white); }
 .destino-item.active .destino-nombre { color: var(--accent-2); font-weight: 600; }
 .destino-item.active .fa-chevron-right { color: var(--accent-2); }
 .btn {

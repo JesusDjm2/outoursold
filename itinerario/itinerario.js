@@ -34,6 +34,9 @@ let modulosFiltro = '';
 // Pestaña de grupo abierta en la lista de itinerarios de cada idioma (Gestión de Datos).
 const MODULOS_SIN_GRUPO = 'sin-clasificar';
 let modulosGrupo = null;
+// Nodo del árbol de destinos/categorías elegido en Gestión de Datos (maestro-detalle):
+// destino = id o null (todos); categoria = id, 'sin' (sin categoría) o null (todas).
+let modulosNodo = { destino: null, categoria: null };
 let itinerarioPaqueteEditandoId = null;
 let historialFiltro = { texto: '', agencia: '', desde: '', hasta: '' };
 
@@ -415,7 +418,8 @@ function renderModulosGrupos() {
     const tabs = itinGruposData.map(g => ({ valor: String(g.id), nombre: g.nombre, icono: iconoGrupoDestino(g) }));
     if (conteo(MODULOS_SIN_GRUPO) > 0) tabs.push({ valor: MODULOS_SIN_GRUPO, nombre: 'Sin clasificar', icono: 'fa-folder-open' });
     if (!tabs.some(t => t.valor === modulosGrupo)) modulosGrupo = tabs[0]?.valor ?? null;
-    cont.innerHTML = tabs.map(t => `<button type="button" class="subnav-tab${t.valor === modulosGrupo ? ' active' : ''}" data-grupo="${t.valor}"><i class="fas ${t.icono} mr-1"></i>${escapeHtml(t.nombre)}<span class="conteo-badge">${conteo(t.valor)}</span></button>`).join('');
+    cont.innerHTML = tabs.map(t => `<button type="button" role="tab" aria-selected="${t.valor === modulosGrupo}" class="filtro-chip${t.valor === modulosGrupo ? ' is-activo' : ''}" data-grupo="${t.valor}"><i class="fas ${t.icono}"></i>${escapeHtml(t.nombre)}<span class="filtro-chip-n">${conteo(t.valor)}</span></button>`).join('');
+    document.dispatchEvent(new CustomEvent('itin:grupo-modulos', { detail: modulosGrupo }));
     // El alta en lote clasifica dentro del grupo abierto.
     const selAlta = document.getElementById('itinerary-module-destino');
     const grupoAlta = modulosGrupo && modulosGrupo !== MODULOS_SIN_GRUPO ? modulosGrupo : null;
@@ -430,9 +434,17 @@ function renderModulosTable() {
     const tbody = document.getElementById('itinerario-modulos-table-body');
     if (!tbody) return; // no existe en Cotizador — la gestión de módulos vive en Gestión de Datos
     renderModulosGrupos();
+    // Un nodo que ya no está en el grupo abierto (se eliminó, se movió de grupo o se cambió
+    // de grupo) vuelve a "Todos".
+    const destinoNodo = itinDestinosData.find(d => d.id === modulosNodo.destino && String(d.grupo_id) === modulosGrupo);
+    if (modulosNodo.destino != null && !destinoNodo) modulosNodo = { destino: null, categoria: null };
+    if (typeof modulosNodo.categoria === 'number' && !itinCategoriasData.some(c => c.id === modulosNodo.categoria && c.destino_id === modulosNodo.destino)) modulosNodo.categoria = null;
     const term = modulosFiltro.trim().toLowerCase();
     const visibles = modulosActivos().filter(it => {
         if (modulosGrupo && grupoDeModulo(it) !== modulosGrupo) return false;
+        if (modulosNodo.destino != null && Number(it.destino_id) !== modulosNodo.destino) return false;
+        if (modulosNodo.categoria === 'sin' && it.categoria_id) return false;
+        if (typeof modulosNodo.categoria === 'number' && Number(it.categoria_id) !== modulosNodo.categoria) return false;
         if (term && !it.titulo.toLowerCase().includes(term)) return false;
         return true;
     });
@@ -442,11 +454,16 @@ function renderModulosTable() {
     const contador = document.getElementById('itinerario-modulos-count');
     if (contador) contador.textContent = modulosActivos().length;
     if (visibles.length === 0) {
-        const enGrupo = modulosGrupo === MODULOS_SIN_GRUPO ? ' sin clasificar' : modulosGrupo ? ` en ${nombreGrupoDestino(modulosGrupo)}` : '';
-        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : `Aún no tienes itinerarios${enGrupo} en este idioma. Súbelos con «Subir PDFs» o clasifícalos con su destino.`}</td></tr>`;
-        return;
+        const categoriaNodo = itinCategoriasData.find(c => c.id === modulosNodo.categoria);
+        const donde = modulosGrupo === MODULOS_SIN_GRUPO ? ' sin clasificar'
+            : destinoNodo ? ` en ${destinoNodo.nombreBase}${categoriaNodo ? ' › ' + categoriaNodo.nombre : modulosNodo.categoria === 'sin' ? ' sin categoría' : ''}`
+            : modulosGrupo ? ` en ${nombreGrupoDestino(modulosGrupo)}` : '';
+        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : `Aún no tienes itinerarios${escapeHtml(donde)} en este idioma. Súbelos con «Subir PDFs» o clasifícalos con su destino.`}</td></tr>`;
+    } else {
+        visibles.forEach(it => tbody.appendChild(buildModuloRow(it)));
     }
-    visibles.forEach(it => tbody.appendChild(buildModuloRow(it)));
+    // Gestión de Datos repinta el árbol y la miga (conteos del idioma, nodo elegido).
+    document.dispatchEvent(new CustomEvent('itin:modulos-render', { detail: { visibles: visibles.length } }));
 }
 
 function buildModuloRow(it) {
@@ -759,6 +776,7 @@ document.getElementById('itinerario-modulos-grupos')?.addEventListener('click', 
     if (!tab || tab.dataset.grupo === modulosGrupo) return;
     if (modulosCambiosPendientes.size && !(await confirmAction('Tienes cambios de clasificación sin guardar en esta pestaña. ¿Descartarlos?', 'Sí, descartar'))) return;
     modulosGrupo = tab.dataset.grupo;
+    modulosNodo = { destino: null, categoria: null };
     renderModulosTable();
 });
 

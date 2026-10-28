@@ -363,70 +363,47 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
              standalone de Itinerario (itinerario/index.php); sus paneles internos usan
              itin-panel en vez de subtab-content para no chocar con las subpestañas de moneda. -->
         <div id="vista-itinerarios" class="<?= $vista === 'itinerarios' ? '' : 'hidden' ?>">
-            <!-- Primero Destinos y Categorías; a su lado los idiomas (inglés primero), cada uno con
-                 su catálogo de itinerarios y páginas fijas (ver initPestanasItinerarios en
-                 gestion-datos.js). -->
-            <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-idioma-tabs">
-                <button type="button" class="subnav-tab active" data-itin-vista="clasificacion"><i class="fas fa-tags mr-1"></i> Destinos y Categorías</button>
-                <button type="button" class="subnav-tab idioma-tab" data-idioma="en"><i class="fas fa-language mr-1"></i> English</button>
-                <button type="button" class="subnav-tab idioma-tab" data-idioma="es"><i class="fas fa-language mr-1"></i> Español</button>
-                <button type="button" class="subnav-tab idioma-tab" data-idioma="pt"><i class="fas fa-language mr-1"></i> Português</button>
+            <!-- Primero el idioma (pestañas con bandera) y, dentro, un menú lateral: Itinerarios y
+                 Páginas fijas son del idioma; Destinos y Categorías es común a los 3 (una sola
+                 clasificación para English, Español y Português). Ver initPestanasItinerarios en
+                 gestion-datos.js; los botones .idioma-tab los maneja itinerario.js. -->
+            <?php
+            $banderasIdioma = [
+                'en' => ['English', '<svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 19 10" aria-hidden="true"><rect width="19" height="10" fill="#b22234"/><path d="M0 1.15h19M0 2.7h19M0 4.23h19M0 5.77h19M0 7.3h19M0 8.85h19" stroke="#fff" stroke-width=".77"/><rect width="7.6" height="5.38" fill="#3c3b6e"/></svg>'],
+                'es' => ['Español', '<svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 3 2" aria-hidden="true"><rect width="3" height="2" fill="#c60b1e"/><rect y=".5" width="3" height="1" fill="#ffc400"/></svg>'],
+                'pt' => ['Português', '<svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.7 18.3 7 10 12.3 1.7 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.1" fill="#002776"/></svg>'],
+            ];
+            ?>
+            <script>window.BANDERAS_IDIOMA = <?= json_encode(array_map(fn($b) => ['nombre' => $b[0], 'svg' => $b[1]], $banderasIdioma), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
+            <div class="itin-idiomas" role="tablist" aria-label="Idioma del catálogo">
+                <?php foreach ($banderasIdioma as $cod => [$nombre, $svg]): ?>
+                <button type="button" role="tab" class="idioma-tab itin-idioma<?= $cod === 'en' ? ' active' : '' ?>" data-idioma="<?= $cod ?>" aria-selected="<?= $cod === 'en' ? 'true' : 'false' ?>">
+                    <span class="idioma-bandera"><?= $svg ?></span><?= $nombre ?>
+                </button>
+                <?php endforeach; ?>
             </div>
 
-            <!-- Destinos y Categorías de Itinerarios: Con pernocte y Sin pernocte (grupo padre,
-                 migraciones 032 y 034) tienen cada uno sus propios destinos — puede haber un
-                 "Cusco" en cada uno — y estos son solo de Itinerarios: Actividades y Hoteles usan
-                 los destinos sin grupo. Las categorías son las propias de Itinerarios. Ver
-                 CLASIF_CTX.itin en gestion-datos.js. -->
-            <div id="itin-clasificacion">
-                <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itin-grupos-tabs"></div>
-                <div class="card p-6">
-                    <p class="text-sm text-slate-500 mb-4">Cada grupo (<strong>Con hotel</strong>, <strong>Sin hotel</strong> y los que crees con «Nuevo grupo») tiene sus propios destinos y categorías; puede haber un mismo nombre, como "Cusco", en varios. Elige un destino para ver y gestionar sus categorías. Estos destinos son solo de Itinerarios; los de Actividades y Hoteles se gestionan en Gestión USD / PEN.</p>
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                        <div class="lg:col-span-5 border rounded-lg p-3">
-                            <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
-                            <div id="itin-destino-new-wrap" class="flex gap-2 mb-3">
-                                <input id="itin-destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
-                                <button id="itin-destino-new-add" class="btn btn-primary px-3" title="Agregar destino en este grupo"><i class="fas fa-plus"></i></button>
-                            </div>
-                            <div id="itin-destinos-table-body" class="divide-y" style="max-height:480px; overflow-y:auto"></div>
-                        </div>
-                        <div class="lg:col-span-7 border rounded-lg p-3">
-                            <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Categorías de itinerarios <span id="itin-categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
-                            <p id="itin-categorias-sin-destino" class="text-sm text-slate-500 hidden">Elige o crea un destino para empezar a agregar categorías.</p>
-                            <div id="itin-categorias-table-wrap">
-                                <div class="flex gap-2 mb-3">
-                                    <input id="itin-categoria-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nueva categoría (ej. Full Day)">
-                                    <button id="itin-categoria-new-add" class="btn btn-primary px-3" title="Agregar categoría"><i class="fas fa-plus"></i></button>
-                                </div>
-                                <div id="itin-categorias-table-body" class="divide-y" style="max-height:480px; overflow-y:auto"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="gestion-itinerarios" class="hidden">
-                <!-- Por idioma: primero Páginas Fijas, después Itinerarios. Ambos se suben en lote
-                     (varios PDF a la vez; el título sale del nombre del archivo, ver
+            <div class="itin-layout" id="itinerario-seccion-bar">
+                <nav class="itin-menu" aria-label="Secciones de Itinerarios">
+                    <div class="itin-menu-titulo" id="itin-menu-idioma"></div>
+                    <button type="button" class="itin-menu-item is-activo" data-itin-seccion="modulos"><i class="fas fa-route"></i><span>Itinerarios</span><span class="itin-menu-n" data-conteo-seccion="modulos"></span></button>
+                    <button type="button" class="itin-menu-item" data-itin-seccion="paginas"><i class="fas fa-file-alt"></i><span>Páginas fijas</span><span class="itin-menu-n" data-conteo-seccion="paginas"></span></button>
+                    <div class="itin-menu-sep"><i class="fas fa-globe"></i>Común a los 3 idiomas</div>
+                    <button type="button" class="itin-menu-item" data-itin-seccion="clasificacion"><i class="fas fa-tags"></i><span>Destinos y Categorías</span></button>
+                </nav>
+                <div class="itin-contenido">
+            <div id="gestion-itinerarios">
+                <!-- Itinerarios y Páginas fijas, del idioma elegido en la barra. Ambos se suben en
+                     lote (varios PDF a la vez; el título sale del nombre del archivo, ver
                      initSubidaMasiva en itinerario.js). -->
-                <div class="flex gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-gestion-subtabs">
-                    <button class="subnav-tab active" data-subtab="paginas">
-                        <i class="fas fa-file-alt mr-1"></i>Páginas Fijas
-                    </button>
-                    <button class="subnav-tab" data-subtab="modulos">
-                        <i class="fas fa-file-pdf mr-1"></i>Itinerarios
-                    </button>
-                </div>
-
                 <!-- Páginas Fijas: subida en lote + tablero para arrastrar cada página a
                      Presentación (inicio del PDF) o Cierre (final), en el orden en que quedan.
                      Se guarda solo al soltar (api.php?path=guardar-config de este idioma). -->
-                <div id="itinerario-gestion-paginas" class="itin-panel">
+                <div id="itinerario-gestion-paginas" class="itin-panel hidden">
                     <div class="card cat-card">
                         <div class="cat-header">
                             <div>
-                                <h2 class="cat-title">Páginas Fijas</h2>
+                                <h2 class="cat-title">Páginas fijas <span class="cat-title-idioma"></span></h2>
                                 <p class="cat-subtitle"><span id="paginas-fijas-count">0 páginas</span> · arrástralas a Presentación o Cierre</p>
                             </div>
                             <div class="cat-tools">
@@ -469,14 +446,11 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
 
                 <!-- Mismo componente que Tours / Hoteles (shared/catalogo.css); mismos ids que
                      lee itinerario.js. -->
-                <div id="itinerario-gestion-modulos" class="itin-panel hidden">
-                    <!-- Primera clasificación, igual que en Destinos y Categorías: el grupo
-                         (pestañas que arma renderModulosGrupos en itinerario.js). -->
-                    <div class="flex flex-wrap gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit max-w-full" id="itinerario-modulos-grupos"></div>
+                <div id="itinerario-gestion-modulos" class="itin-panel">
                     <div class="card cat-card">
                         <div class="cat-header">
                             <div>
-                                <h2 class="cat-title">Itinerarios</h2>
+                                <h2 class="cat-title">Itinerarios <span class="cat-title-idioma"></span></h2>
                                 <p class="cat-subtitle"><span id="itinerario-modulos-count">0</span> en tu catálogo</p>
                             </div>
                             <div class="cat-tools">
@@ -487,6 +461,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-upload"></i>Subir PDFs</button>
                             </div>
                         </div>
+                        <!-- Primera clasificación, igual que en Destinos y Categorías: el grupo
+                             (chips que arma renderModulosGrupos en itinerario.js). -->
+                        <div class="filtro-chips cat-filtros" id="itinerario-modulos-grupos" role="tablist" aria-label="Grupos de destino"></div>
                         <div id="itinerarios-nuevo-panel" class="cat-new-panel hidden">
                             <h3>Subir itinerarios (PDF)</h3>
                             <label class="pdf-drop" for="itinerary-module-pdf">
@@ -515,22 +492,49 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <button type="button" id="upload-local-module" class="btn btn-primary small" disabled><i class="fas fa-upload mr-1"></i>Subir</button>
                             </div>
                         </div>
-                        <div class="cat-table-wrap">
-                            <table class="cat-table">
-                                <thead>
-                                    <tr>
-                                        <th class="cat-col-name">Itinerario</th>
-                                        <th class="cat-col-clasif">Destino / Categoría</th>
-                                        <th class="cat-actions">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="itinerario-modulos-table-body"></tbody>
-                            </table>
+                        <!-- Maestro-detalle: destinos y categorías del grupo abierto (árbol, con su
+                             CRUD) y la lista filtrada por el nodo elegido. Ver
+                             renderArbolItinerarios en gestion-datos.js y modulosNodo en itinerario.js. -->
+                        <div class="itin-md" id="itin-md">
+                            <aside class="itin-arbol" id="itin-arbol" aria-label="Destinos y categorías"></aside>
+                            <div class="itin-md-lista">
+                                <div class="itin-miga" id="itin-miga"></div>
+                                <div class="cat-table-wrap">
+                                    <table class="cat-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="cat-col-name">Itinerario</th>
+                                                <th class="cat-col-clasif">Destino / Categoría</th>
+                                                <th class="cat-actions">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="itinerario-modulos-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <button id="modulos-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
                         <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="modulos-guardar-count">0</span>)
                     </button>
+                </div>
+            </div>
+
+            <!-- Destinos y Categorías: una sola clasificación para los 3 idiomas, con cuántos
+                 itinerarios tiene cada destino / categoría en cada idioma (ver
+                 renderClasificacionItin en gestion-datos.js). -->
+            <div id="itin-clasificacion" class="hidden">
+                <div class="card cat-card">
+                    <div class="cat-header">
+                        <div>
+                            <h2 class="cat-title">Destinos y Categorías</h2>
+                            <p class="cat-subtitle"><i class="fas fa-globe mr-1"></i>Comunes a los 3 idiomas: lo que crees aquí aparece en English, Español y Português.</p>
+                        </div>
+                    </div>
+                    <div class="filtro-chips cat-filtros" id="itin-clasif-grupos" role="tablist" aria-label="Grupos de destino"></div>
+                    <div class="clasif-tabla" id="itin-clasif"></div>
+                </div>
+            </div>
                 </div>
             </div>
         </div>

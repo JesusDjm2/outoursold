@@ -63,16 +63,6 @@ const CLASIF_CTX = {
         destinoSeleccionadoId: null,
         filtro: (d) => d.grupo_id == null,
         conGrupos: false
-    },
-    itin: {
-        ids: { destinos: 'itin-destinos-table-body', categorias: 'itin-categorias-table-body', sinDestino: 'itin-categorias-sin-destino', tableWrap: 'itin-categorias-table-wrap', actual: 'itin-categorias-destino-actual' },
-        tipoTabsSelector: null,
-        tipos: ['itinerarios'],
-        tipoActivo: 'itinerarios',
-        destinoSeleccionadoId: null,
-        grupoActivo: '1',
-        filtro: (d) => String(d.grupo_id) === CLASIF_CTX.itin.grupoActivo,
-        conGrupos: true
     }
 };
 // Módulos de itinerario de los 3 idiomas, solo para contar por destino/categoría en
@@ -518,7 +508,6 @@ async function refrescarTours() {
 // (ver CLASIF_CTX): el de Gestión USD/PEN y el de Itinerarios.
 function renderDestinos() {
     Object.values(CLASIF_CTX).forEach(renderDestinosCtx);
-    renderGruposTabs();
     renderGestionResumen();
 }
 
@@ -544,47 +533,6 @@ function renderDestinosCtx(ctx) {
     renderCategorias(ctx);
 }
 
-// Subpestañas de grupo (Itinerarios > Destinos y Categorías): Con hotel / Sin hotel (base) y
-// los grupos propios de la agencia, con cuántos destinos tiene cada uno. Al final, "Nuevo
-// grupo" y, para el grupo abierto, renombrar / eliminar según lo permita (ver grupos-destino
-// en shared/api.php).
-function renderGruposTabs() {
-    const cont = document.getElementById('itin-grupos-tabs');
-    if (!cont) return;
-    const ctx = CLASIF_CTX.itin;
-    if (!gruposDestinoData.some(g => String(g.id) === ctx.grupoActivo)) ctx.grupoActivo = String(gruposDestinoData[0]?.id ?? '');
-    cont.innerHTML = '';
-    gruposDestinoData.forEach(g => {
-        const valor = String(g.id);
-        const n = destinosData.filter(d => String(d.grupo_id) === valor).length;
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `subnav-tab${ctx.grupoActivo === valor ? ' active' : ''}`;
-        btn.title = Number(g.es_base) ? 'Grupo base, común a todas las agencias' : 'Grupo propio de tu agencia';
-        btn.innerHTML = `<i class="fas ${iconoGrupoDestino(g)} mr-1"></i>${escapeHtml(g.nombre)}<span class="conteo-badge">${n}</span>`;
-        btn.addEventListener('click', () => {
-            ctx.grupoActivo = valor;
-            ctx.destinoSeleccionadoId = null;
-            renderDestinos();
-        });
-        cont.appendChild(btn);
-    });
-    const activo = gruposDestinoData.find(g => String(g.id) === ctx.grupoActivo);
-    const acciones = document.createElement('span');
-    acciones.className = 'grupos-acciones';
-    acciones.innerHTML = `
-        ${activo?.editable ? `<button type="button" class="grupo-accion" data-accion="renombrar" title="Renombrar «${escapeHtml(activo.nombre)}»"><i class="fas fa-pen"></i></button>` : ''}
-        ${activo?.eliminable ? `<button type="button" class="grupo-accion is-peligro" data-accion="eliminar" title="Eliminar «${escapeHtml(activo.nombre)}»"><i class="fas fa-trash"></i></button>` : ''}
-        <button type="button" class="grupo-nuevo" data-accion="nuevo" title="Crear un grupo propio de tu agencia"><i class="fas fa-plus"></i>Nuevo grupo</button>`;
-    acciones.addEventListener('click', (e) => {
-        const accion = e.target.closest('[data-accion]')?.dataset.accion;
-        if (accion === 'nuevo') guardarGrupoDestino(null);
-        else if (accion === 'renombrar') guardarGrupoDestino(activo);
-        else if (accion === 'eliminar') eliminarGrupoDestino(activo);
-    });
-    cont.appendChild(acciones);
-}
-
 // Recarga los grupos (Gestión de Datos y la copia de itinerario.js) y todo lo que muestra
 // su nombre: pestañas, selects de destinos y la lista de itinerarios de cada idioma.
 async function refrescarGruposDestino() {
@@ -606,14 +554,12 @@ async function guardarGrupoDestino(grupo) {
         });
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
-        if (!grupo) {
-            CLASIF_CTX.itin.grupoActivo = String(result.id);
-            CLASIF_CTX.itin.destinoSeleccionadoId = null;
-        }
         await refrescarGruposDestino();
         notifySuccess(grupo ? `Grupo renombrado a "${nombre}".` : `Grupo "${nombre}" creado. Ya puedes agregarle destinos.`);
+        return result.id;
     } catch (e) {
         notifyError(e.message);
+        return null;
     }
 }
 
@@ -736,20 +682,6 @@ function resumenDestino(ctx, destinoId) {
     return { chips, categorias: nCategorias === 0 ? 'Sin categorías' : `${nCategorias} categoría${nCategorias === 1 ? '' : 's'}` };
 }
 
-// Selector para mover un destino entre Con pernocte y Sin pernocte (Itinerarios >
-// Destinos y Categorías). Si en el otro grupo ya hay uno con el mismo nombre, el servidor
-// lo rechaza.
-function selectorGrupoDestino(d) {
-    const sel = document.createElement('select');
-    sel.className = 'destino-grupo-select rounded-md border px-1.5 py-0.5 text-xs';
-    sel.title = 'Mover a otro grupo';
-    gruposDestinoData.forEach(g => sel.appendChild(new Option(g.nombre, String(g.id))));
-    sel.value = String(d.grupo_id);
-    sel.addEventListener('click', (e) => e.stopPropagation());
-    sel.addEventListener('change', () => asignarGrupoDestino(d, sel.value));
-    return sel;
-}
-
 function buildDestinoRow(ctx, d) {
     const div = document.createElement('div');
     div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === ctx.destinoSeleccionadoId ? 'active' : ''}`;
@@ -769,7 +701,6 @@ function buildDestinoRow(ctx, d) {
             <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
         </div>
     `;
-    if (ctx.conGrupos) div.querySelector('.destino-acciones').prepend(selectorGrupoDestino(d));
     div.addEventListener('click', () => {
         ctx.destinoSeleccionadoId = d.id;
         renderDestinosCtx(ctx);
@@ -807,7 +738,7 @@ async function guardarDestino(payload) {
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         notifySuccess(payload.id ? 'Destino actualizado.' : 'Destino agregado.');
         await refrescarDestinosCategorias();
-        return true;
+        return Number(result.id) || true;
     } catch (e) {
         notifyError('Error al guardar el destino: ' + e.message);
         return false;
@@ -1088,7 +1019,7 @@ async function guardarCategoria(tipo, payload) {
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         notifySuccess(payload.id ? 'Categoría actualizada.' : 'Categoría agregada.');
         await refrescarDestinosCategorias();
-        return true;
+        return Number(result.id) || true;
     } catch (e) {
         notifyError('Error al guardar la categoría: ' + e.message);
         return false;
@@ -1879,27 +1810,496 @@ async function eliminarCotizacionGuardada(id, nombre) {
 // Vista Itinerarios: la fila de arriba tiene "Destinos y Categorías" (#itin-clasificacion) y
 // los 3 idiomas (.idioma-tab, que además cambian el idioma activo en itinerario.js) — cada
 // idioma muestra su catálogo de itinerarios y páginas fijas (#gestion-itinerarios).
-function initPestanasItinerarios() {
-    const fila = document.getElementById('itinerario-idioma-tabs');
-    if (!fila) return;
-    const clasificacion = document.getElementById('itin-clasificacion');
-    const catalogo = document.getElementById('gestion-itinerarios');
-    fila.querySelectorAll('.subnav-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            fila.querySelectorAll('.subnav-tab').forEach(b => b.classList.toggle('active', b === btn));
-            const esClasificacion = btn.dataset.itinVista === 'clasificacion';
-            clasificacion.classList.toggle('hidden', !esClasificacion);
-            catalogo.classList.toggle('hidden', esClasificacion);
-            if (esClasificacion) actualizarConteosItinerarios();
-        });
+// Vista Itinerarios: primero el idioma (pestañas con bandera) y, dentro, un menú lateral:
+// Itinerarios y Páginas fijas son del idioma; Destinos y Categorías es común a los 3. La URL
+// recuerda sección, idioma, grupo y nodo del árbol (&seccion=&idioma=&grupo=&destino=
+// &categoria=) para volver al mismo lugar al recargar o compartir el enlace.
+const ITIN_SECCIONES = ['modulos', 'paginas', 'clasificacion'];
+
+function actualizarUrlItinerarios(cambios) {
+    const url = new URL(location.href);
+    Object.entries(cambios).forEach(([k, v]) => v == null ? url.searchParams.delete(k) : url.searchParams.set(k, v));
+    history.replaceState(null, '', url);
+}
+
+function seccionItinActual() {
+    return document.querySelector('#itinerario-seccion-bar .itin-menu-item.is-activo')?.dataset.itinSeccion || 'modulos';
+}
+
+async function mostrarSeccionItinerarios(seccion) {
+    const layout = document.getElementById('itinerario-seccion-bar');
+    if (!layout) return;
+    if (!ITIN_SECCIONES.includes(seccion)) seccion = 'modulos';
+    layout.querySelectorAll('.itin-menu-item').forEach(b => {
+        const activa = b.dataset.itinSeccion === seccion;
+        b.classList.toggle('is-activo', activa);
+        b.setAttribute('aria-current', activa ? 'page' : 'false');
+        // En pantallas chicas el menú es una fila con scroll: que se vea la opción activa.
+        if (activa) b.parentElement.scrollTo({ left: b.offsetLeft - 8, behavior: 'smooth' });
     });
+    const esClasif = seccion === 'clasificacion';
+    document.getElementById('itin-clasificacion').classList.toggle('hidden', !esClasif);
+    document.getElementById('gestion-itinerarios').classList.toggle('hidden', esClasif);
+    document.getElementById('itinerario-gestion-modulos').classList.toggle('hidden', seccion !== 'modulos');
+    document.getElementById('itinerario-gestion-paginas').classList.toggle('hidden', seccion !== 'paginas');
+    layout.classList.toggle('is-comun', esClasif);
+    arbolUI.agregando = null;
+    arbolUI.editando = null;
+    const enLista = seccion === 'modulos';
+    actualizarUrlItinerarios({ seccion, grupo: enLista ? modulosGrupo : null, destino: enLista ? modulosNodo.destino : null, categoria: enLista ? modulosNodo.categoria : null });
+    if (esClasif) {
+        renderClasificacionItin();
+        await actualizarConteosItinerarios(); // conteos de los 3 idiomas, frescos
+        renderClasificacionItin();
+    }
+}
+
+// Pestaña de idioma activa, el título del menú y la bandera en el título de cada tarjeta
+// ("Itinerarios 🇺🇸 English"); el cambio de idioma en sí lo hace itinerario.js (.idioma-tab).
+function pintarIdiomaItinerarios(idioma) {
+    document.querySelectorAll('#vista-itinerarios .itin-idioma').forEach(b => {
+        const activo = b.dataset.idioma === idioma;
+        b.classList.toggle('active', activo);
+        b.setAttribute('aria-selected', String(activo));
+    });
+    const b = (window.BANDERAS_IDIOMA || {})[idioma];
+    const etiqueta = b ? `<span class="titulo-bandera">${b.svg}</span>${escapeHtml(b.nombre)}` : escapeHtml(idioma);
+    document.querySelectorAll('#vista-itinerarios .cat-title-idioma').forEach(s => { s.innerHTML = etiqueta; });
+    const titulo = document.getElementById('itin-menu-idioma');
+    if (titulo) titulo.innerHTML = etiqueta;
+}
+
+// Conteos del menú: itinerarios y páginas fijas del idioma activo.
+function pintarConteosMenuItin() {
+    const n = { modulos: modulosActivos().length, paginas: paginasFijasActivas().length };
+    document.querySelectorAll('#itinerario-seccion-bar [data-conteo-seccion]').forEach(el => { el.textContent = n[el.dataset.conteoSeccion] ?? ''; });
+}
+
+function initPestanasItinerarios() {
+    const layout = document.getElementById('itinerario-seccion-bar');
+    if (!layout) return;
+    layout.querySelectorAll('.itin-menu-item').forEach(btn => btn.addEventListener('click', () => mostrarSeccionItinerarios(btn.dataset.itinSeccion)));
+    document.querySelectorAll('#vista-itinerarios .itin-idioma').forEach(btn => btn.addEventListener('click', () => {
+        pintarIdiomaItinerarios(btn.dataset.idioma);
+        actualizarUrlItinerarios({ idioma: btn.dataset.idioma });
+    }));
+    initArbolItinerarios();
+    initClasificacionItin();
+}
+
+// ===== Itinerarios: maestro-detalle (árbol de destinos y categorías + lista) =====
+// A la izquierda de la lista del idioma: los destinos del grupo abierto y, del elegido, sus
+// categorías, con cuántos itinerarios del idioma tiene cada nodo. Un clic filtra la lista
+// (modulosNodo en itinerario.js). Tiene un CRUD rápido (crear / renombrar / eliminar al
+// vuelo mientras se suben PDFs); el completo está en Destinos y Categorías.
+// arbolUI: alta en curso ({ tipo: 'destino' | 'categoria', grupo, destino } y lo escrito),
+// nodo en edición ({ tipo, id }), si el árbol está desplegado en pantallas chicas (ahí se
+// pliega bajo la miga) y cuántos itinerarios muestra la lista.
+const arbolUI = { agregando: null, valor: '', editando: null, abiertoMovil: false, visibles: 0 };
+
+function grupoAbiertoItin() {
+    if (!modulosGrupo || modulosGrupo === MODULOS_SIN_GRUPO) return null;
+    return gruposDestinoData.find(g => String(g.id) === modulosGrupo) || null;
+}
+
+const ordenDestinosItin = (a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0) || a.nombre.localeCompare(b.nombre);
+
+function nodoArbolHtml({ accion, id = '', nombre, n, nivel = 0, activo = false, abierto = false, crud = false, aviso = false, icono = null }) {
+    const marca = accion === 'destino'
+        ? `<i class="fas fa-chevron-right arbol-caret${abierto ? ' is-abierto' : ''}" aria-hidden="true"></i>`
+        : icono ? `<i class="fas ${icono} arbol-icono" aria-hidden="true"></i>` : '<span class="arbol-guia" aria-hidden="true"></span>';
+    return `<div class="arbol-nodo nivel-${nivel}${activo ? ' is-activo' : ''}${aviso ? ' is-aviso' : ''}" role="treeitem" tabindex="0" aria-selected="${activo}"${accion === 'destino' ? ` aria-expanded="${abierto}"` : ''} data-accion="${accion}" data-id="${id}">
+        ${marca}<span class="arbol-nombre">${escapeHtml(nombre)}</span><span class="arbol-n">${n}</span>${crud ? botonesCrudItinHtml(accion, id, nombre) : ''}
+    </div>`;
+}
+
+function botonesCrudItinHtml(tipo, id, nombre) {
+    return `<span class="arbol-crud">
+        <button type="button" data-crud="editar" data-tipo="${tipo}" data-id="${id}" title="Editar «${escapeHtml(nombre)}»"><i class="fas fa-pen"></i></button>
+        <button type="button" data-crud="eliminar" data-tipo="${tipo}" data-id="${id}" title="Eliminar «${escapeHtml(nombre)}»"><i class="fas fa-trash"></i></button>
+    </span>`;
+}
+
+// Fila con input para crear (tipo 'destino' | 'categoria') o editar ('editar-destino', con
+// el grupo al que pertenece para moverlo; 'editar-categoria').
+function formArbolHtml(tipo, nivel, item = null) {
+    const valor = item ? item.nombre : arbolUI.valor;
+    const ayuda = { destino: 'Nuevo destino (ej. Cusco)', categoria: 'Nueva categoría (ej. Full Day)' }[tipo] || '';
+    const grupo = tipo === 'editar-destino'
+        ? `<select class="arbol-grupo" title="Grupo del destino">${gruposDestinoData.map(g => `<option value="${g.id}"${String(g.id) === String(item.grupo_id) ? ' selected' : ''}>${escapeHtml(g.nombre)}</option>`).join('')}</select>`
+        : '';
+    const ag = arbolUI.agregando || {};
+    return `<div class="arbol-form nivel-${nivel}" data-form="${tipo}" data-id="${item?.id ?? ''}" data-grupo="${ag.grupo ?? ''}" data-destino="${ag.destino ?? ''}">
+        <input type="text" class="arbol-input" maxlength="100" value="${escapeHtml(valor)}" placeholder="${ayuda}" aria-label="${ayuda || 'Nombre'}">
+        ${grupo}
+        <span class="arbol-form-btns">
+            <button type="button" data-form-accion="guardar" title="Guardar"><i class="fas fa-check"></i></button>
+            <button type="button" data-form-accion="cancelar" title="Cancelar"><i class="fas fa-xmark"></i></button>
+        </span>
+    </div>`;
+}
+
+const agregandoEn = (tipo, destino = null) => arbolUI.agregando?.tipo === tipo && (tipo === 'destino' || arbolUI.agregando.destino === destino);
+
+function renderArbolItinerarios() {
+    const cont = document.getElementById('itin-arbol');
+    if (!cont) return;
+    const grupo = grupoAbiertoItin();
+    const md = document.getElementById('itin-md');
+    md.classList.toggle('sin-arbol', !grupo);
+    md.classList.toggle('arbol-abierto', arbolUI.abiertoMovil);
+    renderMigaItinerarios(grupo);
+    if (!grupo) { cont.innerHTML = ''; return; }
+    const enGrupo = modulosActivos().filter(it => grupoDeModulo(it) === modulosGrupo);
+    const cuenta = pred => enGrupo.filter(pred).length;
+    const destinos = destinosData.filter(d => String(d.grupo_id) === modulosGrupo).sort(ordenDestinosItin);
+    const { destino: dSel, categoria: cSel } = modulosNodo;
+    const ed = arbolUI.editando;
+    let html = `<div class="arbol-cab">
+            <span>Destinos</span>
+            <button type="button" class="arbol-mas" data-accion="nuevo-destino" title="Nuevo destino en ${escapeHtml(grupo.nombre)}"><i class="fas fa-plus"></i></button>
+        </div>
+        <div class="arbol-lista" role="tree" aria-label="Destinos de ${escapeHtml(grupo.nombre)}">`;
+    html += nodoArbolHtml({ accion: 'todos', nombre: 'Todos', n: enGrupo.length, activo: dSel == null, icono: 'fa-layer-group' });
+    if (agregandoEn('destino')) html += formArbolHtml('destino', 0);
+    destinos.forEach(d => {
+        const abierto = dSel === d.id;
+        html += ed?.tipo === 'destino' && ed.id === d.id
+            ? formArbolHtml('editar-destino', 0, d)
+            : nodoArbolHtml({ accion: 'destino', id: d.id, nombre: d.nombre, n: cuenta(it => Number(it.destino_id) === d.id), activo: abierto && cSel == null, abierto, crud: true });
+        if (!abierto) return;
+        itinCategoriasData.filter(c => c.destino_id === d.id).sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
+            html += ed?.tipo === 'categoria' && ed.id === c.id
+                ? formArbolHtml('editar-categoria', 1, c)
+                : nodoArbolHtml({ accion: 'categoria', id: c.id, nombre: c.nombre, n: cuenta(it => Number(it.categoria_id) === c.id), nivel: 1, activo: cSel === c.id, crud: true });
+        });
+        const nSin = cuenta(it => Number(it.destino_id) === d.id && !it.categoria_id);
+        if (nSin) html += nodoArbolHtml({ accion: 'categoria', id: 'sin', nombre: 'Sin categoría', n: nSin, nivel: 1, activo: cSel === 'sin', aviso: true });
+        html += agregandoEn('categoria', d.id)
+            ? formArbolHtml('categoria', 1)
+            : `<button type="button" class="arbol-agregar nivel-1" data-accion="nueva-categoria" data-destino="${d.id}"><i class="fas fa-plus"></i>Categoría</button>`;
+    });
+    html += '</div>';
+    if (!destinos.length) html += `<p class="arbol-vacio">Aún no hay destinos en ${escapeHtml(grupo.nombre)}. Crea el primero con <i class="fas fa-plus"></i>.</p>`;
+    cont.innerHTML = html;
+    if (seccionItinActual() === 'modulos' && (arbolUI.agregando || arbolUI.editando)) cont.querySelector('.arbol-input')?.focus();
+}
+
+// Miga sobre la lista: dónde estás (grupo › destino › categoría) y cuántos itinerarios hay.
+// En pantallas chicas su botón despliega el árbol.
+function renderMigaItinerarios(grupo) {
+    const el = document.getElementById('itin-miga');
+    if (!el) return;
+    const n = arbolUI.visibles;
+    const total = `<span class="miga-n">${n} itinerario${n === 1 ? '' : 's'}</span>`;
+    if (!grupo) {
+        el.innerHTML = modulosGrupo === MODULOS_SIN_GRUPO
+            ? `<span class="miga-pasos"><span class="miga-actual"><i class="fas fa-folder-open"></i>Sin clasificar</span></span><span class="miga-ayuda">Asígnales un destino con el selector de cada fila.</span>${total}`
+            : '';
+        return;
+    }
+    const d = destinosData.find(x => x.id === modulosNodo.destino);
+    const c = itinCategoriasData.find(x => x.id === modulosNodo.categoria);
+    const pasos = [{ texto: grupo.nombre, accion: 'todos' }];
+    if (d) pasos.push({ texto: d.nombre, accion: 'destino', id: d.id });
+    if (c || modulosNodo.categoria === 'sin') pasos.push({ texto: c ? c.nombre : 'Sin categoría' });
+    const html = pasos.map((p, i) => i === pasos.length - 1
+        ? `<span class="miga-actual">${escapeHtml(p.texto)}</span>`
+        : `<button type="button" class="miga-paso" data-accion="${p.accion}" data-id="${p.id ?? ''}">${escapeHtml(p.texto)}</button>`
+    ).join('<i class="fas fa-chevron-right miga-sep" aria-hidden="true"></i>');
+    el.innerHTML = `<button type="button" class="miga-arbol" data-accion="toggle-arbol" aria-expanded="${arbolUI.abiertoMovil}" title="Destinos y categorías"><i class="fas fa-sitemap"></i><i class="fas fa-chevron-down miga-arbol-caret"></i></button>
+        <nav class="miga-pasos" aria-label="Ubicación">${html}</nav>${total}`;
+}
+
+// "Subir PDFs" clasifica en el nodo elegido (destino y, si hay, categoría).
+function prepararAltaEnNodo() {
+    const sel = document.getElementById('itinerary-module-destino');
+    if (!sel) return;
+    sel.value = modulosNodo.destino != null ? String(modulosNodo.destino) : '';
+    llenarCategoriasSelect(document.getElementById('itinerary-module-categoria'), sel.value, typeof modulosNodo.categoria === 'number' ? modulosNodo.categoria : null);
+}
+
+function elegirNodoItinerarios(destino, categoria) {
+    modulosNodo = { destino, categoria };
+    arbolUI.agregando = null;
+    arbolUI.editando = null;
+    arbolUI.abiertoMovil = false;
+    prepararAltaEnNodo();
+    renderModulosTable();
+}
+
+function repintarClasificacionItin() {
+    renderArbolItinerarios();
+    if (seccionItinActual() === 'clasificacion') renderClasificacionItin();
+}
+
+function cancelarFormItin() {
+    arbolUI.agregando = null;
+    arbolUI.editando = null;
+    arbolUI.valor = '';
+    repintarClasificacionItin();
+}
+
+// Guarda el alta / edición de cualquiera de las dos vistas (árbol o Destinos y Categorías).
+// Lo nuevo creado desde el árbol queda elegido en él.
+async function guardarFormArbol(form) {
+    const nombre = form.querySelector('.arbol-input').value.trim();
+    if (!nombre) { notifyWarning('Escribe un nombre.'); return; }
+    const tipo = form.dataset.form;
+    const id = Number(form.dataset.id);
+    const enArbol = seccionItinActual() === 'modulos';
+    if (tipo === 'destino') {
+        arbolUI.valor = nombre;
+        const nuevo = await guardarDestino({ nombre, grupo_id: Number(form.dataset.grupo) });
+        if (!nuevo) return;
+        arbolUI.agregando = null;
+        arbolUI.valor = '';
+        if (enArbol && typeof nuevo === 'number') modulosNodo = { destino: nuevo, categoria: null };
+    } else if (tipo === 'categoria') {
+        arbolUI.valor = nombre;
+        const destino = Number(form.dataset.destino);
+        const nuevo = await guardarCategoria('itinerarios', { destino_id: destino, nombre });
+        if (!nuevo) return;
+        arbolUI.agregando = null;
+        arbolUI.valor = '';
+        if (enArbol && typeof nuevo === 'number') modulosNodo = { destino, categoria: nuevo };
+    } else if (tipo === 'editar-destino') {
+        const d = destinosData.find(x => x.id === id);
+        const grupoNuevo = form.querySelector('.arbol-grupo').value;
+        if (nombre !== d.nombre && !(await guardarDestino({ id, nombre }))) return;
+        arbolUI.editando = null;
+        if (String(d.grupo_id) !== grupoNuevo) await asignarGrupoDestino(d, grupoNuevo);
+    } else if (tipo === 'editar-categoria') {
+        const c = itinCategoriasData.find(x => x.id === id);
+        arbolUI.editando = null;
+        if (nombre !== c.nombre) await guardarCategoria('itinerarios', { id, destino_id: c.destino_id, nombre });
+    }
+    if (enArbol) prepararAltaEnNodo();
+    renderModulosTable();
+    repintarClasificacionItin();
+}
+
+// Botones comunes a las dos vistas: editar / eliminar un destino o categoría y los
+// formularios en línea. Devuelve true si el clic era de uno de ellos.
+function manejarCrudItin(e) {
+    const crud = e.target.closest('[data-crud]');
+    if (crud) {
+        const tipo = crud.dataset.tipo;
+        const id = Number(crud.dataset.id);
+        if (crud.dataset.crud === 'editar') {
+            arbolUI.editando = { tipo, id };
+            arbolUI.agregando = null;
+            repintarClasificacionItin();
+        } else if (tipo === 'destino') {
+            eliminarDestino(destinosData.find(d => d.id === id));
+        } else {
+            eliminarCategoria('itinerarios', itinCategoriasData.find(c => c.id === id));
+        }
+        return true;
+    }
+    const formBtn = e.target.closest('[data-form-accion]');
+    if (formBtn) {
+        if (formBtn.dataset.formAccion === 'guardar') guardarFormArbol(formBtn.closest('.arbol-form'));
+        else cancelarFormItin();
+        return true;
+    }
+    return !!e.target.closest('.arbol-form');
+}
+
+function teclasFormItin(e) {
+    const form = e.target.closest('.arbol-form');
+    if (form && e.key === 'Enter') { e.preventDefault(); guardarFormArbol(form); return true; }
+    if (form && e.key === 'Escape') { cancelarFormItin(); return true; }
+    return !!form;
+}
+
+function initArbolItinerarios() {
+    const arbol = document.getElementById('itin-arbol');
+    if (!arbol) return;
+    // itinerario.js avisa al repintar la lista o los chips de grupo.
+    document.addEventListener('itin:modulos-render', (e) => {
+        arbolUI.visibles = e.detail.visibles;
+        repintarClasificacionItin();
+        pintarConteosMenuItin();
+        if (seccionItinActual() === 'modulos') {
+            actualizarUrlItinerarios({ grupo: modulosGrupo, destino: modulosNodo.destino, categoria: modulosNodo.categoria });
+        }
+    });
+    document.addEventListener('itin:grupo-modulos', () => renderAccionesGrupo('itinerario-modulos-grupos', grupoAbiertoItin()));
+    document.getElementById('itinerario-modulos-grupos').addEventListener('click', (e) => accionGrupoItin(e, grupoAbiertoItin(), (id) => { modulosGrupo = id; modulosNodo = { destino: null, categoria: null }; }));
+
+    const alClic = (e) => {
+        if (manejarCrudItin(e)) return;
+        const el = e.target.closest('[data-accion]');
+        if (!el) return;
+        const id = el.dataset.id;
+        switch (el.dataset.accion) {
+            case 'todos': elegirNodoItinerarios(null, null); break;
+            case 'destino': elegirNodoItinerarios(Number(id), null); break;
+            case 'categoria': elegirNodoItinerarios(modulosNodo.destino, id === 'sin' ? 'sin' : Number(id)); break;
+            case 'nuevo-destino': abrirAltaItin({ tipo: 'destino', grupo: modulosGrupo }); break;
+            case 'nueva-categoria': abrirAltaItin({ tipo: 'categoria', destino: Number(el.dataset.destino) }); break;
+            case 'toggle-arbol': arbolUI.abiertoMovil = !arbolUI.abiertoMovil; renderArbolItinerarios(); break;
+        }
+    };
+    arbol.addEventListener('click', alClic);
+    document.getElementById('itin-miga').addEventListener('click', alClic);
+    arbol.addEventListener('keydown', (e) => {
+        if (teclasFormItin(e)) return;
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('arbol-nodo')) { e.preventDefault(); e.target.click(); }
+    });
+    // Lo escrito en un alta sobrevive a los repintados (por ejemplo, al llegar datos).
+    document.getElementById('vista-itinerarios').addEventListener('input', (e) => {
+        if (e.target.closest('.arbol-form[data-form="destino"], .arbol-form[data-form="categoria"]')) arbolUI.valor = e.target.value;
+    });
+    // Primer pintado con el árbol ya escuchando (la lista se pintó antes, al cargar el idioma).
+    renderModulosTable();
+}
+
+function abrirAltaItin(agregando) {
+    arbolUI.agregando = agregando;
+    arbolUI.editando = null;
+    arbolUI.valor = '';
+    repintarClasificacionItin();
+}
+
+// CRUD de grupos al final de unos chips de grupo (los de la lista de Itinerarios, que arma
+// renderModulosGrupos en itinerario.js, o los de Destinos y Categorías): renombrar /
+// eliminar el abierto, según lo permita (ver grupos-destino en shared/api.php), y "Nuevo
+// grupo".
+function renderAccionesGrupo(contId, activo) {
+    const cont = document.getElementById(contId);
+    if (!cont || cont.querySelector('.grupos-acciones')) return;
+    const acciones = document.createElement('span');
+    acciones.className = 'grupos-acciones';
+    acciones.innerHTML = `
+        ${activo?.editable ? `<button type="button" class="grupo-accion" data-accion-grupo="renombrar" title="Renombrar el grupo «${escapeHtml(activo.nombre)}»"><i class="fas fa-pen"></i></button>` : ''}
+        ${activo?.eliminable ? `<button type="button" class="grupo-accion is-peligro" data-accion-grupo="eliminar" title="Eliminar el grupo «${escapeHtml(activo.nombre)}»"><i class="fas fa-trash"></i></button>` : ''}
+        <button type="button" class="grupo-nuevo" data-accion-grupo="nuevo" title="Crear un grupo propio de tu agencia"><i class="fas fa-plus"></i>Nuevo grupo</button>`;
+    cont.appendChild(acciones);
+}
+
+async function accionGrupoItin(e, activo, alCrear) {
+    const accion = e.target.closest('[data-accion-grupo]')?.dataset.accionGrupo;
+    if (accion === 'nuevo') {
+        const id = await guardarGrupoDestino(null);
+        if (id) { alCrear(String(id)); clasifGrupo = String(id); renderModulosTable(); repintarClasificacionItin(); }
+    } else if (accion === 'renombrar' && activo) guardarGrupoDestino(activo);
+    else if (accion === 'eliminar' && activo) eliminarGrupoDestino(activo);
+}
+
+// ===== Destinos y Categorías (común a los 3 idiomas) =====
+// Los destinos del grupo elegido con sus categorías, y cuántos itinerarios tiene cada uno en
+// cada idioma: un 0 en un destino avisa que todavía no tiene versión en ese idioma. Un clic
+// en un conteo lleva a ese idioma, filtrado por ese destino / categoría.
+let clasifGrupo = null;
+const IDIOMAS_CLASIF = ['en', 'es', 'pt'];
+
+function renderClasificacionItin() {
+    const cont = document.getElementById('itin-clasif');
+    const chips = document.getElementById('itin-clasif-grupos');
+    if (!cont || !chips) return;
+    if (!gruposDestinoData.some(g => String(g.id) === clasifGrupo)) {
+        clasifGrupo = gruposDestinoData.some(g => String(g.id) === modulosGrupo) ? modulosGrupo : String(gruposDestinoData[0]?.id ?? '');
+    }
+    const grupo = gruposDestinoData.find(g => String(g.id) === clasifGrupo);
+    const destinos = destinosData.filter(d => String(d.grupo_id) === clasifGrupo).sort(ordenDestinosItin);
+    chips.innerHTML = gruposDestinoData.map(g => {
+        const activo = String(g.id) === clasifGrupo;
+        const n = destinosData.filter(d => String(d.grupo_id) === String(g.id)).length;
+        return `<button type="button" role="tab" aria-selected="${activo}" class="filtro-chip${activo ? ' is-activo' : ''}" data-clasif-grupo="${g.id}" title="${n} destino${n === 1 ? '' : 's'}"><i class="fas ${iconoGrupoDestino(g)}"></i>${escapeHtml(g.nombre)}<span class="filtro-chip-n">${n}</span></button>`;
+    }).join('');
+    renderAccionesGrupo('itin-clasif-grupos', grupo);
+
+    const banderas = window.BANDERAS_IDIOMA || {};
+    const conteos = (pred, idioma) => (modulosItinTodos[idioma] || []).filter(pred).length;
+    const celdas = (pred, { faltante = false, destino, categoria }) => IDIOMAS_CLASIF.map(idioma => {
+        const n = conteos(pred, idioma);
+        return `<button type="button" class="clasif-n${n === 0 ? (faltante ? ' is-falta' : ' is-cero') : ''}" data-ir-idioma="${idioma}" data-destino="${destino}" data-categoria="${categoria ?? ''}" title="${banderas[idioma]?.nombre || idioma}: ${n} itinerario${n === 1 ? '' : 's'} — ver">${n}</button>`;
+    }).join('');
+    const ed = arbolUI.editando;
+    const fila = (contenido, clase = '') => `<div class="clasif-fila${clase}">${contenido}</div>`;
+
+    let html = `<div class="clasif-fila is-cab">
+        <span>Destino / categoría</span>
+        ${IDIOMAS_CLASIF.map(i => `<span class="clasif-idioma" title="${banderas[i]?.nombre || i}"><span class="titulo-bandera">${banderas[i]?.svg || ''}</span>${i.toUpperCase()}</span>`).join('')}
+        <span></span>
+    </div>`;
+    destinos.forEach(d => {
+        const enD = it => Number(it.destino_id) === d.id;
+        html += ed?.tipo === 'destino' && ed.id === d.id
+            ? fila(formArbolHtml('editar-destino', 0, d), ' is-form')
+            : fila(`<span class="clasif-nombre is-destino"><i class="fas fa-location-dot"></i>${escapeHtml(d.nombre)}</span>${celdas(enD, { faltante: true, destino: d.id })}${botonesCrudItinHtml('destino', d.id, d.nombre)}`, ' is-destino');
+        itinCategoriasData.filter(c => c.destino_id === d.id).sort((a, b) => a.nombre.localeCompare(b.nombre)).forEach(c => {
+            html += ed?.tipo === 'categoria' && ed.id === c.id
+                ? fila(formArbolHtml('editar-categoria', 1, c), ' is-form')
+                : fila(`<span class="clasif-nombre"><span class="arbol-guia"></span>${escapeHtml(c.nombre)}</span>${celdas(it => enD(it) && Number(it.categoria_id) === c.id, { destino: d.id, categoria: c.id })}${botonesCrudItinHtml('categoria', c.id, c.nombre)}`);
+        });
+        const sinCat = it => enD(it) && !it.categoria_id;
+        if (IDIOMAS_CLASIF.some(i => conteos(sinCat, i))) {
+            html += fila(`<span class="clasif-nombre is-aviso"><span class="arbol-guia"></span>Sin categoría</span>${celdas(sinCat, { destino: d.id, categoria: 'sin' })}<span></span>`);
+        }
+        html += agregandoEn('categoria', d.id)
+            ? fila(formArbolHtml('categoria', 1), ' is-form')
+            : fila(`<button type="button" class="arbol-agregar" data-clasif-accion="nueva-categoria" data-destino="${d.id}"><i class="fas fa-plus"></i>Categoría en ${escapeHtml(d.nombre)}</button>`, ' is-agregar');
+    });
+    if (!destinos.length) html += `<p class="arbol-vacio clasif-vacio">Aún no hay destinos en ${escapeHtml(grupo?.nombre || 'este grupo')}.</p>`;
+    html += agregandoEn('destino')
+        ? fila(formArbolHtml('destino', 0), ' is-form is-pie')
+        : `<div class="clasif-pie"><button type="button" class="cat-new-btn" data-clasif-accion="nuevo-destino"><i class="fas fa-plus"></i>Nuevo destino en ${escapeHtml(grupo?.nombre || '')}</button></div>`;
+    cont.innerHTML = html;
+    if (seccionItinActual() === 'clasificacion' && (arbolUI.agregando || arbolUI.editando)) cont.querySelector('.arbol-input')?.focus();
+}
+
+function initClasificacionItin() {
+    const cont = document.getElementById('itin-clasif');
+    const chips = document.getElementById('itin-clasif-grupos');
+    if (!cont || !chips) return;
+    chips.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-clasif-grupo]');
+        if (chip) {
+            clasifGrupo = chip.dataset.clasifGrupo;
+            arbolUI.agregando = null;
+            arbolUI.editando = null;
+            renderClasificacionItin();
+            return;
+        }
+        accionGrupoItin(e, gruposDestinoData.find(g => String(g.id) === clasifGrupo), (id) => { clasifGrupo = id; });
+    });
+    cont.addEventListener('click', (e) => {
+        if (manejarCrudItin(e)) return;
+        const ir = e.target.closest('[data-ir-idioma]');
+        if (ir) {
+            // Al idioma, en Itinerarios, filtrado por ese destino / categoría.
+            const cat = ir.dataset.categoria;
+            modulosGrupo = clasifGrupo;
+            modulosNodo = { destino: Number(ir.dataset.destino), categoria: cat === 'sin' ? 'sin' : cat ? Number(cat) : null };
+            document.querySelector(`#vista-itinerarios .itin-idioma[data-idioma="${ir.dataset.irIdioma}"]`)?.click();
+            mostrarSeccionItinerarios('modulos');
+            renderModulosTable();
+            return;
+        }
+        const accion = e.target.closest('[data-clasif-accion]');
+        if (accion?.dataset.clasifAccion === 'nuevo-destino') abrirAltaItin({ tipo: 'destino', grupo: clasifGrupo });
+        else if (accion?.dataset.clasifAccion === 'nueva-categoria') abrirAltaItin({ tipo: 'categoria', destino: Number(accion.dataset.destino) });
+    });
+    cont.addEventListener('keydown', teclasFormItin);
 }
 
 async function init() {
     await cargarDatosIniciales();
-    // Vista "Itinerarios": arranca en inglés (mismo idioma por defecto que el Cotizador);
-    // las pestañas .idioma-tab de esa vista cambian de idioma (las maneja itinerario.js).
-    await initItinerario('en');
+    // Vista "Itinerarios": arranca en el idioma de la URL o en inglés (mismo idioma por
+    // defecto que el Cotizador), en la sección y el grupo de la URL si vienen.
+    const paramsItin = new URLSearchParams(location.search);
+    const idiomaItin = ['en', 'es', 'pt'].includes(paramsItin.get('idioma')) ? paramsItin.get('idioma') : 'en';
+    if (paramsItin.get('grupo')) modulosGrupo = paramsItin.get('grupo');
+    if (paramsItin.get('destino')) {
+        const cat = paramsItin.get('categoria');
+        modulosNodo = { destino: Number(paramsItin.get('destino')), categoria: cat === 'sin' ? 'sin' : cat ? Number(cat) : null };
+    }
+    pintarIdiomaItinerarios(idiomaItin);
+    await initItinerario(idiomaItin);
+    if (window.APP_CONFIG.vista === 'itinerarios') mostrarSeccionItinerarios(paramsItin.get('seccion'));
     if (window.APP_CONFIG.vista === 'paquetes') cargarPaquetes();
     actualizarConteosItinerarios();
 
@@ -2011,21 +2411,6 @@ async function init() {
             CLASIF_CTX.moneda.tipoActivo = btn.dataset.categoriaTipo;
             renderCategorias(CLASIF_CTX.moneda);
         });
-    });
-    // Itinerarios > Destinos y Categorías: el destino nuevo nace en el grupo abierto (Con /
-    // Sin pernocte); las categorías son las de Itinerarios.
-    document.getElementById('itin-destino-new-add').addEventListener('click', async () => {
-        const ok = await guardarDestino({
-            nombre: document.getElementById('itin-destino-new-nombre').value.trim(),
-            grupo_id: Number(CLASIF_CTX.itin.grupoActivo)
-        });
-        if (ok) document.getElementById('itin-destino-new-nombre').value = '';
-    });
-    document.getElementById('itin-categoria-new-add').addEventListener('click', async () => {
-        const ctx = CLASIF_CTX.itin;
-        if (!ctx.destinoSeleccionadoId) { notifyError('Selecciona un destino primero.'); return; }
-        const ok = await guardarCategoria('itinerarios', { destino_id: ctx.destinoSeleccionadoId, nombre: document.getElementById('itin-categoria-new-nombre').value.trim() });
-        if (ok) document.getElementById('itin-categoria-new-nombre').value = '';
     });
     initPestanasItinerarios();
     document.getElementById('hotel-new-add').addEventListener('click', async () => {
