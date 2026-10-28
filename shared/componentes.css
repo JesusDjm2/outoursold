@@ -1,0 +1,486 @@
+/* =====================================================================================
+   Componentes de Gestión de Datos (shared/componentes.css)
+   Una sola fuente para el aspecto de todas las vistas de gestión (Gestión USD / PEN,
+   Itinerarios, Paquetes) y de las que se agreguen: las vistas solo combinan estas clases,
+   sin estilos propios ni style="...". Los colores de marca salen de la agencia
+   (--accent-1 / --accent-2 en el <body>, ver resolverAccentColorStyle).
+
+   Índice
+     1. Tokens
+     2. Pestañas de vista (.vista-tabs / .vista-tab)
+     3. Menú lateral (.vista-layout / .vista-menu)
+     4. Banderas de idioma
+     5. Chips de filtro y acciones de grupo
+     6. Maestro-detalle: árbol + lista (.md / .md-arbol / .arbol-* / .md-miga)
+     7. Formularios en línea (.arbol-form)
+     8. Tabla de clasificación (.clasif-*)
+     9. Avisos, paneles, listas y etiquetas
+    10. Registros (tarjetas de una lista: paquetes)
+   ===================================================================================== */
+
+/* ---------- 1. Tokens ----------
+   En el <body> (no en :root) para que tomen el color de la agencia que se inyecta ahí. */
+body {
+    --ui-acento: var(--accent-1, #e80c13);
+    --ui-acento-2: var(--accent-2, #bb3135);
+    --ui-degradado: linear-gradient(90deg, var(--ui-acento), var(--ui-acento-2));
+    --ui-degradado-v: linear-gradient(180deg, var(--ui-acento), var(--ui-acento-2));
+    --ui-acento-suave: color-mix(in srgb, var(--ui-acento) 10%, white);
+    --ui-sombra-acento: 0 2px 6px color-mix(in srgb, var(--ui-acento) 30%, transparent);
+    --ui-tinta: #0f172a;
+    --ui-texto: #334155;
+    --ui-texto-2: #475569;
+    --ui-mute: #64748b;
+    --ui-tenue: #94a3b8;
+    --ui-borde: #e2e8f0;
+    --ui-borde-suave: #f1f5f9;
+    --ui-fondo-suave: #f8fafc;
+    --ui-aviso: #b45309;
+    --ui-aviso-fondo: #fffbeb;
+    --ui-aviso-borde: #fde68a;
+}
+
+/* ---------- 2. Pestañas de vista ----------
+   Primer nivel dentro de una vista (secciones o idiomas): pestañas subrayadas con el
+   degradado de la agencia. .is-aparte + .vista-tabs-sep separan una pestaña de las demás
+   (ej. Destinos y Categorías, común a los 3 idiomas). Activa: .active. */
+.vista-tabs {
+    display: flex; gap: 2px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--ui-borde);
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.vista-tabs::-webkit-scrollbar { display: none; }
+.vista-tab {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 10px 16px 12px;
+    font-size: 0.92rem; font-weight: 600; color: var(--ui-mute);
+    white-space: nowrap;
+    transition: color 0.15s;
+}
+.vista-tab i { font-size: 0.82rem; }
+.vista-tab:hover { color: var(--ui-tinta); }
+.vista-tab.active { color: var(--ui-acento); }
+.vista-tab.active::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--ui-degradado);
+}
+.vista-tab:focus-visible { outline: 2px solid var(--ui-acento); outline-offset: -2px; border-radius: 6px; }
+.vista-tab .vista-tab-n {
+    min-width: 22px; padding: 1px 7px;
+    border-radius: 999px; background: var(--ui-borde-suave);
+    font-size: 0.7rem; font-weight: 700; text-align: center; color: var(--ui-mute); font-variant-numeric: tabular-nums;
+}
+.vista-tab.active .vista-tab-n { background: var(--ui-acento-suave); color: var(--ui-acento); }
+.vista-tabs-sep { flex-shrink: 0; width: 1px; margin: 10px 8px; background: var(--ui-borde); }
+/* Con la pestaña aparte abierta, ningún idioma se marca. */
+.vista-tabs.is-comun .vista-tab[data-idioma].active { color: var(--ui-mute); }
+.vista-tabs.is-comun .vista-tab[data-idioma].active::after { display: none; }
+.vista-resumen { margin: -8px 0 14px; font-size: 0.75rem; color: var(--ui-mute); }
+.vista-resumen:empty { display: none; }
+@media (max-width: 640px) {
+    .vista-tab { padding: 9px 12px 11px; font-size: 0.86rem; }
+}
+
+/* ---------- 3. Menú lateral ----------
+   Segundo nivel: menú a la izquierda del contenido; en pantallas medianas pasa a ser una
+   fila horizontal sobre el contenido. .is-comun en el layout lo oculta (vista sin menú). */
+.vista-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 20px; align-items: start; }
+.vista-contenido { min-width: 0; }
+.vista-menu {
+    position: sticky; top: 16px;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px;
+    border: 1px solid var(--muted-border, var(--ui-borde));
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
+}
+.vista-menu-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 0.86rem; font-weight: 500; color: var(--ui-texto-2); text-align: left;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+.vista-menu-item i { width: 16px; text-align: center; font-size: 0.82rem; color: var(--ui-tenue); }
+.vista-menu-item:hover { background: var(--ui-borde-suave); color: var(--ui-tinta); }
+.vista-menu-item.is-activo { background: var(--ui-degradado); color: #fff; font-weight: 600; box-shadow: var(--ui-sombra-acento); }
+.vista-menu-item.is-activo i { color: inherit; }
+.vista-menu-item:focus-visible { outline: 2px solid var(--ui-acento); outline-offset: 1px; }
+.vista-menu-n {
+    margin-left: auto; min-width: 22px; padding: 1px 7px;
+    border-radius: 999px; background: var(--ui-borde-suave);
+    font-size: 0.7rem; font-weight: 700; text-align: center; color: var(--ui-mute); font-variant-numeric: tabular-nums;
+}
+.vista-menu-n:empty { display: none; }
+.vista-menu-item.is-activo .vista-menu-n { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.vista-layout.is-comun { grid-template-columns: minmax(0, 1fr); }
+.vista-layout.is-comun .vista-menu { display: none; }
+@media (max-width: 1279px) {
+    .vista-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    .vista-menu { position: static; flex-direction: row; align-items: center; gap: 4px; padding: 5px; overflow-x: auto; scrollbar-width: none; }
+    .vista-menu::-webkit-scrollbar { display: none; }
+    .vista-menu-item { width: auto; flex-shrink: 0; padding: 7px 12px; }
+}
+@media (max-width: 640px) {
+    .vista-menu-item { padding: 7px 10px; font-size: 0.82rem; }
+    .vista-menu-item i { display: none; }
+}
+
+/* ---------- 4. Banderas de idioma ---------- */
+.idioma-bandera, .titulo-bandera { display: inline-flex; flex-shrink: 0; overflow: hidden; border-radius: 2px; box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12); }
+.idioma-bandera svg, .titulo-bandera svg { width: 100%; height: 100%; display: block; }
+.idioma-bandera { width: 21px; height: 14px; }
+.titulo-bandera { width: 16px; height: 11px; margin: 0 5px 0 2px; vertical-align: -1px; }
+.cat-title-idioma { font-weight: 500; color: var(--ui-tenue); }
+.cat-title-idioma:empty { display: none; }
+
+/* ---------- 5. Chips de filtro y acciones de grupo ----------
+   Filtran el contenido de una tarjeta (grupos, tipos). Activo: .is-activo, con degradado. */
+.filtro-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.cat-filtros { padding: 0 20px 16px; }
+.filtro-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 6px 5px 12px;
+    border: 1px solid var(--ui-borde);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.8rem; font-weight: 600; color: var(--ui-texto-2);
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.filtro-chip i { font-size: 0.75rem; color: var(--ui-tenue); }
+.filtro-chip:hover { border-color: color-mix(in srgb, var(--ui-acento) 45%, white); color: var(--ui-acento); }
+.filtro-chip-n {
+    min-width: 22px; padding: 1px 7px;
+    border-radius: 999px; background: var(--ui-borde-suave);
+    font-size: 0.7rem; font-weight: 700; text-align: center; color: var(--ui-mute); font-variant-numeric: tabular-nums;
+}
+.filtro-chip.is-activo { border-color: transparent; background: var(--ui-degradado); color: #fff; box-shadow: var(--ui-sombra-acento); }
+.filtro-chip.is-activo i { color: inherit; }
+.filtro-chip.is-activo .filtro-chip-n { background: rgba(255, 255, 255, 0.25); color: #fff; }
+.filtro-chip:focus-visible { outline: 2px solid var(--ui-acento); outline-offset: 2px; }
+/* Renombrar / eliminar el grupo abierto y "Nuevo grupo", al final de los chips. */
+.grupos-acciones { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; padding-left: 6px; border-left: 1px solid var(--ui-borde); }
+.grupo-accion { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--ui-tenue); font-size: 0.75rem; transition: background 0.15s, color 0.15s; }
+.grupo-accion:hover { background: var(--ui-borde-suave); color: var(--ui-texto); }
+.grupo-accion.is-peligro:hover { background: #fef2f2; color: #dc2626; }
+/* Renombrar / eliminar pegados al chip del grupo abierto. */
+.grupo-edicion { display: inline-flex; align-items: center; gap: 1px; margin-left: -2px; }
+.grupo-edicion .grupo-accion { width: 28px; height: 28px; border-radius: 999px; }
+.grupo-nuevo { display: inline-flex; align-items: center; gap: 6px; margin-left: 2px; padding: 5px 12px; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 0.8rem; font-weight: 500; color: var(--ui-mute); white-space: nowrap; transition: border-color 0.15s, color 0.15s, background 0.15s; }
+.grupo-nuevo:hover { border-color: var(--ui-acento); color: var(--ui-acento); background: var(--ui-acento-suave); }
+@media (max-width: 640px) {
+    .cat-filtros { padding: 0 14px 12px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .cat-filtros::-webkit-scrollbar { display: none; }
+}
+
+/* ---------- 6. Maestro-detalle: árbol + lista ----------
+   .md dentro de una tarjeta: árbol (.md-arbol) a la izquierda y el detalle (.md-lista) a la
+   derecha, con su miga (.md-miga). .sin-arbol oculta el árbol; en celular el árbol se pliega
+   bajo el botón de la miga (.arbol-abierto lo despliega). */
+.md { display: grid; grid-template-columns: 250px minmax(0, 1fr); border-top: 1px solid var(--ui-borde); }
+.md.sin-arbol { grid-template-columns: minmax(0, 1fr); }
+.md.sin-arbol .md-arbol { display: none; }
+.md-lista { min-width: 0; display: flex; flex-direction: column; }
+.md-arbol { min-width: 0; padding: 12px 10px 16px; border-right: 1px solid var(--ui-borde); background: #fbfcfe; }
+.md-detalle { min-width: 0; padding: 14px 18px 18px; }
+
+.arbol-cab { display: flex; align-items: center; justify-content: space-between; padding: 2px 6px 8px; }
+.arbol-cab > span { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-mute); }
+.arbol-mas {
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; color: #fff; font-size: 0.72rem;
+    background: var(--ui-degradado); box-shadow: var(--ui-sombra-acento);
+}
+.arbol-mas:hover { filter: brightness(1.08); }
+.arbol-lista { display: flex; flex-direction: column; gap: 1px; }
+.arbol-nodo {
+    position: relative;
+    display: flex; align-items: center; gap: 8px;
+    min-height: 34px; padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.84rem; color: var(--ui-texto);
+    cursor: pointer; -webkit-user-select: none; user-select: none;
+    transition: background 0.12s, color 0.12s;
+}
+.arbol-nodo.nivel-1 { min-height: 30px; padding-left: 28px; font-size: 0.8rem; color: var(--ui-texto-2); }
+.arbol-nodo:hover { background: var(--ui-borde-suave); }
+.arbol-nodo:focus-visible { outline: 2px solid var(--ui-acento); outline-offset: -2px; }
+.arbol-nodo.is-activo { background: var(--ui-acento-suave); color: var(--ui-acento); font-weight: 600; }
+.arbol-nodo.is-activo::before {
+    content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 3px 3px 0;
+    background: var(--ui-degradado-v);
+}
+.arbol-nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arbol-sub { display: block; margin-top: 1px; font-size: 0.7rem; font-weight: 400; color: var(--ui-tenue); }
+.arbol-caret { width: 10px; flex-shrink: 0; font-size: 0.62rem; color: var(--ui-tenue); transition: transform 0.15s; }
+.arbol-caret.is-abierto { transform: rotate(90deg); }
+.arbol-icono { width: 10px; flex-shrink: 0; font-size: 0.72rem; color: var(--ui-tenue); }
+.arbol-guia { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: #cbd5e1; }
+.arbol-nodo.is-activo .arbol-caret, .arbol-nodo.is-activo .arbol-icono { color: inherit; }
+.arbol-nodo.is-activo .arbol-guia { background: var(--ui-acento); }
+.arbol-n {
+    flex-shrink: 0; min-width: 22px; padding: 1px 7px;
+    border-radius: 999px; background: #eef2f6;
+    font-size: 0.7rem; font-weight: 700; text-align: center; color: var(--ui-mute); font-variant-numeric: tabular-nums;
+}
+.arbol-n.is-cero { background: transparent; color: #cbd5e1; }
+.arbol-n i { margin-right: 4px; font-size: 0.62rem; }
+.arbol-nodo.is-activo .arbol-n:not(.is-cero) { background: var(--ui-acento); color: #fff; }
+.arbol-nodo.is-aviso .arbol-nombre { color: var(--ui-aviso); font-style: italic; }
+.arbol-nodo.is-aviso .arbol-guia { background: #f59e0b; }
+/* Editar / eliminar: aparecen al pasar el mouse (y siempre en el nodo activo en táctil),
+   en el lugar del conteo. */
+.arbol-crud { display: none; flex-shrink: 0; gap: 2px; }
+.arbol-crud button { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 0.68rem; color: var(--ui-mute); }
+.arbol-crud button:hover { background: #fff; color: var(--ui-tinta); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
+.arbol-crud button[data-crud="eliminar"]:hover { color: #dc2626; }
+.arbol-nodo:hover .arbol-crud, .arbol-nodo:focus-within .arbol-crud { display: inline-flex; }
+.arbol-nodo:hover .arbol-n, .arbol-nodo:focus-within .arbol-n { display: none; }
+@media (hover: none) {
+    .arbol-nodo:hover .arbol-crud { display: none; }
+    .arbol-nodo:hover .arbol-n { display: inline-block; }
+    .arbol-nodo.is-activo .arbol-crud { display: inline-flex; }
+}
+.arbol-agregar {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+    margin: 2px 0 4px; padding: 5px 8px 5px 28px;
+    border-radius: 8px; font-size: 0.76rem; font-weight: 600; color: var(--ui-mute);
+}
+.arbol-agregar i { font-size: 0.62rem; }
+.arbol-agregar:hover { color: var(--ui-acento); background: var(--ui-borde-suave); }
+.arbol-vacio { padding: 10px 8px; font-size: 0.78rem; line-height: 1.4; color: var(--ui-tenue); }
+
+/* Miga sobre el detalle: dónde estás (› ...) y un total. */
+.md-miga { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 10px 16px; border-bottom: 1px solid #eef2f6; font-size: 0.82rem; }
+.md-miga:empty { display: none; }
+.miga-pasos { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.miga-paso { color: var(--ui-mute); font-weight: 500; border-radius: 4px; }
+.miga-paso:hover { color: var(--ui-acento); text-decoration: underline; text-underline-offset: 3px; }
+.miga-actual { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ui-tinta); }
+.miga-sep { font-size: 0.55rem; color: #cbd5e1; }
+.miga-ayuda { font-size: 0.75rem; color: var(--ui-tenue); }
+.miga-n { margin-left: auto; font-size: 0.75rem; color: var(--ui-tenue); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.miga-extra { margin-left: auto; }
+.miga-arbol { display: none; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--ui-borde); border-radius: 8px; background: #fff; color: var(--ui-texto-2); font-size: 0.78rem; }
+.miga-arbol-caret { font-size: 0.6rem; transition: transform 0.15s; }
+.miga-arbol[aria-expanded="true"] { border-color: var(--ui-acento); color: var(--ui-acento); }
+.miga-arbol[aria-expanded="true"] .miga-arbol-caret { transform: rotate(180deg); }
+
+@media (max-width: 1023px) {
+    .md { grid-template-columns: 210px minmax(0, 1fr); }
+}
+/* Con el árbol al lado la lista es más angosta: entre tablet y laptop, las columnas de
+   clasificación de una tabla se apilan para que quepa sin scroll horizontal. */
+@media (min-width: 768px) and (max-width: 1439px) {
+    .md .cat-table { min-width: 0; }
+    .md .cat-clasif { grid-template-columns: minmax(0, 1fr); }
+    .md .cat-col-clasif { width: 170px; min-width: 150px; }
+    .md .cat-col-name { min-width: 170px; }
+}
+@media (max-width: 767px) {
+    .md { grid-template-columns: minmax(0, 1fr); }
+    .md-arbol { display: none; border-right: 0; border-bottom: 1px solid var(--ui-borde); order: 2; }
+    .md.arbol-abierto .md-arbol { display: block; }
+    .md.sin-pliegue .md-arbol { display: block; order: 0; }
+    .md-lista { display: contents; }
+    .md-miga { order: 1; padding: 10px 14px; }
+    .md-lista > .cat-table-wrap, .md-lista > .md-detalle { order: 3; }
+    .miga-arbol { display: inline-flex; }
+    .md.sin-pliegue .miga-arbol { display: none; }
+}
+
+/* ---------- 7. Formularios en línea ----------
+   Crear / renombrar dentro de un árbol, una tabla o una lista (input + Guardar / Cancelar). */
+.arbol-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 4px 6px; }
+.arbol-form.nivel-1 { padding-left: 24px; }
+.arbol-form input, .arbol-form select {
+    min-width: 0; height: 30px; padding: 0 8px;
+    border: 1px solid #cbd5e1; border-radius: 7px; background: #fff;
+    font-size: 0.8rem; color: var(--ui-tinta);
+}
+.arbol-form input { flex: 1 1 100%; }
+.arbol-form.en-linea input { flex: 1 1 160px; }
+.arbol-form select { flex: 1 1 0; }
+.arbol-form input:focus, .arbol-form select:focus { outline: none; border-color: var(--ui-acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-acento) 15%, transparent); }
+.arbol-form-btns { display: inline-flex; gap: 4px; margin-left: auto; }
+.arbol-form-btns button { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; border: 1px solid var(--ui-borde); background: #fff; font-size: 0.75rem; color: var(--ui-mute); }
+.arbol-form-btns [data-form-accion="guardar"] { border-color: transparent; color: #fff; background: var(--ui-degradado); }
+
+/* ---------- 8. Tabla de clasificación ----------
+   Filas de destino / categoría con columnas de conteo (por idioma, por tipo...). */
+.clasif-tabla { border-top: 1px solid var(--ui-borde); }
+.clasif-fila {
+    display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 56px) 64px;
+    align-items: center; gap: 4px;
+    min-height: 40px; padding: 5px 20px;
+    border-bottom: 1px solid var(--ui-borde-suave);
+}
+.clasif-fila.is-cab {
+    min-height: 36px; background: var(--ui-fondo-suave);
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ui-mute);
+}
+.clasif-idioma { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.clasif-fila.is-destino { border-top: 1px solid var(--ui-borde); background: #fbfcfe; }
+.clasif-fila.is-destino:first-of-type { border-top: 0; }
+.clasif-nombre { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 0.82rem; color: var(--ui-texto-2); padding-left: 22px; }
+.clasif-nombre.is-destino { padding-left: 0; font-size: 0.9rem; font-weight: 600; color: var(--ui-tinta); }
+.clasif-nombre.is-destino i { color: var(--ui-acento); font-size: 0.8rem; }
+.clasif-nombre.is-aviso { color: var(--ui-aviso); font-style: italic; }
+.clasif-nombre.is-aviso .arbol-guia { background: #f59e0b; }
+.clasif-n {
+    justify-self: center; min-width: 34px; padding: 2px 8px;
+    border-radius: 999px; background: #eef2f6;
+    font-size: 0.74rem; font-weight: 700; color: var(--ui-texto); font-variant-numeric: tabular-nums;
+    transition: background 0.15s, color 0.15s;
+}
+.clasif-n:hover { background: color-mix(in srgb, var(--ui-acento) 14%, white); color: var(--ui-acento); }
+.clasif-n.is-cero { background: transparent; color: #cbd5e1; }
+.clasif-n.is-falta { background: #fef3c7; color: var(--ui-aviso); }
+.clasif-fila .arbol-crud { display: inline-flex; justify-self: end; opacity: 0; transition: opacity 0.15s; }
+.clasif-fila:hover .arbol-crud, .clasif-fila:focus-within .arbol-crud { opacity: 1; }
+@media (hover: none) { .clasif-fila .arbol-crud { opacity: 1; } }
+.clasif-fila.is-form { grid-template-columns: minmax(0, 1fr); padding-top: 6px; padding-bottom: 6px; }
+.clasif-fila.is-form .arbol-form { padding: 0; max-width: 520px; }
+.clasif-fila.is-form .arbol-form input { flex: 1 1 220px; }
+.clasif-fila.is-agregar { grid-template-columns: minmax(0, 1fr); min-height: 0; padding-top: 0; padding-bottom: 6px; }
+.clasif-fila.is-agregar .arbol-agregar { padding-left: 22px; margin: 0; }
+.clasif-fila.is-alta { background: var(--ui-acento-suave); border-bottom-color: var(--ui-borde); }
+.clasif-vacio { padding: 14px 20px; }
+@media (max-width: 640px) {
+    .clasif-fila { grid-template-columns: minmax(0, 1fr) repeat(3, 40px) 54px; padding: 5px 12px; gap: 2px; }
+    .clasif-idioma { font-size: 0; gap: 0; }
+    .clasif-n { min-width: 30px; padding: 2px 6px; }
+}
+
+/* ---------- 9. Avisos, paneles, listas y etiquetas ---------- */
+/* Aviso ámbar: algo pendiente (ej. elementos sin categoría, falta crear destinos). */
+.aviso-bloque {
+    padding: 12px 14px;
+    border: 1px solid var(--ui-aviso-borde); border-radius: 10px;
+    background: var(--ui-aviso-fondo);
+    font-size: 0.82rem; color: #92400e;
+}
+.aviso-bloque.en-linea { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 20px 16px; }
+.aviso-bloque-titulo { margin-bottom: 6px; font-size: 0.76rem; font-weight: 700; color: #92400e; }
+.aviso-bloque-texto { margin-bottom: 6px; font-size: 0.76rem; color: var(--ui-aviso); }
+.aviso-bloque-btn { padding: 4px 10px; border: 1px solid #fcd34d; border-radius: 7px; font-size: 0.75rem; font-weight: 600; color: #92400e; white-space: nowrap; }
+.aviso-bloque-btn:hover { background: #fef3c7; }
+.texto-aviso { font-size: 0.75rem; color: #d97706; }
+
+/* Panel secundario dentro de un detalle (ej. asignados a una categoría). */
+.panel-sub { margin: 4px 0 10px 18px; padding: 12px 14px; border: 1px solid var(--ui-borde); border-radius: 10px; background: var(--ui-fondo-suave); }
+.panel-sub-titulo { margin-bottom: 8px; font-size: 0.74rem; font-weight: 700; color: var(--ui-texto-2); }
+
+/* Lista simple: nombre a la izquierda y un control a la derecha. */
+.lista-simple { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.lista-simple li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.82rem; color: var(--ui-texto); }
+.lista-simple li > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-mini { flex-shrink: 0; max-width: 55%; height: 28px; padding: 0 8px; border: 1px solid var(--ui-borde); border-radius: 7px; background: #fff; font-size: 0.76rem; color: var(--ui-texto); }
+.select-mini.is-ancho { width: 100%; max-width: none; height: 32px; }
+.select-mini:focus { outline: none; border-color: var(--ui-acento); }
+
+/* Fila de detalle (categoría con su conteo y acciones). */
+.fila-detalle { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 8px; border-radius: 8px; }
+.fila-detalle:hover { background: var(--ui-fondo-suave); }
+.fila-detalle .arbol-nombre { font-size: 0.86rem; color: var(--ui-texto); }
+.fila-detalle .arbol-crud { display: inline-flex; opacity: 0; transition: opacity 0.15s; }
+.fila-detalle:hover .arbol-crud, .fila-detalle:focus-within .arbol-crud { opacity: 1; }
+@media (hover: none) { .fila-detalle .arbol-crud { opacity: 1; } }
+.fila-detalle + .fila-detalle, .bloque-detalle + .bloque-detalle { border-top: 1px solid var(--ui-borde-suave); }
+.detalle-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.detalle-titulo { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ui-mute); }
+.detalle-titulo span { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ui-tenue); }
+
+/* Botón-conteo (abre / cierra un panel). */
+.conteo-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    padding: 3px 10px; border-radius: 999px; background: #eef2f6;
+    font-size: 0.74rem; font-weight: 600; color: var(--ui-texto-2);
+    transition: background 0.15s, color 0.15s;
+}
+.conteo-btn i { font-size: 0.68rem; color: var(--ui-tenue); }
+.conteo-btn:hover, .conteo-btn.is-abierto { background: var(--ui-acento-suave); color: var(--ui-acento); }
+.conteo-btn:hover i, .conteo-btn.is-abierto i { color: inherit; }
+.conteo-btn.is-cero { background: transparent; color: var(--ui-tenue); }
+
+/* Etiqueta (pill) con ícono; .is-acento con el color de la agencia. */
+.etiqueta { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; background: var(--ui-borde-suave); font-size: 0.72rem; font-weight: 500; color: var(--ui-texto-2); white-space: nowrap; }
+.etiqueta i { font-size: 0.66rem; }
+.etiqueta.is-acento { background: var(--ui-acento-suave); color: var(--ui-acento); font-weight: 600; }
+.etiquetas { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Estado vacío / cargando dentro de una tarjeta o tabla. */
+.texto-vacio { padding: 18px 12px; font-size: 0.82rem; text-align: center; color: var(--ui-tenue); }
+.texto-vacio.is-error { color: #dc2626; }
+.texto-tenue { color: var(--ui-tenue); }
+
+/* ---------- 10. Registros ----------
+   Tarjetas de una lista dentro de una tarjeta (ej. paquetes), con detalle desplegable. */
+.registros { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 20px; }
+.registro { padding: 12px 14px; border: 1px solid var(--ui-borde); border-radius: 10px; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
+.registro:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(2, 6, 23, 0.04); }
+.registro-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.registro-nombre { font-size: 0.9rem; font-weight: 600; color: var(--ui-tinta); }
+.registro-cab .etiquetas { margin-top: 6px; }
+.registro-cab .texto-aviso { margin-top: 6px; }
+.registro-detalle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ui-borde-suave); }
+.registro-detalle[hidden] { display: none; }
+@media (max-width: 767px) {
+    .registro-detalle { grid-template-columns: minmax(0, 1fr); }
+    .registros { padding: 0 14px 14px; }
+}
+.registro-cab > div:first-child { min-width: 0; }
+
+/* ---------- 11. Varios ---------- */
+/* Pila de tarjetas de una vista (ej. Paquetes USD y PEN). */
+.vista-pila { display: flex; flex-direction: column; gap: 24px; }
+/* Detalle a la derecha de un árbol (ej. categorías del destino elegido). */
+.md-detalle .aviso-bloque { margin-top: 12px; }
+.md-detalle > .arbol-form { margin-bottom: 8px; padding: 0; max-width: 520px; }
+/* Enlace dentro de un texto de ayuda. */
+.cat-link { color: var(--ui-acento); text-decoration: underline; text-underline-offset: 2px; }
+/* Ícono de candado (precios confidenciales) junto a una etiqueta. */
+.icono-candado { margin-right: 4px; font-size: 0.6rem; }
+
+/* Menú desplegable bajo un botón (ej. descargar CSV). .menu-ancla lo posiciona. */
+.menu-ancla { position: relative; }
+.menu-desplegable {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+    width: 16rem; overflow: hidden;
+    border: 1px solid var(--ui-borde); border-radius: 10px; background: #fff;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15);
+    font-size: 0.85rem;
+}
+.menu-desplegable-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 9px 12px; text-align: left; color: var(--ui-texto); }
+.menu-desplegable-item + .menu-desplegable-item { border-top: 1px solid var(--ui-borde-suave); }
+.menu-desplegable-item:hover { background: var(--ui-fondo-suave); }
+.menu-desplegable-item > i { margin-top: 3px; color: var(--ui-tenue); }
+.menu-desplegable-item small { display: block; font-size: 0.74rem; color: var(--ui-tenue); }
+
+/* Botón fijo abajo a la derecha (ej. "Guardar clasificación" con cambios pendientes). */
+.btn-flotante { position: fixed; right: 24px; bottom: 24px; z-index: 40; box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--ui-acento) 45%, transparent); }
+
+/* Detalle de un registro: secciones con título y lista. */
+.detalle-seccion-titulo { margin-bottom: 6px; font-size: 0.74rem; font-weight: 700; color: var(--ui-texto-2); }
+.detalle-seccion-titulo i { margin-right: 5px; color: var(--ui-tenue); }
+.lista-detalle { display: flex; flex-direction: column; gap: 3px; font-size: 0.82rem; color: var(--ui-texto); }
+.lista-detalle .texto-tenue { margin-right: 4px; }
+
+/* Etiqueta mini dentro de un texto (ej. "3 d." junto a un título). */
+.etiqueta-mini { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 4px; font-size: 0.62rem; font-weight: 500; vertical-align: 1px; background: var(--ui-borde-suave); color: var(--ui-texto-2); }
+.etiqueta-mini.is-verde { background: #d1fae5; color: #065f46; }
+
+/* Resumen de una importación CSV (dentro del diálogo de confirmación). */
+.csv-resumen { text-align: left; font-size: 0.875rem; }
+.csv-resumen-aviso { margin-top: 8px; color: var(--ui-aviso); }
+.csv-resumen-lista { max-height: 9rem; overflow-y: auto; margin-top: 6px; text-align: left; font-size: 0.75rem; }
+
+/* Estado oculto (.hidden, que el JS pone y quita): que ningún componente con su propio
+   display lo pise. */
+.aviso-bloque.hidden, .menu-desplegable.hidden, .texto-vacio.hidden, .btn-flotante.hidden { display: none; }

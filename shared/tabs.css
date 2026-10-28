@@ -49,8 +49,7 @@
 /* Contenedores de subpestañas: swipe horizontal táctil en pantallas chicas */
 #idioma-tabs,
 #itinerario-idioma-tabs,
-#itinerario-gestion-subtabs,
-.subnav-tabs-bar {
+#itinerario-gestion-subtabs {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -63,7 +62,6 @@
 }
 #idioma-tabs::-webkit-scrollbar,
 #itinerario-idioma-tabs::-webkit-scrollbar,
-#itinerario-gestion-subtabs::-webkit-scrollbar,
-.subnav-tabs-bar::-webkit-scrollbar {
+#itinerario-gestion-subtabs::-webkit-scrollbar {
     display: none;
 }

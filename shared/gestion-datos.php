@@ -38,6 +38,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
     <link rel="stylesheet" href="../shared/hero.css?v=<?= filemtime(__DIR__ . '/hero.css') ?>">
     <link rel="stylesheet" href="../itinerario/itinerario.css?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.css') ?>">
     <link rel="stylesheet" href="../shared/catalogo.css?v=<?= filemtime(__DIR__ . '/catalogo.css') ?>">
+    <link rel="stylesheet" href="../shared/componentes.css?v=<?= filemtime(__DIR__ . '/componentes.css') ?>">
 </head>
 <body<?= $accentColorStyle ? ' style="' . htmlspecialchars($accentColorStyle) . '"' : '' ?>>
     <?php require __DIR__ . '/sidebar.php'; ?>
@@ -75,21 +76,15 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
         <div id="gestion-section" class="<?= $vista === 'moneda' ? '' : 'hidden' ?>">
-            <div class="subnav-tabs-bar gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit">
-                <button class="subnav-tab active" data-subtab="clasificacion">
-                    <i class="fas fa-tags mr-1"></i> Destinos y Categorías
-                </button>
-                <button class="subnav-tab" data-subtab="tours">
-                    <i class="fas fa-map-marked-alt mr-1"></i> Tours
-                </button>
-                <button class="subnav-tab" data-subtab="hoteles">
-                    <i class="fas fa-hotel mr-1"></i> Hoteles
-                </button>
-                <button class="subnav-tab" data-subtab="cotizaciones">
-                    <i class="fas fa-folder-open mr-1"></i> Cotizaciones Guardadas
-                </button>
+            <!-- Mismas pestañas que Itinerarios (shared/componentes.css): Destinos y Categorías
+                 aparte y primero; después los catálogos, con su conteo (ver renderGestionResumen). -->
+            <div class="vista-tabs" id="gestion-tabs" role="tablist" aria-label="Secciones de Gestión">
+                <button type="button" role="tab" class="vista-tab is-aparte active" data-subtab="clasificacion"><i class="fas fa-tags"></i>Destinos y Categorías<span class="vista-tab-n" data-conteo-tab="clasificacion"></span></button>
+                <span class="vista-tabs-sep" aria-hidden="true"></span>
+                <button type="button" role="tab" class="vista-tab" data-subtab="tours"><i class="fas fa-person-hiking"></i>Tours<span class="vista-tab-n" data-conteo-tab="tours"></span></button>
+                <button type="button" role="tab" class="vista-tab" data-subtab="hoteles"><i class="fas fa-hotel"></i>Hoteles<span class="vista-tab-n" data-conteo-tab="hoteles"></span></button>
+                <button type="button" role="tab" class="vista-tab" data-subtab="cotizaciones"><i class="fas fa-folder-open"></i>Cotizaciones guardadas</button>
             </div>
-            <div id="gestion-resumen" class="text-xs text-slate-500 mb-3"></div>
 
             <div id="gestion-tours" class="subtab-content hidden">
                 <div class="card cat-card">
@@ -104,16 +99,16 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <input id="tours-search" type="text" placeholder="Buscar tour...">
                             </div>
                             <select id="tours-filtro-destino" class="cat-filter" aria-label="Filtrar por destino"></select>
-                            <div class="relative">
+                            <div class="menu-ancla">
                                 <button type="button" id="tours-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
-                                <div id="tours-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
-                                    <button type="button" id="tours-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
-                                        <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
-                                        <span>Mi catálogo actual<br><span class="text-xs text-slate-400">Lo que ya tienes cargado, para editarlo</span></span>
+                                <div id="tours-download-menu" class="csv-download-menu menu-desplegable hidden">
+                                    <button type="button" id="tours-export-btn" class="menu-desplegable-item">
+                                        <i class="fas fa-file-export"></i>
+                                        <span>Mi catálogo actual<small>Lo que ya tienes cargado, para editarlo</small></span>
                                     </button>
-                                    <a href="../shared/plantilla_tours.csv" download class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2 border-t">
-                                        <i class="fas fa-file-alt text-slate-400 mt-0.5"></i>
-                                        <span>Plantilla de ejemplo<br><span class="text-xs text-slate-400">Para armar tu catálogo desde cero</span></span>
+                                    <a href="../shared/plantilla_tours.csv" download class="menu-desplegable-item">
+                                        <i class="fas fa-file-alt"></i>
+                                        <span>Plantilla de ejemplo<small>Para armar tu catálogo desde cero</small></span>
                                     </a>
                                 </div>
                             </div>
@@ -122,9 +117,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             <button type="button" id="tours-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo tour</button>
                         </div>
                     </div>
-                    <div id="tours-sin-destinos-hint" class="cat-hint hidden p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
-                        <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus tours.</span>
-                        <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
+                    <div id="tours-sin-destinos-hint" class="aviso-bloque en-linea hidden">
+                        <span><i class="fas fa-circle-info"></i> Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus tours.</span>
+                        <button type="button" class="aviso-bloque-btn">Crear destino →</button>
                     </div>
                     <div id="tours-nuevo-panel" class="cat-new-panel hidden">
                         <h3>Nuevo tour</h3>
@@ -150,11 +145,11 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <input id="tour-new-ppromo" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <div class="cat-field cat-span-2">
-                                <label for="tour-new-pconf"><i class="fas fa-lock text-[9px] mr-1"></i>P. Confid.</label>
+                                <label for="tour-new-pconf"><i class="fas fa-lock icono-candado"></i>P. Confid.</label>
                                 <input id="tour-new-pconf" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <div class="cat-field cat-span-2">
-                                <label for="tour-new-pctotal"><i class="fas fa-lock text-[9px] mr-1"></i>P. C. Total</label>
+                                <label for="tour-new-pctotal"><i class="fas fa-lock icono-candado"></i>P. C. Total</label>
                                 <input id="tour-new-pctotal" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <p class="cat-form-hint"><i class="fas fa-lock mr-1"></i>Los precios confidenciales son de uso interno: nunca se muestran en la cotización salvo que se revelen a propósito.</p>
@@ -171,7 +166,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                     <th class="cat-col-name">Tour / Actividad</th>
                                     <th class="cat-col-clasif">Destino / Categoría</th>
                                     <th class="cat-col-precio">Precio venta</th>
-                                    <th class="cat-col-precio"><i class="fas fa-lock text-[9px] mr-1"></i>Confidencial</th>
+                                    <th class="cat-col-precio"><i class="fas fa-lock icono-candado"></i>Confidencial</th>
                                     <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -180,8 +175,8 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                     </div>
                     <div id="tours-paginacion" class="cat-pag" hidden></div>
                 </div>
-                <button id="tours-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
-                    <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="tours-guardar-count">0</span>)
+                <button id="tours-guardar-flotante" type="button" class="hidden btn btn-primary btn-flotante">
+                    <i class="fas fa-save"></i> Guardar clasificación (<span id="tours-guardar-count">0</span>)
                 </button>
             </div>
 
@@ -198,16 +193,16 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <input id="hoteles-search" type="text" placeholder="Buscar alojamiento...">
                             </div>
                             <select id="hoteles-filtro-destino" class="cat-filter" aria-label="Filtrar por destino"></select>
-                            <div class="relative">
+                            <div class="menu-ancla">
                                 <button type="button" id="hoteles-download-toggle" class="cat-icon-btn" title="Descargar CSV"><i class="fas fa-download"></i></button>
-                                <div id="hoteles-download-menu" class="csv-download-menu hidden absolute right-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-20 text-sm overflow-hidden">
-                                    <button type="button" id="hoteles-export-btn" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2">
-                                        <i class="fas fa-file-export text-slate-400 mt-0.5"></i>
-                                        <span>Mi catálogo actual<br><span class="text-xs text-slate-400">Lo que ya tienes cargado, para editarlo</span></span>
+                                <div id="hoteles-download-menu" class="csv-download-menu menu-desplegable hidden">
+                                    <button type="button" id="hoteles-export-btn" class="menu-desplegable-item">
+                                        <i class="fas fa-file-export"></i>
+                                        <span>Mi catálogo actual<small>Lo que ya tienes cargado, para editarlo</small></span>
                                     </button>
-                                    <a href="../shared/plantilla_hoteles.csv" download class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-start gap-2 border-t">
-                                        <i class="fas fa-file-alt text-slate-400 mt-0.5"></i>
-                                        <span>Plantilla de ejemplo<br><span class="text-xs text-slate-400">Para armar tu catálogo desde cero</span></span>
+                                    <a href="../shared/plantilla_hoteles.csv" download class="menu-desplegable-item">
+                                        <i class="fas fa-file-alt"></i>
+                                        <span>Plantilla de ejemplo<small>Para armar tu catálogo desde cero</small></span>
                                     </a>
                                 </div>
                             </div>
@@ -216,9 +211,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             <button type="button" id="hoteles-nuevo-toggle" class="cat-new-btn"><i class="fas fa-plus"></i>Nuevo alojamiento</button>
                         </div>
                     </div>
-                    <div id="hoteles-sin-destinos-hint" class="cat-hint hidden p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm flex items-center justify-between gap-3 flex-wrap">
-                        <span><i class="fas fa-circle-info mr-1"></i>Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus alojamientos.</span>
-                        <button type="button" class="text-xs px-2.5 py-1 rounded-md border border-amber-300 hover:bg-amber-100 whitespace-nowrap">Crear destino →</button>
+                    <div id="hoteles-sin-destinos-hint" class="aviso-bloque en-linea hidden">
+                        <span><i class="fas fa-circle-info"></i> Aún no hay destinos ni categorías creados. Es recomendable crearlos primero para poder clasificar tus alojamientos.</span>
+                        <button type="button" class="aviso-bloque-btn">Crear destino →</button>
                     </div>
                     <div id="hoteles-nuevo-panel" class="cat-new-panel hidden">
                         <h3>Nuevo alojamiento</h3>
@@ -244,11 +239,11 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <input id="hotel-new-ppromo" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <div class="cat-field cat-span-2">
-                                <label for="hotel-new-pconf"><i class="fas fa-lock text-[9px] mr-1"></i>P. Confid.</label>
+                                <label for="hotel-new-pconf"><i class="fas fa-lock icono-candado"></i>P. Confid.</label>
                                 <input id="hotel-new-pconf" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <div class="cat-field cat-span-2">
-                                <label for="hotel-new-pctotal"><i class="fas fa-lock text-[9px] mr-1"></i>P. C. Total</label>
+                                <label for="hotel-new-pctotal"><i class="fas fa-lock icono-candado"></i>P. C. Total</label>
                                 <input id="hotel-new-pctotal" type="number" step="0.01" placeholder="0.00">
                             </div>
                             <p class="cat-form-hint"><i class="fas fa-lock mr-1"></i>Los precios confidenciales son de uso interno: nunca se muestran en la cotización salvo que se revelen a propósito.</p>
@@ -265,7 +260,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                     <th class="cat-col-name">Alojamiento</th>
                                     <th class="cat-col-clasif">Destino / Categoría</th>
                                     <th class="cat-col-precio">Precio venta</th>
-                                    <th class="cat-col-precio"><i class="fas fa-lock text-[9px] mr-1"></i>Confidencial</th>
+                                    <th class="cat-col-precio"><i class="fas fa-lock icono-candado"></i>Confidencial</th>
                                     <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
@@ -274,96 +269,111 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                     </div>
                     <div id="hoteles-paginacion" class="cat-pag" hidden></div>
                 </div>
-                <button id="hoteles-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
-                    <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="hoteles-guardar-count">0</span>)
+                <button id="hoteles-guardar-flotante" type="button" class="hidden btn btn-primary btn-flotante">
+                    <i class="fas fa-save"></i> Guardar clasificación (<span id="hoteles-guardar-count">0</span>)
                 </button>
             </div>
 
             <div id="gestion-clasificacion" class="subtab-content">
-                <div class="card p-6">
-                    <h2 class="text-base font-semibold text-slate-800 mb-1">Destinos y Categorías</h2>
-                    <p class="text-sm text-slate-500 mb-4">Los destinos son compartidos por Actividades, Hoteles e Itinerarios. Cada destino muestra cuántas actividades y hoteles tiene; elige uno a la izquierda para ver y gestionar sus categorías. Las categorías de itinerarios y los grupos Con / Sin hotel se gestionan en la pestaña <a href="gestion.php?vista=itinerarios" class="underline">Itinerarios</a>.</p>
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                        <div class="lg:col-span-4 border rounded-lg p-3">
-                            <h3 class="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Destinos</h3>
-                            <div class="flex gap-2 mb-3">
-                                <input id="destino-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nuevo destino (ej. Cusco)">
-                                <button id="destino-new-add" class="btn btn-primary px-3" title="Agregar destino"><i class="fas fa-plus"></i></button>
-                            </div>
-                            <div id="destinos-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
+                <div class="card cat-card">
+                    <div class="cat-header">
+                        <div>
+                            <h2 class="cat-title">Destinos y Categorías</h2>
+                            <p class="cat-subtitle">Los destinos son compartidos por Actividades y Hoteles; cada uno tiene sus propias categorías. Los de Itinerarios se gestionan en <a href="gestion.php?vista=itinerarios" class="cat-link">Itinerarios</a>.</p>
                         </div>
-                        <div class="lg:col-span-8 border rounded-lg p-3">
-                            <div class="flex items-center gap-3 mb-3 flex-wrap">
-                                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Categorías <span id="categorias-destino-actual" class="text-slate-400 normal-case font-normal"></span></h3>
-                                <div class="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1 sm:ml-auto">
-                                    <button class="categoria-tipo-tab active" data-categoria-tipo="tours">Actividades</button>
-                                    <button class="categoria-tipo-tab" data-categoria-tipo="hoteles">Hoteles</button>
+                    </div>
+                    <!-- Mismo maestro-detalle que Itinerarios: destinos a la izquierda y las
+                         categorías del elegido a la derecha (renderDestinosCtx / renderCategorias). -->
+                    <div class="md sin-pliegue">
+                        <aside class="md-arbol" aria-label="Destinos">
+                            <div class="arbol-cab">
+                                <span>Destinos</span>
+                                <button type="button" class="arbol-mas" id="destino-new-toggle" title="Nuevo destino"><i class="fas fa-plus"></i></button>
+                            </div>
+                            <div class="arbol-form" id="destino-new-wrap" hidden>
+                                <input id="destino-new-nombre" type="text" maxlength="100" placeholder="Nuevo destino (ej. Cusco)" aria-label="Nuevo destino">
+                                <span class="arbol-form-btns">
+                                    <button type="button" id="destino-new-add" data-form-accion="guardar" title="Agregar destino"><i class="fas fa-check"></i></button>
+                                    <button type="button" id="destino-new-cancel" title="Cancelar"><i class="fas fa-xmark"></i></button>
+                                </span>
+                            </div>
+                            <div id="destinos-table-body" class="arbol-lista" role="tree" aria-label="Destinos"></div>
+                        </aside>
+                        <div class="md-lista">
+                            <div class="md-miga">
+                                <span class="miga-pasos"><span class="miga-actual"><i class="fas fa-location-dot"></i><span id="categorias-destino-actual"></span></span></span>
+                                <div class="filtro-chips miga-extra" role="tablist" aria-label="Tipo de categoría">
+                                    <button type="button" role="tab" class="filtro-chip is-activo" data-categoria-tipo="tours">Actividades</button>
+                                    <button type="button" role="tab" class="filtro-chip" data-categoria-tipo="hoteles">Hoteles</button>
                                 </div>
                             </div>
-                            <p id="categorias-sin-destino" class="text-sm text-slate-500 hidden">Crea un destino para empezar a agregar categorías.</p>
-                            <div id="categorias-table-wrap">
-                                <div class="flex gap-2 mb-3">
-                                    <input id="categoria-new-nombre" class="input flex-1 rounded px-2 py-1 border text-sm" type="text" placeholder="Nueva categoría">
-                                    <button id="categoria-new-add" class="btn btn-primary px-3" title="Agregar categoría"><i class="fas fa-plus"></i></button>
+                            <div class="md-detalle">
+                                <p id="categorias-sin-destino" class="texto-vacio hidden">Crea un destino para empezar a agregar categorías.</p>
+                                <div id="categorias-table-wrap">
+                                    <div class="arbol-form en-linea">
+                                        <input id="categoria-new-nombre" type="text" maxlength="100" placeholder="Nueva categoría" aria-label="Nueva categoría">
+                                        <span class="arbol-form-btns">
+                                            <button type="button" id="categoria-new-add" data-form-accion="guardar" title="Agregar categoría"><i class="fas fa-plus"></i></button>
+                                        </span>
+                                    </div>
+                                    <div id="categorias-table-body"></div>
                                 </div>
-                                <div id="categorias-table-body" class="divide-y" style="max-height:420px; overflow-y:auto"></div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
             <!-- Cotizaciones Guardadas: antes pestaña del Cotizador, ahora acá — mismos ids
                  que usaba (cot-search, cot-nueva, cot-table-body, cot-page-info, cot-prev,
                  cot-next), ver shared/gestion-datos.js. -->
             <div id="gestion-cotizaciones" class="subtab-content hidden">
-                <div class="card p-6">
-                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-                        <h2 class="text-base font-semibold text-slate-800">Cotizaciones Guardadas de mi agencia</h2>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <div class="relative">
-                                <input id="cot-search" class="input rounded px-2 py-2 border pl-8 text-sm" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
-                                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <div class="card cat-card">
+                    <div class="cat-header">
+                        <div>
+                            <h2 class="cat-title">Cotizaciones guardadas</h2>
+                            <p class="cat-subtitle">De tu agencia<span id="cot-total"></span></p>
+                        </div>
+                        <div class="cat-tools">
+                            <div class="cat-search">
+                                <i class="fas fa-search"></i>
+                                <input id="cot-search" type="text" placeholder="Buscar por ID, nombre o contacto...">
                             </div>
-                            <button id="cot-nueva" class="btn btn-primary">
-                                <i class="fas fa-plus-circle mr-2"></i>Nueva Cotización
-                            </button>
+                            <button id="cot-nueva" type="button" class="cat-new-btn"><i class="fas fa-plus"></i>Nueva cotización</button>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full small" style="min-width:640px">
+                    <div class="cat-table-wrap">
+                        <table class="cat-table">
                             <thead>
                                 <tr>
-                                    <th class="text-left p-3">ID</th>
-                                    <th class="text-left p-3">Nombre PAX</th>
-                                    <th class="text-left p-3">Contacto</th>
-                                    <th class="text-left p-3">Fecha Cot.</th>
-                                    <th class="text-left p-3">N° PAX</th>
-                                    <th class="text-left p-3">Paquete</th>
-                                    <th class="text-right p-3 w-14">Acciones</th>
+                                    <th>ID</th>
+                                    <th>Nombre PAX</th>
+                                    <th>Contacto</th>
+                                    <th>Fecha cot.</th>
+                                    <th>N° PAX</th>
+                                    <th>Paquete</th>
+                                    <th class="cat-actions">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="cot-table-body"></tbody>
                         </table>
                     </div>
-                    <div class="flex justify-between items-center mt-4 text-sm text-slate-600">
-                        <span id="cot-page-info"></span>
-                        <div class="flex gap-2">
-                            <button id="cot-prev" class="btn border">Anterior</button>
-                            <button id="cot-next" class="btn border">Siguiente</button>
-                        </div>
+                    <div class="cat-pag">
+                        <div class="cat-pag-info"><span id="cot-page-info"></span></div>
+                        <nav class="cat-pag-nav" aria-label="Paginación">
+                            <button type="button" id="cot-prev" aria-label="Página anterior"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" id="cot-next" aria-label="Página siguiente"><i class="fas fa-chevron-right"></i></button>
+                        </nav>
                     </div>
                 </div>
             </div>
         </div>
-
         <!-- Vista "Itinerarios" (pestaña superior, ?vista=itinerarios): no depende de la moneda,
              sí del idioma — cada idioma tiene su propio catálogo de itinerarios y páginas fijas
              (las pestañas .idioma-tab las maneja itinerario.js). Mismos ids que la página
              standalone de Itinerario (itinerario/index.php); sus paneles internos usan
              itin-panel en vez de subtab-content para no chocar con las subpestañas de moneda. -->
         <div id="vista-itinerarios" class="<?= $vista === 'itinerarios' ? '' : 'hidden' ?>">
-            <!-- Primera pestaña: Destinos y Categorías, común a los 3 idiomas (una sola
+            <!-- Primera pestaña: Clasificación (grupo › destino › categoría), común a los 3 idiomas (una sola
                  clasificación para English, Español y Português). Después, una pestaña por
                  idioma con un menú lateral: Itinerarios y Páginas fijas de ese idioma. Ver initPestanasItinerarios en
                  gestion-datos.js; los botones .idioma-tab los maneja itinerario.js. -->
@@ -375,24 +385,24 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             ];
             ?>
             <script>window.BANDERAS_IDIOMA = <?= json_encode(array_map(fn($b) => ['nombre' => $b[0], 'svg' => $b[1]], $banderasIdioma), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;</script>
-            <div class="itin-idiomas" role="tablist" aria-label="Clasificación e idioma del catálogo">
-                <button type="button" role="tab" class="itin-idioma itin-tab-comun" data-itin-seccion="clasificacion" aria-selected="false" title="Comunes a los 3 idiomas">
-                    <i class="fas fa-tags"></i>Destinos y Categorías
+            <div class="vista-tabs" role="tablist" aria-label="Clasificación e idioma del catálogo">
+                <button type="button" role="tab" class="vista-tab is-aparte" data-itin-seccion="clasificacion" aria-selected="false" title="Con / Sin hotel › destinos › categorías, comunes a los 3 idiomas">
+                    <i class="fas fa-sitemap"></i>Clasificación
                 </button>
-                <span class="itin-idiomas-sep" aria-hidden="true"></span>
+                <span class="vista-tabs-sep" aria-hidden="true"></span>
                 <?php foreach ($banderasIdioma as $cod => [$nombre, $svg]): ?>
-                <button type="button" role="tab" class="idioma-tab itin-idioma<?= $cod === 'en' ? ' active' : '' ?>" data-idioma="<?= $cod ?>" aria-selected="<?= $cod === 'en' ? 'true' : 'false' ?>">
+                <button type="button" role="tab" class="idioma-tab vista-tab<?= $cod === 'en' ? ' active' : '' ?>" data-idioma="<?= $cod ?>" aria-selected="<?= $cod === 'en' ? 'true' : 'false' ?>">
                     <span class="idioma-bandera"><?= $svg ?></span><?= $nombre ?>
                 </button>
                 <?php endforeach; ?>
             </div>
 
-            <div class="itin-layout" id="itinerario-seccion-bar">
-                <nav class="itin-menu" aria-label="Secciones de Itinerarios">
-                    <button type="button" class="itin-menu-item is-activo" data-itin-seccion="modulos"><i class="fas fa-route"></i><span>Itinerarios</span><span class="itin-menu-n" data-conteo-seccion="modulos"></span></button>
-                    <button type="button" class="itin-menu-item" data-itin-seccion="paginas"><i class="fas fa-file-alt"></i><span>Páginas fijas</span><span class="itin-menu-n" data-conteo-seccion="paginas"></span></button>
+            <div class="vista-layout" id="itinerario-seccion-bar">
+                <nav class="vista-menu" aria-label="Secciones de Itinerarios">
+                    <button type="button" class="vista-menu-item is-activo" data-itin-seccion="modulos"><i class="fas fa-route"></i><span>Itinerarios</span><span class="vista-menu-n" data-conteo-seccion="modulos"></span></button>
+                    <button type="button" class="vista-menu-item" data-itin-seccion="paginas"><i class="fas fa-file-alt"></i><span>Páginas fijas</span><span class="vista-menu-n" data-conteo-seccion="paginas"></span></button>
                 </nav>
-                <div class="itin-contenido">
+                <div class="vista-contenido">
             <div id="gestion-itinerarios">
                 <!-- Itinerarios y Páginas fijas, del idioma elegido en la barra. Ambos se suben en
                      lote (varios PDF a la vez; el título sale del nombre del archivo, ver
@@ -462,8 +472,9 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-upload"></i>Subir PDFs</button>
                             </div>
                         </div>
-                        <!-- Primera clasificación, igual que en Destinos y Categorías: el grupo
-                             (chips que arma renderModulosGrupos en itinerario.js). -->
+                        <!-- Primera clasificación: el grupo (chips que arma renderModulosGrupos en
+                             itinerario.js). Aquí solo filtran: los grupos se crean y editan en
+                             la pestaña Clasificación. -->
                         <div class="filtro-chips cat-filtros" id="itinerario-modulos-grupos" role="tablist" aria-label="Grupos de destino"></div>
                         <div id="itinerarios-nuevo-panel" class="cat-new-panel hidden">
                             <h3>Subir itinerarios (PDF)</h3>
@@ -496,10 +507,10 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         <!-- Maestro-detalle: destinos y categorías del grupo abierto (árbol, con su
                              CRUD) y la lista filtrada por el nodo elegido. Ver
                              renderArbolItinerarios en gestion-datos.js y modulosNodo en itinerario.js. -->
-                        <div class="itin-md" id="itin-md">
-                            <aside class="itin-arbol" id="itin-arbol" aria-label="Destinos y categorías"></aside>
-                            <div class="itin-md-lista">
-                                <div class="itin-miga" id="itin-miga"></div>
+                        <div class="md" id="itin-md">
+                            <aside class="md-arbol" id="itin-arbol" aria-label="Destinos y categorías"></aside>
+                            <div class="md-lista">
+                                <div class="md-miga" id="itin-miga"></div>
                                 <div class="cat-table-wrap">
                                     <table class="cat-table">
                                         <thead>
@@ -515,21 +526,24 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                             </div>
                         </div>
                     </div>
-                    <button id="modulos-guardar-flotante" type="button" class="hidden fixed bottom-6 right-6 z-40 btn btn-primary shadow-lg">
-                        <i class="fas fa-save mr-2"></i>Guardar clasificación (<span id="modulos-guardar-count">0</span>)
+                    <button id="modulos-guardar-flotante" type="button" class="hidden btn btn-primary btn-flotante">
+                        <i class="fas fa-save"></i> Guardar clasificación (<span id="modulos-guardar-count">0</span>)
                     </button>
                 </div>
             </div>
 
-            <!-- Destinos y Categorías: una sola clasificación para los 3 idiomas, con cuántos
+            <!-- Clasificación (grupo › destino › categoría): una sola para los 3 idiomas, con cuántos
                  itinerarios tiene cada destino / categoría en cada idioma (ver
                  renderClasificacionItin en gestion-datos.js). -->
             <div id="itin-clasificacion" class="hidden">
                 <div class="card cat-card">
                     <div class="cat-header">
                         <div>
-                            <h2 class="cat-title">Destinos y Categorías</h2>
-                            <p class="cat-subtitle"><i class="fas fa-globe mr-1"></i>Comunes a los 3 idiomas: lo que crees aquí aparece en English, Español y Português.</p>
+                            <h2 class="cat-title">Clasificación</h2>
+                            <p class="cat-subtitle">Grupo (Con / Sin hotel…) <i class="fas fa-angle-right"></i> Destino <i class="fas fa-angle-right"></i> Categoría · <i class="fas fa-globe"></i> común a English, Español y Português</p>
+                        </div>
+                        <div class="cat-tools">
+                            <button type="button" class="cat-new-btn" id="clasif-nuevo-destino"><i class="fas fa-plus"></i><span>Nuevo destino</span></button>
                         </div>
                     </div>
                     <div class="filtro-chips cat-filtros" id="itin-clasif-grupos" role="tablist" aria-label="Grupos de destino"></div>
@@ -544,7 +558,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
              por moneda (usan los tours/hoteles de ese catálogo), así que se listan USD y PEN
              juntos. Acá solo se ven / eliminan; se crean y editan en el Cotizador de su moneda
              ("Guardar como paquete" / ?editarPaquete=ID, ver shared/cotizador.js). -->
-        <div id="vista-paquetes" class="<?= $vista === 'paquetes' ? '' : 'hidden' ?> space-y-6">
+        <div id="vista-paquetes" class="<?= $vista === 'paquetes' ? '' : 'hidden' ?> vista-pila">
             <div class="card cat-card">
                 <div class="cat-header">
                     <div>
@@ -555,7 +569,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         <a href="../usd/index.php" class="cat-new-btn" title="Arma Itinerario, Actividades y Hoteles en el Cotizador USD y usa «Guardar como paquete»"><i class="fas fa-plus"></i>Crear en el Cotizador USD</a>
                     </div>
                 </div>
-                <div id="paquetes-list-usd" class="space-y-2 p-5"></div>
+                <div id="paquetes-list-usd" class="registros"></div>
             </div>
             <div class="card cat-card">
                 <div class="cat-header">
@@ -567,7 +581,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                         <a href="../pen/index.php" class="cat-new-btn" title="Arma Itinerario, Actividades y Hoteles en el Cotizador PEN y usa «Guardar como paquete»"><i class="fas fa-plus"></i>Crear en el Cotizador PEN</a>
                     </div>
                 </div>
-                <div id="paquetes-list-pen" class="space-y-2 p-5"></div>
+                <div id="paquetes-list-pen" class="registros"></div>
             </div>
         </div>
         </div>

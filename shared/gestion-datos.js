@@ -57,7 +57,7 @@ const destinosActividadesHotelesGD = () => destinosData.filter(d => d.grupo_id =
 const CLASIF_CTX = {
     moneda: {
         ids: { destinos: 'destinos-table-body', categorias: 'categorias-table-body', sinDestino: 'categorias-sin-destino', tableWrap: 'categorias-table-wrap', actual: 'categorias-destino-actual' },
-        tipoTabsSelector: '.categoria-tipo-tab',
+        tipoTabsSelector: '[data-categoria-tipo]',
         tipos: ['tours', 'hoteles'],
         tipoActivo: 'tours',
         destinoSeleccionadoId: null,
@@ -100,15 +100,16 @@ async function cargarDatosIniciales() {
 }
 
 // Cambia de subpestaña dentro de Gestión USD / PEN (Destinos y Categorías / Tours /
-// Hoteles / Cotizaciones Guardadas) — misma lógica que el click en un .subnav-tab,
+// Hoteles / Cotizaciones Guardadas) — misma lógica que el click en una pestaña,
 // reutilizada por los avisos de "falta X". Itinerarios y Paquetes predefinidos ya no son
 // subpestañas: son vistas propias (pestañas superiores, ?vista=...), fuera de
 // #gestion-section.
 function irASubtabGestion(subtab) {
     if (typeof cerrarDropdownCotizaciones === 'function') cerrarDropdownCotizaciones();
     const contenedor = document.getElementById('gestion-section');
-    contenedor.querySelectorAll(':scope > div > .subnav-tab').forEach(t => {
+    document.querySelectorAll('#gestion-tabs .vista-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.subtab === subtab);
+        t.setAttribute('aria-selected', String(t.dataset.subtab === subtab));
     });
     contenedor.querySelectorAll('.subtab-content').forEach(c => c.classList.add('hidden'));
     document.getElementById(`gestion-${subtab}`).classList.remove('hidden');
@@ -140,17 +141,10 @@ function llenarSelectCategoria(select, categoriasDataset, destinoId, selectedId)
 
 // "3 destinos · 12 categorías · 45 tours · 8 paquetes" arriba de las subpestañas de
 // Gestión de Datos, para tener panorama general sin entrar a cada una.
+// Conteos en las pestañas de Gestión USD/PEN (destinos, tours, hoteles).
 function renderGestionResumen() {
-    const el = document.getElementById('gestion-resumen');
-    if (!el) return;
-    const nCategorias = categoriasData.length + categoriasHotelesData.length;
-    const pl = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
-    el.textContent = [
-        pl(destinosActividadesHotelesGD().length, 'destino', 'destinos'),
-        pl(nCategorias, 'categoría', 'categorías'),
-        pl(toursData.length, 'tour', 'tours'),
-        pl(hotelsData.length, 'hotel', 'hoteles')
-    ].join(' · ');
+    const n = { clasificacion: destinosActividadesHotelesGD().length, tours: toursData.length, hoteles: hotelsData.length };
+    document.querySelectorAll('#gestion-tabs [data-conteo-tab]').forEach(el => { el.textContent = n[el.dataset.conteoTab] ?? ''; });
 }
 
 // Aviso accionable cuando falta la data de la que depende la pestaña actual (ej. Tours sin
@@ -415,13 +409,13 @@ function buildTourRow(t) {
 // categoriasHotelesData (Hoteles) — cada tipo tiene su propio catálogo de categorías.
 function buildDestinoCategoriaSelector(categoriasDataset, destinoId, categoriaId) {
     const wrap = document.createElement('div');
-    wrap.className = 'grid grid-cols-2 gap-1';
+    wrap.className = 'selector-par';
     wrap.innerHTML = `
-        <select class="input w-full rounded px-2 py-1 border sel-destino-tour">
+        <select class="sel-destino-tour">
             <option value="">Destino...</option>
             ${destinosActividadesHotelesGD().map(d => `<option value="${d.id}">${d.nombre}</option>`).join('')}
         </select>
-        <select class="input w-full rounded px-2 py-1 border sel-categoria-tour" disabled>
+        <select class="sel-categoria-tour" disabled>
             <option value="">Categoría...</option>
         </select>
     `;
@@ -525,8 +519,7 @@ function renderDestinosCtx(ctx) {
     }
     listEl.innerHTML = '';
     if (visibles.length === 0) {
-        const vacio = 'Sin destinos registrados.';
-        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">${vacio}</p>`;
+        listEl.innerHTML = '<p class="arbol-vacio">Sin destinos todavía. Crea el primero con <i class="fas fa-plus"></i>.</p>';
     } else {
         visibles.forEach(d => listEl.appendChild(buildDestinoRow(ctx, d)));
     }
@@ -666,7 +659,7 @@ const enDestino = (destinoId) => (x) => Number(x.destino_id) === destinoId;
 const enCategoria = (categoriaId) => (x) => Number(x.categoria_id) === categoriaId;
 
 function chipConteo(icono, titulo, n, desglose) {
-    return `<span class="conteo-chip${n === 0 ? ' is-cero' : ''}" title="${titulo}${desglose ? ' — ' + desglose : ''}"><i class="fas ${icono}"></i>${n}</span>`;
+    return `<span class="arbol-n${n === 0 ? ' is-cero' : ''}" title="${titulo}: ${n}${desglose ? ' — ' + desglose : ''}"><i class="fas ${icono}"></i>${n}</span>`;
 }
 
 // Cuántos elementos de los tipos de este contexto (actividades y hoteles, o itinerarios)
@@ -684,27 +677,27 @@ function resumenDestino(ctx, destinoId) {
 
 function buildDestinoRow(ctx, d) {
     const div = document.createElement('div');
-    div.className = `destino-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg cursor-pointer ${d.id === ctx.destinoSeleccionadoId ? 'active' : ''}`;
+    const activo = d.id === ctx.destinoSeleccionadoId;
+    div.className = `arbol-nodo${activo ? ' is-activo' : ''}`;
+    div.setAttribute('role', 'treeitem');
+    div.setAttribute('aria-selected', String(activo));
+    div.tabIndex = 0;
     div.title = 'Ver categorías de este destino';
     const resumen = resumenDestino(ctx, d.id);
     div.innerHTML = `
-        <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-                <i class="fas fa-chevron-right text-xs text-slate-300"></i>
-                <span class="destino-nombre font-medium truncate">${escapeHtml(d.nombre)}</span>
-            </div>
-            <div class="pl-4 mt-1 flex flex-wrap gap-1">${resumen.chips}</div>
-            <div class="text-xs text-slate-400 pl-4 mt-0.5">${resumen.categorias}</div>
-        </div>
-        <div class="flex items-center gap-1 shrink-0 destino-acciones">
-            <button class="text-slate-400 hover:text-slate-700 p-1" title="Editar"><i class="fas fa-pen text-xs"></i></button>
-            <button class="text-red-400 hover:text-red-600 p-1" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
-        </div>
+        <i class="fas fa-location-dot arbol-icono" aria-hidden="true"></i>
+        <span class="arbol-nombre">${escapeHtml(d.nombre)}<span class="arbol-sub">${resumen.categorias}</span></span>
+        ${resumen.chips}
+        <span class="arbol-crud">
+            <button type="button" data-crud="editar" title="Editar «${escapeHtml(d.nombre)}»"><i class="fas fa-pen"></i></button>
+            <button type="button" data-crud="eliminar" title="Eliminar «${escapeHtml(d.nombre)}»"><i class="fas fa-trash"></i></button>
+        </span>
     `;
     div.addEventListener('click', () => {
         ctx.destinoSeleccionadoId = d.id;
         renderDestinosCtx(ctx);
     });
+    div.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === div) { e.preventDefault(); div.click(); } });
     const [editBtn, delBtn] = div.querySelectorAll('button');
     editBtn.addEventListener('click', (e) => { e.stopPropagation(); div.replaceWith(buildDestinoEditRow(ctx, d)); });
     delBtn.addEventListener('click', (e) => { e.stopPropagation(); eliminarDestino(d); });
@@ -712,17 +705,9 @@ function buildDestinoRow(ctx, d) {
 }
 
 function buildDestinoEditRow(ctx, d) {
-    const div = document.createElement('div');
-    div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
-    div.innerHTML = `
-        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${escapeHtml(d.nombre)}">
-        <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
-        <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
-    `;
-    const nombreI = div.querySelector('input');
-    const [saveBtn, cancelBtn] = div.querySelectorAll('button');
-    saveBtn.addEventListener('click', () => guardarDestino({ id: d.id, nombre: nombreI.value.trim() }));
-    cancelBtn.addEventListener('click', () => div.replaceWith(buildDestinoRow(ctx, d)));
+    const div = formEnLinea(d.nombre,
+        (nombre) => guardarDestino({ id: d.id, nombre }),
+        () => div.replaceWith(buildDestinoRow(ctx, d)));
     return div;
 }
 
@@ -785,13 +770,15 @@ function renderCategorias(ctx) {
     const tableWrap = document.getElementById(ctx.ids.tableWrap);
     if (!listEl) return;
     const destino = destinosData.find(d => d.id === ctx.destinoSeleccionadoId);
-    document.getElementById(ctx.ids.actual).textContent = destino ? `· ${destino.nombre}` : '';
-    // Cada pestaña muestra cuántos elementos de ese tipo tiene el destino elegido.
+    document.getElementById(ctx.ids.actual).textContent = destino ? destino.nombre : 'Sin destino';
+    // Cada chip de tipo muestra cuántos elementos de ese tipo tiene el destino elegido.
     if (ctx.tipoTabsSelector) document.querySelectorAll(ctx.tipoTabsSelector).forEach(btn => {
         const t = CATEGORIA_TIPOS[btn.dataset.categoriaTipo];
-        btn.classList.toggle('active', btn.dataset.categoriaTipo === ctx.tipoActivo);
-        const badge = destino ? `<span class="conteo-badge" title="${t.items(enDestino(destino.id)).desglose || ''}">${t.items(enDestino(destino.id)).total}</span>` : '';
-        btn.innerHTML = `${t.label}${badge}`;
+        const activo = btn.dataset.categoriaTipo === ctx.tipoActivo;
+        btn.classList.toggle('is-activo', activo);
+        btn.setAttribute('aria-selected', String(activo));
+        const badge = destino ? `<span class="filtro-chip-n" title="${t.items(enDestino(destino.id)).desglose || ''}">${t.items(enDestino(destino.id)).total}</span>` : '';
+        btn.innerHTML = `<i class="fas ${t.icono}"></i>${t.label}${badge}`;
     });
     if (!destino) {
         listEl.innerHTML = '';
@@ -807,7 +794,7 @@ function renderCategorias(ctx) {
         .filter(c => c.destino_id === ctx.destinoSeleccionadoId)
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
     if (visibles.length === 0) {
-        listEl.innerHTML = `<p class="p-3 text-center text-slate-400 text-sm">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${escapeHtml(destino.nombre)}" todavía.</p>`;
+        listEl.innerHTML = `<p class="texto-vacio">Sin categorías de ${CATEGORIA_TIPOS[tipo].label.toLowerCase()} para "${escapeHtml(destino.nombre)}" todavía.</p>`;
     } else {
         visibles.forEach(c => listEl.appendChild(buildCategoriaRow(ctx, tipo, c)));
     }
@@ -825,17 +812,17 @@ function construirBloqueSinCategoria(tipo, destino, categorias) {
         .filter(x => Number(x.destino_id) === destino.id && x.categoria_id == null)
         .sort((a, b) => a.nombre.localeCompare(b.nombre) || (a.idioma || '').localeCompare(b.idioma || ''));
     if (!pendientes.length) return null;
-    const bloque = crearNodo('div', 'sin-categoria-bloque mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50');
-    bloque.appendChild(crearNodo('div', 'text-xs font-semibold text-amber-800 mb-2', `Sin categoría en "${destino.nombre}" (${pendientes.length} ${t.sustantivo[pendientes.length === 1 ? 0 : 1]})`));
+    const bloque = crearNodo('div', 'aviso-bloque');
+    bloque.appendChild(crearNodo('div', 'aviso-bloque-titulo', `Sin categoría en "${destino.nombre}" (${pendientes.length} ${t.sustantivo[pendientes.length === 1 ? 0 : 1]})`));
     if (!categorias.length) {
-        bloque.appendChild(crearNodo('p', 'text-xs text-amber-700 mb-2', 'Crea una categoría arriba para poder clasificarlos.'));
+        bloque.appendChild(crearNodo('p', 'aviso-bloque-texto', 'Crea una categoría arriba para poder clasificarlos.'));
     }
-    const ul = crearNodo('ul', 'space-y-1');
+    const ul = crearNodo('ul', 'lista-simple');
     pendientes.forEach(x => {
-        const li = crearNodo('li', 'flex items-center justify-between gap-2 text-sm');
-        li.appendChild(crearNodo('span', 'min-w-0 truncate', etiqueta(x)));
+        const li = crearNodo('li');
+        li.appendChild(crearNodo('span', null, etiqueta(x)));
         if (categorias.length) {
-            const sel = crearNodo('select', 'rounded-md small border px-2 py-0.5 shrink-0 bg-white');
+            const sel = crearNodo('select', 'select-mini');
             sel.title = 'Asignar a una categoría de este destino';
             sel.appendChild(new Option('Asignar a…', ''));
             categorias.forEach(c => sel.appendChild(new Option(c.nombre, String(c.id))));
@@ -902,17 +889,17 @@ function construirPanelAsignaciones(tipo, c) {
     const etiqueta = (x) => x.idioma ? `${x.nombre} [${x.idioma.toUpperCase()}]` : x.nombre;
     const nombreCategoria = (id) => t.getDataset().find(x => x.id === Number(id))?.nombre;
 
-    const panel = crearNodo('div', 'categoria-asignados ml-4 mt-1 mb-2 p-3 rounded-lg bg-slate-50 border');
-    panel.appendChild(crearNodo('div', 'text-xs font-semibold text-slate-600 mb-2', `Asignados a "${c.nombre}" (${asignados.length})`));
+    const panel = crearNodo('div', 'panel-sub');
+    panel.appendChild(crearNodo('div', 'panel-sub-titulo', `Asignados a "${c.nombre}" (${asignados.length})`));
 
     if (asignados.length === 0) {
-        panel.appendChild(crearNodo('p', 'text-sm text-slate-400 mb-2', `Todavía no hay ${t.sustantivo[1]} en esta categoría.`));
+        panel.appendChild(crearNodo('p', 'aviso-bloque-texto texto-tenue', `Todavía no hay ${t.sustantivo[1]} en esta categoría.`));
     } else {
-        const ul = crearNodo('ul', 'space-y-1 mb-3');
+        const ul = crearNodo('ul', 'lista-simple');
         asignados.forEach(x => {
-            const li = crearNodo('li', 'flex items-center justify-between gap-2 text-sm');
-            li.appendChild(crearNodo('span', 'min-w-0 truncate', etiqueta(x)));
-            const mover = crearNodo('select', 'rounded-md small border px-2 py-0.5 shrink-0');
+            const li = crearNodo('li');
+            li.appendChild(crearNodo('span', null, etiqueta(x)));
+            const mover = crearNodo('select', 'select-mini');
             mover.title = 'Mover a otra categoría de este destino, o quitarlo de esta';
             mover.appendChild(new Option('Mover a…', ''));
             mover.appendChild(new Option('— Quitar de esta categoría —', '__quitar__'));
@@ -936,7 +923,7 @@ function construirPanelAsignaciones(tipo, c) {
             ['En otras categorías de este destino', candidatos.filter(x => Number(x.destino_id) === c.destino_id && x.categoria_id != null)],
             ['Sin destino (se les asignará también este destino)', candidatos.filter(x => x.destino_id == null)]
         ];
-        const agregar = crearNodo('select', 'rounded-md small border px-2 py-1 w-full');
+        const agregar = crearNodo('select', 'select-mini is-ancho');
         agregar.appendChild(new Option('+ Agregar a esta categoría…', ''));
         grupos.forEach(([titulo, items]) => {
             if (!items.length) return;
@@ -966,20 +953,19 @@ function buildCategoriaRow(ctx, tipo, c) {
     const clave = `${tipo}:${c.id}`;
     const abierta = categoriasExpandidas.has(clave);
     const wrapper = document.createElement('div');
-    wrapper.className = 'categoria-bloque';
+    wrapper.className = 'bloque-detalle';
     const div = document.createElement('div');
-    div.className = 'categoria-item flex items-center justify-between gap-2 px-2 py-2 rounded-lg';
+    div.className = 'fila-detalle';
     const cuenta = t.items(enCategoria(c.id));
     const noun = t.sustantivo[cuenta.total === 1 ? 0 : 1];
     div.innerHTML = `
-        <span class="min-w-0 truncate">${escapeHtml(c.nombre)} <span class="text-xs text-slate-400">· ${escapeHtml(c.creado_por_nombre || '—')}</span></span>
-        <div class="flex items-center gap-2 shrink-0">
-            <button type="button" class="conteo-chip categoria-ver-btn${cuenta.total === 0 ? ' is-cero' : ''}" title="${cuenta.desglose ? cuenta.desglose + ' — ' : ''}Ver y editar sus asignaciones"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}<i class="fas fa-chevron-${abierta ? 'up' : 'down'}"></i></button>
-            <div class="flex items-center gap-1 shrink-0">
-                <button class="text-slate-400 hover:text-slate-700 p-1 categoria-editar-btn" title="Editar"><i class="fas fa-pen text-xs"></i></button>
-                <button class="text-red-400 hover:text-red-600 p-1 categoria-eliminar-btn" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
-            </div>
-        </div>
+        <span class="arbol-guia" aria-hidden="true"></span>
+        <span class="arbol-nombre">${escapeHtml(c.nombre)} <span class="texto-tenue">· ${escapeHtml(c.creado_por_nombre || '—')}</span></span>
+        <button type="button" class="conteo-btn categoria-ver-btn${cuenta.total === 0 ? ' is-cero' : ''}${abierta ? ' is-abierto' : ''}" title="${cuenta.desglose ? cuenta.desglose + ' — ' : ''}Ver y editar sus asignaciones"><i class="fas ${t.icono}"></i>${cuenta.total} ${noun}<i class="fas fa-chevron-${abierta ? 'up' : 'down'}"></i></button>
+        <span class="arbol-crud">
+            <button type="button" class="categoria-editar-btn" data-crud="editar" title="Editar «${escapeHtml(c.nombre)}»"><i class="fas fa-pen"></i></button>
+            <button type="button" class="categoria-eliminar-btn" data-crud="eliminar" title="Eliminar «${escapeHtml(c.nombre)}»"><i class="fas fa-trash"></i></button>
+        </span>
     `;
     div.querySelector('.categoria-ver-btn').addEventListener('click', () => {
         if (categoriasExpandidas.has(clave)) categoriasExpandidas.delete(clave); else categoriasExpandidas.add(clave);
@@ -993,17 +979,30 @@ function buildCategoriaRow(ctx, tipo, c) {
 }
 
 function buildCategoriaEditRow(ctx, tipo, c) {
-    const div = document.createElement('div');
-    div.className = 'flex items-center gap-2 px-2 py-2 rounded-lg';
+    const div = formEnLinea(c.nombre,
+        (nombre) => guardarCategoria(tipo, { id: c.id, destino_id: c.destino_id, nombre }),
+        () => div.replaceWith(buildCategoriaRow(ctx, tipo, c)));
+    return div;
+}
+
+// Fila para renombrar en línea (input + Guardar / Cancelar, Enter y Escape), con el
+// componente .arbol-form de shared/componentes.css.
+function formEnLinea(valor, alGuardar, alCancelar) {
+    const div = crearNodo('div', 'arbol-form en-linea');
     div.innerHTML = `
-        <input class="input flex-1 min-w-0 rounded px-2 py-1 border text-sm" type="text" value="${escapeHtml(c.nombre)}">
-        <button class="text-emerald-600 hover:text-emerald-800 p-1 shrink-0" title="Guardar"><i class="fas fa-check text-xs"></i></button>
-        <button class="text-slate-400 hover:text-slate-600 p-1 shrink-0" title="Cancelar"><i class="fas fa-times text-xs"></i></button>
-    `;
-    const nombreI = div.querySelector('input');
-    const [saveBtn, cancelBtn] = div.querySelectorAll('button');
-    saveBtn.addEventListener('click', () => guardarCategoria(tipo, { id: c.id, destino_id: c.destino_id, nombre: nombreI.value.trim() }));
-    cancelBtn.addEventListener('click', () => div.replaceWith(buildCategoriaRow(ctx, tipo, c)));
+        <input type="text" maxlength="100" value="${escapeHtml(valor)}" aria-label="Nombre">
+        <span class="arbol-form-btns">
+            <button type="button" data-form-accion="guardar" title="Guardar"><i class="fas fa-check"></i></button>
+            <button type="button" data-form-accion="cancelar" title="Cancelar"><i class="fas fa-xmark"></i></button>
+        </span>`;
+    const input = div.querySelector('input');
+    div.querySelector('[data-form-accion="guardar"]').addEventListener('click', () => alGuardar(input.value.trim()));
+    div.querySelector('[data-form-accion="cancelar"]').addEventListener('click', alCancelar);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); alGuardar(input.value.trim()); }
+        else if (e.key === 'Escape') alCancelar();
+    });
+    setTimeout(() => { input.focus(); input.select(); }, 0);
     return div;
 }
 
@@ -1268,29 +1267,30 @@ async function construirDetallePaquete(p, moneda) {
     const { tours: toursMoneda, hoteles: hotelesMoneda } = paquetesPorMoneda[moneda];
     const seccion = (icono, titulo, itemsHtml) => `
         <div>
-            <div class="text-xs font-semibold text-slate-600 mb-1"><i class="fas ${icono} mr-1"></i>${titulo}</div>
-            <ul class="text-sm text-slate-700 space-y-0.5">${itemsHtml}</ul>
+            <div class="detalle-seccion-titulo"><i class="fas ${icono}"></i>${titulo}</div>
+            <ul class="lista-detalle">${itemsHtml}</ul>
         </div>`;
+    const faltante = ' <span class="texto-aviso">(ya no está en el catálogo)</span>';
     const partes = [];
     if (p.itinerario?.modulos?.length) {
         const { idioma, modulos } = p.itinerario;
         await asegurarIdiomaCargado(idioma);
         const vigentes = new Set((idiomaCache[idioma]?.modules || []).map(m => m.filename));
-        partes.push(seccion('fa-route', `Itinerario · ${NOMBRES_IDIOMA[idioma] || idioma} (${modulos.length} día${modulos.length === 1 ? '' : 's'})`, modulos.map((fn, i) => `<li><span class="text-slate-400 mr-1">Día ${i + 1}:</span>${escapeHtml(tituloModuloDeIdioma(idioma, fn))}${vigentes.has(fn) ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`).join('')));
+        partes.push(seccion('fa-route', `Itinerario · ${NOMBRES_IDIOMA[idioma] || idioma} (${modulos.length} día${modulos.length === 1 ? '' : 's'})`, modulos.map((fn, i) => `<li><span class="texto-tenue">Día ${i + 1}:</span>${escapeHtml(tituloModuloDeIdioma(idioma, fn))}${vigentes.has(fn) ? '' : faltante}</li>`).join('')));
     }
     if (p.tours.length) {
         partes.push(seccion('fa-person-hiking', `Actividades (${p.tours.length})`, p.tours.map((t, i) => {
             const existe = toursMoneda.some(td => td.tour === t.tour);
-            return `<li><span class="text-slate-400 mr-1">${i + 1}.</span>${escapeHtml(t.tour)} <span class="text-slate-400">x${t.cant}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+            return `<li><span class="texto-tenue">${i + 1}.</span>${escapeHtml(t.tour)} <span class="texto-tenue">x${t.cant}</span>${existe ? '' : faltante}</li>`;
         }).join('')));
     }
     if (p.hoteles.length) {
         partes.push(seccion('fa-hotel', `Hoteles (${p.hoteles.length})`, p.hoteles.map(h => {
             const existe = hotelesMoneda.some(hd => hd.aloj === h.aloj);
-            return `<li>${escapeHtml(h.aloj)} <span class="text-slate-400">· ${h.nhab} hab. · ${h.noches} noche${h.noches === 1 ? '' : 's'}</span>${existe ? '' : ' <span class="text-amber-600 text-xs">(ya no está en el catálogo)</span>'}</li>`;
+            return `<li>${escapeHtml(h.aloj)} <span class="texto-tenue">· ${h.nhab} hab. · ${h.noches} noche${h.noches === 1 ? '' : 's'}</span>${existe ? '' : faltante}</li>`;
         }).join('')));
     }
-    return partes.join('') || '<p class="text-slate-400 text-sm">Paquete vacío.</p>';
+    return partes.join('') || '<p class="texto-vacio">Paquete vacío.</p>';
 }
 
 function renderPaquetesList(moneda) {
@@ -1300,11 +1300,11 @@ function renderPaquetesList(moneda) {
     document.getElementById(`paquetes-count-${moneda}`).textContent = `${paquetes.length} paquete${paquetes.length === 1 ? '' : 's'}`;
     container.innerHTML = '';
     if (paquetes.length === 0) {
-        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-4">Aún no hay paquetes en ${moneda.toUpperCase()}. Arma uno en el Cotizador ${moneda.toUpperCase()} y usa «Guardar como paquete».</p>`;
+        container.innerHTML = `<p class="texto-vacio">Aún no hay paquetes en ${moneda.toUpperCase()}. Arma uno en el Cotizador ${moneda.toUpperCase()} y usa «Guardar como paquete».</p>`;
         return;
     }
     paquetes.forEach(p => {
-        const chip = (icono, texto) => `<span class="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"><i class="fas ${icono} mr-1"></i>${texto}</span>`;
+        const chip = (icono, texto) => `<span class="etiqueta"><i class="fas ${icono}"></i>${texto}</span>`;
         const chips = [];
         if (p.itinerario?.modulos?.length) chips.push(chip('fa-route', `Itinerario ${NOMBRES_IDIOMA[p.itinerario.idioma] || ''} · ${p.itinerario.modulos.length} día${p.itinerario.modulos.length === 1 ? '' : 's'}`));
         if (p.tours.length) chips.push(chip('fa-person-hiking', `${p.tours.length} actividad${p.tours.length === 1 ? '' : 'es'}`));
@@ -1316,36 +1316,36 @@ function renderPaquetesList(moneda) {
             ...p.hoteles.filter(h => !hotelesMoneda.some(hd => hd.aloj === h.aloj)).map(h => h.aloj)
         ];
         const avisoHtml = faltantes.length
-            ? `<div class="text-xs text-amber-600 mt-1"><i class="fas fa-triangle-exclamation mr-1"></i>${faltantes.length} elemento${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${escapeHtml(faltantes.join(', '))}</div>`
+            ? `<div class="texto-aviso"><i class="fas fa-triangle-exclamation"></i> ${faltantes.length} elemento${faltantes.length === 1 ? '' : 's'} ya no ${faltantes.length === 1 ? 'existe' : 'existen'} en el catálogo: ${escapeHtml(faltantes.join(', '))}</div>`
             : '';
         const div = document.createElement('div');
-        div.className = 'p-3 border rounded-lg';
+        div.className = 'registro';
         div.innerHTML = `
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-                <div class="min-w-0">
-                    <div class="font-medium">${escapeHtml(p.nombre)}</div>
-                    <div class="flex flex-wrap gap-1 mt-1">${chips.join('')}</div>
+            <div class="registro-cab">
+                <div>
+                    <div class="registro-nombre">${escapeHtml(p.nombre)}</div>
+                    <div class="etiquetas">${chips.join('')}</div>
                     ${avisoHtml}
                 </div>
-                <div class="cat-actions-inner shrink-0">
+                <div class="cat-actions-inner">
                     <button type="button" class="cat-icon-btn is-view paquete-ver-btn" title="Ver el contenido del paquete"><i class="fas fa-eye"></i></button>
                     <button type="button" class="cat-icon-btn paquete-editar-btn" title="Editar en el Cotizador ${moneda.toUpperCase()}"><i class="fas fa-pen"></i></button>
                     <button type="button" class="cat-icon-btn is-danger paquete-eliminar-btn" title="Eliminar"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
-            <div class="paquete-detalle hidden mt-3 pt-3 border-t grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            <div class="registro-detalle paquete-detalle" hidden></div>
         `;
         const detalle = div.querySelector('.paquete-detalle');
         const verBtn = div.querySelector('.paquete-ver-btn');
         verBtn.addEventListener('click', async () => {
-            const abrir = detalle.classList.contains('hidden');
+            const abrir = detalle.hidden;
             if (abrir && !detalle.dataset.cargado) {
-                detalle.innerHTML = '<p class="text-slate-400 text-sm">Cargando...</p>';
-                detalle.classList.remove('hidden');
+                detalle.innerHTML = '<p class="texto-vacio">Cargando...</p>';
+                detalle.hidden = false;
                 detalle.innerHTML = await construirDetallePaquete(p, moneda);
                 detalle.dataset.cargado = '1';
             }
-            detalle.classList.toggle('hidden', !abrir);
+            detalle.hidden = !abrir;
             verBtn.innerHTML = abrir ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
         });
         // Editar se hace en el Cotizador de SU moneda (reusa su drag-and-drop) — ver
@@ -1436,12 +1436,12 @@ document.addEventListener('click', () => {
 // confirmación previa (con números reales, no una advertencia genérica) como en el
 // resumen final tras aplicar.
 function construirResumenHtmlCsv(data) {
-    let html = `<div class="text-left text-sm">
+    let html = `<div class="csv-resumen">
         <p>✅ <b>${data.creados}</b> nuevo(s)</p>
         <p>🔄 <b>${data.actualizados}</b> actualizado(s) (coincidieron por nombre)</p>`;
     if (data.errores.length) {
-        html += `<p class="mt-2" style="color:#b45309">⚠️ ${data.errores.length} fila(s) con error — se omitirán:</p>
-            <ul class="text-xs text-left" style="max-height:8rem;overflow-y:auto">`;
+        html += `<p class="csv-resumen-aviso">⚠️ ${data.errores.length} fila(s) con error — se omitirán:</p>
+            <ul class="csv-resumen-lista">`;
         data.errores.slice(0, 12).forEach(e => { html += `<li>Fila ${e.fila}: ${e.motivo}</li>`; });
         if (data.errores.length > 12) html += `<li>... y ${data.errores.length - 12} más.</li>`;
         html += `</ul>`;
@@ -1471,7 +1471,7 @@ async function subirCsvConPreview(tipo, file) {
     if (!previo.success) {
         let html = `<p>${escapeHtml(previo.error)}</p>`;
         if (previo.errores?.length) {
-            html += `<ul class="text-xs text-left mt-2" style="max-height:10rem;overflow-y:auto">` +
+            html += `<ul class="csv-resumen-lista">` +
                 previo.errores.slice(0, 15).map(e => `<li>Fila ${escapeHtml(e.fila)}: ${escapeHtml(e.motivo)}</li>`).join('') +
                 (previo.errores.length > 15 ? `<li>... y ${previo.errores.length - 15} más.</li>` : '') + `</ul>`;
         }
@@ -1562,11 +1562,9 @@ function posicionarMenuCot(triggerBtn, menu) {
         top = Math.max(10, rect.top - menuHeight - 4);
     }
 
-    menu.style.position = 'fixed';
     menu.style.width = `${menuWidth}px`;
     menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
-    menu.style.zIndex = '9999';
 }
 
 if (!window._cotDropdownWired) {
@@ -1586,7 +1584,7 @@ if (!window._cotDropdownWired) {
 async function cargarCotizacionesGuardadas() {
     cerrarDropdownCotizaciones();
     const tbody = document.getElementById('cot-table-body');
-    tbody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="texto-vacio">Cargando...</td></tr>';
     try {
         const params = new URLSearchParams({
             q: cotState.term,
@@ -1598,16 +1596,17 @@ async function cargarCotizacionesGuardadas() {
         cotState.total = total;
         tbody.innerHTML = '';
         if (results.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-3 text-center text-slate-400">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="texto-vacio">${cotState.term ? 'Sin resultados.' : 'Sin cotizaciones guardadas.'}</td></tr>`;
         } else {
             results.forEach(cot => tbody.appendChild(buildCotRow(cot)));
         }
         const shown = cotState.offset + results.length;
         document.getElementById('cot-page-info').textContent = total === 0 ? '' : `${cotState.offset + 1}-${shown} de ${total}`;
+        document.getElementById('cot-total').textContent = ` · ${total} cotizaci${total === 1 ? 'ón' : 'ones'}${cotState.term ? ' encontradas' : ''}`;
         document.getElementById('cot-prev').disabled = cotState.offset === 0;
         document.getElementById('cot-next').disabled = shown >= total;
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-red-500">Error al cargar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="texto-vacio is-error">Error al cargar.</td></tr>';
     }
 }
 
@@ -1618,17 +1617,16 @@ function buildCotRow(cot) {
     const cantModulos = tieneItinerario ? itinModulos.length : 0;
 
     const tr = document.createElement('tr');
-    tr.className = 'border-t hover:bg-slate-50';
     tr.innerHTML = `
-        <td class="p-3 font-medium">${escapeHtml(cot.id)}</td>
-        <td class="p-3">${escapeHtml(pax.nombre_pax || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.contacto || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.fecha_cot || '-')}</td>
-        <td class="p-3">${escapeHtml(pax.n_pax || '-')}</td>
-        <td class="p-3">${cot.data.paquete?.nombre
-            ? `<span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)"><i class="fas fa-box-archive"></i>${escapeHtml(cot.data.paquete.nombre)}</span>`
-            : '<span class="text-slate-400">—</span>'}</td>
-        <td class="p-3 text-right whitespace-nowrap"></td>
+        <td><span class="cat-name">${escapeHtml(cot.id)}</span></td>
+        <td>${escapeHtml(pax.nombre_pax || '-')}</td>
+        <td>${escapeHtml(pax.contacto || '-')}</td>
+        <td>${escapeHtml(pax.fecha_cot || '-')}</td>
+        <td>${escapeHtml(pax.n_pax || '-')}</td>
+        <td>${cot.data.paquete?.nombre
+            ? `<span class="etiqueta is-acento"><i class="fas fa-box-archive"></i>${escapeHtml(cot.data.paquete.nombre)}</span>`
+            : '<span class="texto-tenue">—</span>'}</td>
+        <td class="cat-actions"></td>
     `;
     const actionsCell = tr.querySelector('td:last-child');
 
@@ -1650,7 +1648,7 @@ function buildCotRow(cot) {
     abrirBtn.type = 'button';
     abrirBtn.className = 'cot-action-item';
     abrirBtn.innerHTML = `
-        <span class="cot-action-icon" style="background:#eff6ff;color:#2563eb;">
+        <span class="cot-action-icon is-azul">
             <i class="fas fa-folder-open"></i>
         </span>
         <span class="cot-action-item-text">
@@ -1669,7 +1667,7 @@ function buildCotRow(cot) {
     pdfCotBtn.type = 'button';
     pdfCotBtn.className = 'cot-action-item';
     pdfCotBtn.innerHTML = `
-        <span class="cot-action-icon" style="background:#fef2f2;color:#dc2626;">
+        <span class="cot-action-icon is-rojo">
             <i class="fas fa-file-pdf"></i>
         </span>
         <span class="cot-action-item-text">
@@ -1688,13 +1686,13 @@ function buildCotRow(cot) {
     itinBtn.type = 'button';
     itinBtn.className = 'cot-action-item' + (tieneItinerario ? '' : ' is-disabled');
     itinBtn.innerHTML = `
-        <span class="cot-action-icon" style="background:#ecfdf5;color:#059669;">
+        <span class="cot-action-icon is-verde">
             <i class="fas fa-route"></i>
         </span>
         <span class="cot-action-item-text">
             <span class="cot-action-title">
                 PDF de Itinerario
-                ${tieneItinerario ? `<span class="text-[10px] font-normal px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 ml-1">${cantModulos} d.</span>` : ''}
+                ${tieneItinerario ? `<span class="etiqueta-mini is-verde">${cantModulos} d.</span>` : ''}
             </span>
             <span class="cot-action-desc">${tieneItinerario ? `${cantModulos} módulo(s) armado(s)` : 'Sin itinerario armado'}</span>
         </span>
@@ -1714,7 +1712,7 @@ function buildCotRow(cot) {
     dupBtn.type = 'button';
     dupBtn.className = 'cot-action-item';
     dupBtn.innerHTML = `
-        <span class="cot-action-icon" style="background:#fffbeb;color:#d97706;">
+        <span class="cot-action-icon is-ambar">
             <i class="fas fa-copy"></i>
         </span>
         <span class="cot-action-item-text">
@@ -1737,7 +1735,7 @@ function buildCotRow(cot) {
     delBtn.type = 'button';
     delBtn.className = 'cot-action-item is-danger';
     delBtn.innerHTML = `
-        <span class="cot-action-icon" style="background:#fef2f2;color:#ef4444;">
+        <span class="cot-action-icon is-rojo">
             <i class="fas fa-trash-can"></i>
         </span>
         <span class="cot-action-item-text">
@@ -1807,11 +1805,11 @@ async function eliminarCotizacionGuardada(id, nombre) {
     }
 }
 
-// Vista Itinerarios: la fila de arriba tiene "Destinos y Categorías" (#itin-clasificacion) y
+// Vista Itinerarios: la fila de arriba tiene "Clasificación" (#itin-clasificacion) y
 // los 3 idiomas (.idioma-tab, que además cambian el idioma activo en itinerario.js) — cada
 // idioma muestra su catálogo de itinerarios y páginas fijas (#gestion-itinerarios).
 // Vista Itinerarios: primero el idioma (pestañas con bandera) y, dentro, un menú lateral:
-// Itinerarios y Páginas fijas son del idioma; Destinos y Categorías es común a los 3. La URL
+// Itinerarios y Páginas fijas son del idioma; Clasificación es común a los 3. La URL
 // recuerda sección, idioma, grupo y nodo del árbol (&seccion=&idioma=&grupo=&destino=
 // &categoria=) para volver al mismo lugar al recargar o compartir el enlace.
 const ITIN_SECCIONES = ['modulos', 'paginas', 'clasificacion'];
@@ -1834,15 +1832,15 @@ async function mostrarSeccionItinerarios(seccion) {
     if (!ITIN_SECCIONES.includes(seccion)) seccion = 'modulos';
     seccionItin = seccion;
     if (seccion !== 'clasificacion') ultimaSeccionIdioma = seccion;
-    // Pestañas de arriba: Destinos y Categorías o el idioma activo.
-    const pestanas = document.querySelector('#vista-itinerarios .itin-idiomas');
+    // Pestañas de arriba: Clasificación o el idioma activo.
+    const pestanas = document.querySelector('#vista-itinerarios .vista-tabs');
     pestanas.classList.toggle('is-comun', seccion === 'clasificacion');
-    pestanas.querySelectorAll('.itin-idioma').forEach(b => {
-        const activa = b.classList.contains('itin-tab-comun') ? seccion === 'clasificacion' : seccion !== 'clasificacion' && b.classList.contains('active');
-        if (b.classList.contains('itin-tab-comun')) b.classList.toggle('active', activa);
+    pestanas.querySelectorAll('.vista-tab').forEach(b => {
+        const activa = b.classList.contains('is-aparte') ? seccion === 'clasificacion' : seccion !== 'clasificacion' && b.classList.contains('active');
+        if (b.classList.contains('is-aparte')) b.classList.toggle('active', activa);
         b.setAttribute('aria-selected', String(activa));
     });
-    layout.querySelectorAll('.itin-menu-item').forEach(b => {
+    layout.querySelectorAll('.vista-menu-item').forEach(b => {
         const activa = b.dataset.itinSeccion === seccion;
         b.classList.toggle('is-activo', activa);
         b.setAttribute('aria-current', activa ? 'page' : 'false');
@@ -1869,7 +1867,7 @@ async function mostrarSeccionItinerarios(seccion) {
 // Pestaña de idioma activa y la bandera en el título de cada tarjeta
 // ("Itinerarios 🇺🇸 English"); el cambio de idioma en sí lo hace itinerario.js (.idioma-tab).
 function pintarIdiomaItinerarios(idioma) {
-    document.querySelectorAll('#vista-itinerarios .itin-idioma[data-idioma]').forEach(b => {
+    document.querySelectorAll('#vista-itinerarios .vista-tab[data-idioma]').forEach(b => {
         const activo = b.dataset.idioma === idioma;
         b.classList.toggle('active', activo);
         b.setAttribute('aria-selected', String(activo && seccionItin !== 'clasificacion'));
@@ -1888,10 +1886,10 @@ function pintarConteosMenuItin() {
 function initPestanasItinerarios() {
     const layout = document.getElementById('itinerario-seccion-bar');
     if (!layout) return;
-    layout.querySelectorAll('.itin-menu-item').forEach(btn => btn.addEventListener('click', () => mostrarSeccionItinerarios(btn.dataset.itinSeccion)));
-    document.querySelector('#vista-itinerarios .itin-tab-comun').addEventListener('click', () => mostrarSeccionItinerarios('clasificacion'));
+    layout.querySelectorAll('.vista-menu-item').forEach(btn => btn.addEventListener('click', () => mostrarSeccionItinerarios(btn.dataset.itinSeccion)));
+    document.querySelector('#vista-itinerarios .vista-tab.is-aparte').addEventListener('click', () => mostrarSeccionItinerarios('clasificacion'));
     // Una pestaña de idioma abre su última sección (Itinerarios o Páginas fijas).
-    document.querySelectorAll('#vista-itinerarios .itin-idioma[data-idioma]').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('#vista-itinerarios .vista-tab[data-idioma]').forEach(btn => btn.addEventListener('click', () => {
         pintarIdiomaItinerarios(btn.dataset.idioma);
         actualizarUrlItinerarios({ idioma: btn.dataset.idioma });
         if (seccionItin === 'clasificacion') mostrarSeccionItinerarios(ultimaSeccionIdioma);
@@ -1904,7 +1902,7 @@ function initPestanasItinerarios() {
 // A la izquierda de la lista del idioma: los destinos del grupo abierto y, del elegido, sus
 // categorías, con cuántos itinerarios del idioma tiene cada nodo. Un clic filtra la lista
 // (modulosNodo en itinerario.js). Tiene un CRUD rápido (crear / renombrar / eliminar al
-// vuelo mientras se suben PDFs); el completo está en Destinos y Categorías.
+// vuelo mientras se suben PDFs); el completo está en Clasificación.
 // arbolUI: alta en curso ({ tipo: 'destino' | 'categoria', grupo, destino } y lo escrito),
 // nodo en edición ({ tipo, id }), si el árbol está desplegado en pantallas chicas (ahí se
 // pliega bajo la miga) y cuántos itinerarios muestra la lista.
@@ -2053,7 +2051,7 @@ function cancelarFormItin() {
     repintarClasificacionItin();
 }
 
-// Guarda el alta / edición de cualquiera de las dos vistas (árbol o Destinos y Categorías).
+// Guarda el alta / edición de cualquiera de las dos vistas (árbol o Clasificación).
 // Lo nuevo creado desde el árbol queda elegido en él.
 async function guardarFormArbol(form) {
     const nombre = form.querySelector('.arbol-input').value.trim();
@@ -2138,8 +2136,6 @@ function initArbolItinerarios() {
             actualizarUrlItinerarios({ grupo: modulosGrupo, destino: modulosNodo.destino, categoria: modulosNodo.categoria });
         }
     });
-    document.addEventListener('itin:grupo-modulos', () => renderAccionesGrupo('itinerario-modulos-grupos', grupoAbiertoItin()));
-    document.getElementById('itinerario-modulos-grupos').addEventListener('click', (e) => accionGrupoItin(e, grupoAbiertoItin(), (id) => { modulosGrupo = id; modulosNodo = { destino: null, categoria: null }; }));
 
     const alClic = (e) => {
         if (manejarCrudItin(e)) return;
@@ -2176,32 +2172,39 @@ function abrirAltaItin(agregando) {
     repintarClasificacionItin();
 }
 
-// CRUD de grupos al final de unos chips de grupo (los de la lista de Itinerarios, que arma
-// renderModulosGrupos en itinerario.js, o los de Destinos y Categorías): renombrar /
-// eliminar el abierto, según lo permita (ver grupos-destino en shared/api.php), y "Nuevo
-// grupo".
+// CRUD de grupos (Con / Sin hotel y los propios) en los chips de Clasificación: es el único
+// lugar donde se crean / renombran / eliminan; en la lista de Itinerarios de cada idioma los
+// chips solo filtran. Renombrar / eliminar el abierto según lo permita (ver grupos-destino
+// en shared/api.php), y "Nuevo grupo".
 function renderAccionesGrupo(contId, activo) {
     const cont = document.getElementById(contId);
     if (!cont || cont.querySelector('.grupos-acciones')) return;
+    // Renombrar / eliminar van pegados al chip del grupo abierto: así se ve a cuál afectan.
+    const chipActivo = cont.querySelector('.filtro-chip.is-activo');
+    if (chipActivo && (activo?.editable || activo?.eliminable)) {
+        const edicion = document.createElement('span');
+        edicion.className = 'grupo-edicion';
+        edicion.innerHTML = `
+            ${activo.editable ? `<button type="button" class="grupo-accion" data-accion-grupo="renombrar" title="Renombrar «${escapeHtml(activo.nombre)}»" aria-label="Renombrar el grupo ${escapeHtml(activo.nombre)}"><i class="fas fa-pen"></i></button>` : ''}
+            ${activo.eliminable ? `<button type="button" class="grupo-accion is-peligro" data-accion-grupo="eliminar" title="Eliminar «${escapeHtml(activo.nombre)}»" aria-label="Eliminar el grupo ${escapeHtml(activo.nombre)}"><i class="fas fa-trash"></i></button>` : ''}`;
+        chipActivo.after(edicion);
+    }
     const acciones = document.createElement('span');
     acciones.className = 'grupos-acciones';
-    acciones.innerHTML = `
-        ${activo?.editable ? `<button type="button" class="grupo-accion" data-accion-grupo="renombrar" title="Renombrar el grupo «${escapeHtml(activo.nombre)}»"><i class="fas fa-pen"></i></button>` : ''}
-        ${activo?.eliminable ? `<button type="button" class="grupo-accion is-peligro" data-accion-grupo="eliminar" title="Eliminar el grupo «${escapeHtml(activo.nombre)}»"><i class="fas fa-trash"></i></button>` : ''}
-        <button type="button" class="grupo-nuevo" data-accion-grupo="nuevo" title="Crear un grupo propio de tu agencia"><i class="fas fa-plus"></i>Nuevo grupo</button>`;
+    acciones.innerHTML = '<button type="button" class="grupo-nuevo" data-accion-grupo="nuevo" title="Crear un grupo propio de tu agencia"><i class="fas fa-plus"></i>Nuevo grupo</button>';
     cont.appendChild(acciones);
 }
 
-async function accionGrupoItin(e, activo, alCrear) {
+async function accionGrupoItin(e, activo) {
     const accion = e.target.closest('[data-accion-grupo]')?.dataset.accionGrupo;
     if (accion === 'nuevo') {
         const id = await guardarGrupoDestino(null);
-        if (id) { alCrear(String(id)); clasifGrupo = String(id); renderModulosTable(); repintarClasificacionItin(); }
+        if (id) { clasifGrupo = String(id); renderModulosTable(); repintarClasificacionItin(); }
     } else if (accion === 'renombrar' && activo) guardarGrupoDestino(activo);
     else if (accion === 'eliminar' && activo) eliminarGrupoDestino(activo);
 }
 
-// ===== Destinos y Categorías (común a los 3 idiomas) =====
+// ===== Clasificación: grupo › destino › categoría (común a los 3 idiomas) =====
 // Los destinos del grupo elegido con sus categorías, y cuántos itinerarios tiene cada uno en
 // cada idioma: un 0 en un destino avisa que todavía no tiene versión en ese idioma. Un clic
 // en un conteo lleva a ese idioma, filtrado por ese destino / categoría.
@@ -2238,6 +2241,10 @@ function renderClasificacionItin() {
         ${IDIOMAS_CLASIF.map(i => `<span class="clasif-idioma" title="${banderas[i]?.nombre || i}"><span class="titulo-bandera">${banderas[i]?.svg || ''}</span>${i.toUpperCase()}</span>`).join('')}
         <span></span>
     </div>`;
+    // El alta de destino va arriba (el botón está en la cabecera de la tarjeta).
+    const botonNuevo = document.getElementById('clasif-nuevo-destino');
+    if (botonNuevo) botonNuevo.querySelector('span').textContent = `Nuevo destino en ${grupo?.nombre || ''}`;
+    if (agregandoEn('destino')) html += fila(formArbolHtml('destino', 0), ' is-form is-alta');
     destinos.forEach(d => {
         const enD = it => Number(it.destino_id) === d.id;
         html += ed?.tipo === 'destino' && ed.id === d.id
@@ -2257,9 +2264,6 @@ function renderClasificacionItin() {
             : fila(`<button type="button" class="arbol-agregar" data-clasif-accion="nueva-categoria" data-destino="${d.id}"><i class="fas fa-plus"></i>Categoría en ${escapeHtml(d.nombre)}</button>`, ' is-agregar');
     });
     if (!destinos.length) html += `<p class="arbol-vacio clasif-vacio">Aún no hay destinos en ${escapeHtml(grupo?.nombre || 'este grupo')}.</p>`;
-    html += agregandoEn('destino')
-        ? fila(formArbolHtml('destino', 0), ' is-form is-pie')
-        : `<div class="clasif-pie"><button type="button" class="cat-new-btn" data-clasif-accion="nuevo-destino"><i class="fas fa-plus"></i>Nuevo destino en ${escapeHtml(grupo?.nombre || '')}</button></div>`;
     cont.innerHTML = html;
     if (seccionItinActual() === 'clasificacion' && (arbolUI.agregando || arbolUI.editando)) cont.querySelector('.arbol-input')?.focus();
 }
@@ -2277,7 +2281,7 @@ function initClasificacionItin() {
             renderClasificacionItin();
             return;
         }
-        accionGrupoItin(e, gruposDestinoData.find(g => String(g.id) === clasifGrupo), (id) => { clasifGrupo = id; });
+        accionGrupoItin(e, gruposDestinoData.find(g => String(g.id) === clasifGrupo));
     });
     cont.addEventListener('click', (e) => {
         if (manejarCrudItin(e)) return;
@@ -2287,7 +2291,7 @@ function initClasificacionItin() {
             const cat = ir.dataset.categoria;
             modulosGrupo = clasifGrupo;
             modulosNodo = { destino: Number(ir.dataset.destino), categoria: cat === 'sin' ? 'sin' : cat ? Number(cat) : null };
-            document.querySelector(`#vista-itinerarios .itin-idioma[data-idioma="${ir.dataset.irIdioma}"]`)?.click();
+            document.querySelector(`#vista-itinerarios .vista-tab[data-idioma="${ir.dataset.irIdioma}"]`)?.click();
             mostrarSeccionItinerarios('modulos');
             renderModulosTable();
             return;
@@ -2297,6 +2301,10 @@ function initClasificacionItin() {
         else if (accion?.dataset.clasifAccion === 'nueva-categoria') abrirAltaItin({ tipo: 'categoria', destino: Number(accion.dataset.destino) });
     });
     cont.addEventListener('keydown', teclasFormItin);
+    document.getElementById('clasif-nuevo-destino')?.addEventListener('click', () => {
+        abrirAltaItin({ tipo: 'destino', grupo: clasifGrupo });
+        cont.querySelector('.is-alta')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
 }
 
 async function init() {
@@ -2316,7 +2324,7 @@ async function init() {
     if (window.APP_CONFIG.vista === 'paquetes') cargarPaquetes();
     actualizarConteosItinerarios();
 
-    document.querySelectorAll('#gestion-section > div > .subnav-tab').forEach(tab => {
+    document.querySelectorAll('#gestion-tabs .vista-tab').forEach(tab => {
         tab.addEventListener('click', () => irASubtabGestion(tab.dataset.subtab));
     });
 
@@ -2409,9 +2417,24 @@ async function init() {
             renderTourNewDestinoCategoria();
         }
     });
+    const formDestino = document.getElementById('destino-new-wrap');
+    const inputDestino = document.getElementById('destino-new-nombre');
+    const cerrarFormDestino = () => { formDestino.hidden = true; inputDestino.value = ''; };
+    document.getElementById('destino-new-toggle').addEventListener('click', () => {
+        formDestino.hidden = !formDestino.hidden;
+        if (!formDestino.hidden) inputDestino.focus();
+    });
+    document.getElementById('destino-new-cancel').addEventListener('click', cerrarFormDestino);
+    inputDestino.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('destino-new-add').click(); }
+        else if (e.key === 'Escape') cerrarFormDestino();
+    });
+    document.getElementById('categoria-new-nombre').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('categoria-new-add').click(); }
+    });
     document.getElementById('destino-new-add').addEventListener('click', async () => {
-        const ok = await guardarDestino({ nombre: document.getElementById('destino-new-nombre').value.trim() });
-        if (ok) document.getElementById('destino-new-nombre').value = '';
+        const ok = await guardarDestino({ nombre: inputDestino.value.trim() });
+        if (ok) cerrarFormDestino();
     });
     document.getElementById('categoria-new-add').addEventListener('click', async () => {
         const ctx = CLASIF_CTX.moneda;
@@ -2419,7 +2442,7 @@ async function init() {
         const ok = await guardarCategoria(ctx.tipoActivo, { destino_id: ctx.destinoSeleccionadoId, nombre: document.getElementById('categoria-new-nombre').value.trim() });
         if (ok) document.getElementById('categoria-new-nombre').value = '';
     });
-    document.querySelectorAll('.categoria-tipo-tab').forEach(btn => {
+    document.querySelectorAll('[data-categoria-tipo]').forEach(btn => {
         btn.addEventListener('click', () => {
             CLASIF_CTX.moneda.tipoActivo = btn.dataset.categoriaTipo;
             renderCategorias(CLASIF_CTX.moneda);
