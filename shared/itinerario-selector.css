@@ -420,7 +420,45 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .idet-fecha input[type="number"] { width: 80px; }
 .idet-fecha input:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
 .idet-fecha-dia { align-self: center; font-size: 0.8rem; font-weight: 600; color: #334155; text-transform: capitalize; }
-.idet-fecha-acciones { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.idet-fecha-acciones { margin-left: auto; display: flex; gap: 6px; }
+/* Acciones compactas de la tarjeta de fecha: misma altura que el campo de fecha. */
+.idet-chip {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 34px; padding: 0 11px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff; color: #334155;
+    font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.idet-chip i { font-size: 0.72rem; color: #64748b; }
+.idet-chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.idet-chip:hover i { color: var(--ia-accent); }
+.idet-chip:focus-visible, .idet-seg button:focus-visible { outline: 2px solid var(--ia-accent); outline-offset: 1px; }
+/* Día libre: control segmentado en su propia línea, separado por un filete. */
+.idet-libre {
+    flex-basis: 100%;
+    display: flex; align-items: center; gap: 10px;
+    padding-top: 10px; margin-top: 2px;
+    border-top: 1px dashed #e2e8f0;
+}
+.idet-libre-tit { display: inline-flex; align-items: center; gap: 6px; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; white-space: nowrap; }
+.idet-libre-tit i { color: #d97706; font-size: 0.74rem; }
+.idet-seg {
+    display: inline-flex;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+.idet-seg button {
+    height: 30px; padding: 0 12px;
+    border: 0; background: transparent;
+    font-size: 0.76rem; font-weight: 600; color: #334155; white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.idet-seg button + button { border-left: 1px solid #e2e8f0; }
+.idet-seg button:hover { background: #fffbeb; color: #b45309; }
 .idet-body section { margin-top: 16px; }
 .idet-body h4 { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
 .idet-body h4 i { color: #94a3b8; }
@@ -561,8 +599,15 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .idet-acciones .idet-btn { flex: 1; padding: 0 10px; }
     .idet-acciones .idet-btn:first-child { margin-right: 0; flex-basis: 100%; }
     .idet-campos-2 { grid-template-columns: 1fr; }
+    /* Fecha y su día en una línea; acciones y día libre a todo el ancho, en partes iguales. */
+    .idet-fecha { gap: 8px; }
+    .idet-fecha label { flex: 1; min-width: 0; }
+    .idet-fecha input[type="date"] { width: 100%; }
     .idet-fecha-acciones { margin-left: 0; width: 100%; }
-    .idet-fecha-acciones .idet-btn { flex: 1; }
+    .idet-fecha-acciones .idet-chip { flex: 1; }
+    .idet-libre { flex-wrap: wrap; gap: 6px; }
+    .idet-seg { flex: 1 1 190px; }
+    .idet-seg button { flex: 1; padding: 0 6px; height: 34px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

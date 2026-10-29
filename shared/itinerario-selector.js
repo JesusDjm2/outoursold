@@ -892,9 +892,9 @@ function elegirDesdePanel(filename) {
             tr.querySelector('.module-filename').value = filename;
             iselToast(`Día ${tr.dataset.dia}: ${titulo}`);
         }
-        armadoUI.reemplazar = null;
+        // Se reemplaza solo ese itinerario: la lista se cierra.
+        cerrarPanelItinerarios();
         refrescarArmadoItinerario();
-        renderPanelCabecera();
         resaltarTarjeta(tr?.dataset.uid);
         return;
     }
@@ -1001,8 +1001,16 @@ function renderDetalle() {
     const llegada = iselLlegada();
     const diasDelItinerario = [...new Set(itemsArmado().map(x => x.dia))];
     const esPrimerDia = dia !== null && dia === diasDelItinerario[0];
+    // Un día libre va siempre entre dos días con itinerario: no antes del primero ni después del último.
+    const esUltimoDia = dia !== null && dia === diasDelItinerario[diasDelItinerario.length - 1];
+    const soloEnSuDia = dia !== null && itemsArmado().filter(x => x.dia === dia).length === 1;
     // Solo en el primer día puede ir antes de la llegada: su fecha pasa a ser la F. Llegada.
-    const minFecha = esPrimerDia && itemsArmado().filter(x => x.dia === dia).length === 1 ? '' : ` min="${llegada}"`;
+    const minFecha = esPrimerDia && soloEnSuDia ? '' : ` min="${llegada}"`;
+    const libresHtml = [
+        !esPrimerDia && '<button type="button" data-accion="libre-antes" title="Agrega un día libre antes: este día y los siguientes se corren uno">Antes</button>',
+        !esUltimoDia && '<button type="button" data-accion="libre-despues" title="Agrega un día libre después: los días siguientes se corren uno">Después</button>',
+        !esPrimerDia && !esUltimoDia && soloEnSuDia && '<button type="button" data-accion="libre-en-lugar" title="Quita este itinerario y su día queda libre, sin correr los demás">En su lugar</button>',
+    ].filter(Boolean).join('');
     caja.innerHTML = `
         <div class="idet-media">
             ${iselMediaHtml(e)}
@@ -1021,9 +1029,13 @@ function renderDetalle() {
                 </label>
                 <span class="idet-fecha-dia">Día ${dia}${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}</span>
                 <span class="idet-fecha-acciones">
-                    <button type="button" class="idet-btn is-suave" data-accion="mismo-dia" title="Agregar otro itinerario a este mismo día"><i class="fas fa-plus"></i>Otro en este día</button>
-                    ${!esPrimerDia ? '<button type="button" class="idet-btn is-suave" data-accion="libre-antes" title="Corre este día y los siguientes un día"><i class="fas fa-mug-hot"></i>Día libre antes</button>' : ''}
+                    <button type="button" class="idet-chip" data-accion="reemplazar" title="Poner otro itinerario en lugar de este, en el mismo día"><i class="fas fa-arrows-rotate"></i>Reemplazar</button>
+                    <button type="button" class="idet-chip" data-accion="mismo-dia" title="Agregar otro itinerario a este mismo día" aria-label="Otro itinerario en este mismo día"><i class="fas fa-plus"></i>Otro</button>
                 </span>
+                ${libresHtml ? `<div class="idet-libre">
+                    <span class="idet-libre-tit"><i class="fas fa-mug-hot"></i>Día libre</span>
+                    <span class="idet-seg" role="group" aria-label="Día libre">${libresHtml}</span>
+                </div>` : ''}
             </div>` : ''}
             ${lugares.length ? `<section><h4><i class="fas fa-location-dot"></i>Lugares a visitar</h4>
                 ${lugares.length > 1 ? `<ul class="idet-lugares">${lugares.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : `<p>${escapeHtml(lugares[0])}</p>`}</section>` : ''}
@@ -1087,9 +1099,27 @@ function enlazarDetalle(caja, e) {
             case 'agregar': { const f = detalleActual.filename; cerrarDetalleItinerario(); elegirDesdePanel(f); break; }
         }
     });
+    caja.querySelector('.idet-fecha [data-accion="reemplazar"]')?.addEventListener('click', () => {
+        const uid = detalleActual.uid;
+        cerrarDetalleItinerario();
+        abrirPanelItinerarios({ reemplazar: uid });
+    });
     caja.querySelector('[data-accion="libre-antes"]')?.addEventListener('click', () => {
         iselDesplazarDiasDesde(Number(tr.dataset.dia), 1);
         renderDetalle();
+    });
+    caja.querySelector('[data-accion="libre-despues"]')?.addEventListener('click', () => {
+        iselDesplazarDiasDesde(Number(tr.dataset.dia) + 1, 1);
+        renderDetalle();
+    });
+    // Sin correr los demás: el día queda vacío y la grilla lo muestra como libre.
+    caja.querySelector('[data-accion="libre-en-lugar"]')?.addEventListener('click', () => {
+        const uid = detalleActual.uid;
+        const dia = tr.dataset.dia;
+        cerrarDetalleItinerario();
+        filaPorUid(uid)?.remove();
+        refrescarArmadoItinerario();
+        iselToast(`El Día ${dia} ahora es un día libre`);
     });
     // Sumar otro itinerario al mismo día (es la forma de hacerlo: al tocar la tarjeta).
     caja.querySelector('[data-accion="mismo-dia"]')?.addEventListener('click', () => {
