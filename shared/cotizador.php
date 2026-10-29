@@ -104,14 +104,30 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 <div class="lg:col-span-1 space-y-3">
                 <!-- Historial de cotizaciones guardadas (actividades, hoteles e itinerarios para
                      reusar en esta): es de toda la cotización, por eso va sobre Datos Pax. -->
-                <button id="historial-tours-btn" type="button" class="solo-cotizacion historial-cta" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
-                    <span class="historial-cta-icono"><i class="fas fa-clock-rotate-left"></i></span>
-                    <span class="historial-cta-texto">
-                        <strong>Historial</strong>
-                        <small>Reusa lo de cotizaciones guardadas</small>
-                    </span>
-                    <i class="fas fa-chevron-right historial-cta-flecha"></i>
-                </button>
+                <!-- Se despliega debajo del botón: buscador + últimas guardadas (ver
+                     abrirHistorialTours en cotizador.js). -->
+                <div id="historial-drop" class="solo-cotizacion historial-drop">
+                    <button id="historial-tours-btn" type="button" class="historial-cta" aria-expanded="false" aria-controls="historial-panel" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
+                        <span class="historial-cta-icono"><i class="fas fa-clock-rotate-left"></i></span>
+                        <span class="historial-cta-texto">
+                            <strong>Historial</strong>
+                            <small>Reusa lo de cotizaciones guardadas</small>
+                        </span>
+                        <i class="fas fa-chevron-down historial-cta-flecha"></i>
+                    </button>
+                    <div id="historial-panel" class="historial-panel" hidden>
+                        <div class="historial-buscar">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input id="historial-tours-search" type="search" autocomplete="off" placeholder="Buscar por ID, pasajero o contacto" aria-label="Buscar en el historial" aria-controls="historial-tours-list">
+                        </div>
+                        <p id="historial-titulo" class="historial-titulo">Últimas guardadas</p>
+                        <div id="historial-tours-list" class="historial-lista"></div>
+                        <div id="historial-pie" class="historial-pie" hidden>
+                            <span id="historial-tours-page-info"></span>
+                            <button id="historial-tours-mas" type="button">Ver más</button>
+                        </div>
+                    </div>
+                </div>
                 <section id="datos-pax-section" class="card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
                         <button type="button" class="accordion-toggle" aria-expanded="true">
@@ -342,26 +358,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </main>
         </div>
         </div>
-        </div>
-    </div>
-    <div id="historial-tours-modal" class="modal-overlay hidden">
-        <div class="modal-content" style="max-width:600px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="text-lg font-semibold">Historial de Cotizaciones</h2>
-                <button id="close-historial-tours-btn" class="text-xl text-slate-500">&times;</button>
-            </div>
-            <div class="relative mb-3">
-                <input id="historial-tours-search" class="input rounded px-2 py-2 border pl-8 text-sm w-full" type="text" placeholder="Buscar por ID, Nombre o Contacto...">
-                <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-            </div>
-            <div id="historial-tours-list" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
-            <div class="flex justify-between items-center mt-3 pt-3 border-t text-sm text-slate-600">
-                <span id="historial-tours-page-info"></span>
-                <div class="flex gap-2">
-                    <button id="historial-tours-prev" class="btn border">Anterior</button>
-                    <button id="historial-tours-next" class="btn border">Siguiente</button>
-                </div>
-            </div>
         </div>
     </div>
     <!-- Modales del armador de Itinerario embebido (itinerario/itinerario.js) — mismos ids

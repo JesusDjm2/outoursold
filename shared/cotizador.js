@@ -314,35 +314,86 @@ function renderPaqueteAplicado() {
 }
 
 // ===== Historial de Cotizaciones guardadas (traer TODAS sus actividades a la vista actual) =====
-const HIST_PAGE_SIZE = 15;
-const histState = { term: '', offset: 0, total: 0 };
+// Se despliega debajo del botón Historial: buscador arriba y las últimas guardadas;
+// "Ver más" trae las siguientes en la misma lista.
+const HIST_PAGE_SIZE = 8;
+// pedido: número de la última carga; descarta respuestas viejas si se escribe rápido.
+const histState = { term: '', offset: 0, total: 0, items: [], pedido: 0 };
 let histSearchDebounce = null;
 
-async function abrirHistorialTours() {
-    document.getElementById('historial-tours-modal').classList.remove('hidden');
-    histState.term = '';
-    histState.offset = 0;
-    document.getElementById('historial-tours-search').value = '';
-    await cargarHistorialTours();
+function historialAbierto() {
+    return !document.getElementById('historial-panel').hidden;
 }
 
-async function cargarHistorialTours() {
-    const container = document.getElementById('historial-tours-list');
-    container.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Cargando...</p>';
-    try {
-        const params = new URLSearchParams({ q: histState.term, limit: HIST_PAGE_SIZE, offset: histState.offset });
-        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`).then(r => r.json());
-        renderHistorialTours(res.results || [], res.total || 0);
-    } catch (e) {
-        container.innerHTML = '<p class="text-red-500 text-sm text-center py-6">Error al cargar el historial.</p>';
-        document.getElementById('historial-tours-page-info').textContent = '';
-        document.getElementById('historial-tours-prev').disabled = true;
-        document.getElementById('historial-tours-next').disabled = true;
-    }
+function abrirHistorialTours() {
+    document.getElementById('historial-panel').hidden = false;
+    document.getElementById('historial-drop').classList.add('is-abierto');
+    document.getElementById('historial-tours-btn').setAttribute('aria-expanded', 'true');
+    const input = document.getElementById('historial-tours-search');
+    input.value = '';
+    histState.term = '';
+    cargarHistorialTours();
+    // En celular/tablet no se enfoca: el teclado taparía la lista recién abierta.
+    if (window.matchMedia('(hover: hover)').matches) input.focus();
 }
 
 function cerrarHistorialTours() {
-    document.getElementById('historial-tours-modal').classList.add('hidden');
+    if (!historialAbierto()) return;
+    clearTimeout(histSearchDebounce);
+    document.getElementById('historial-panel').hidden = true;
+    document.getElementById('historial-drop').classList.remove('is-abierto');
+    document.getElementById('historial-tours-btn').setAttribute('aria-expanded', 'false');
+}
+
+async function cargarHistorialTours(mas = false) {
+    const container = document.getElementById('historial-tours-list');
+    const pedido = ++histState.pedido;
+    if (!mas) {
+        histState.offset = 0;
+        histState.items = [];
+        container.innerHTML = '<div class="historial-cargando"><span></span><span></span><span></span></div>';
+        document.getElementById('historial-pie').hidden = true;
+    }
+    const btnMas = document.getElementById('historial-tours-mas');
+    btnMas.disabled = true;
+    btnMas.textContent = 'Cargando...';
+    try {
+        const params = new URLSearchParams({ q: histState.term, limit: HIST_PAGE_SIZE, offset: histState.offset });
+        const res = await fetch(`${API_URL}?path=cotizaciones&${params}`).then(r => r.json());
+        if (pedido !== histState.pedido) return;
+        const nuevas = res.results || [];
+        histState.items.push(...nuevas);
+        histState.offset += nuevas.length;
+        histState.total = res.total || 0;
+        renderHistorialTours();
+    } catch (e) {
+        if (pedido !== histState.pedido) return;
+        container.innerHTML = '<p class="historial-vacio is-error"><i class="fas fa-triangle-exclamation"></i>No se pudo cargar el historial.</p>';
+        document.getElementById('historial-pie').hidden = true;
+    } finally {
+        btnMas.disabled = false;
+        btnMas.textContent = 'Ver más';
+    }
+}
+
+// "hoy 14:20", "ayer", "28 oct" o "28 oct 2025" (otro año).
+function fechaHistorial(fechaGuardado) {
+    if (!fechaGuardado) return '';
+    const f = new Date(fechaGuardado.replace(' ', 'T'));
+    if (isNaN(f)) return '';
+    const hoy = new Date();
+    const dias = Math.round((new Date(hoy.toDateString()) - new Date(f.toDateString())) / 86400000);
+    if (dias === 0) return `hoy ${f.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`;
+    if (dias === 1) return 'ayer';
+    const opciones = { day: 'numeric', month: 'short' };
+    if (f.getFullYear() !== hoy.getFullYear()) opciones.year = 'numeric';
+    return f.toLocaleDateString('es-PE', opciones).replace('.', '');
+}
+
+function inicialesHistorial(nombre) {
+    const partes = nombre.trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return '?';
+    return ((partes[0][0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
 }
 
 // Resumen de lo que trae una cotización histórica, para el preview de la lista y para
@@ -359,36 +410,51 @@ function resumenHistorialCotizacion(c) {
     return { tours, hoteles, modulos, resumen: partes.join(' · ') };
 }
 
-function renderHistorialTours(cotizacionesGuardadas, total) {
+function renderHistorialTours() {
     const container = document.getElementById('historial-tours-list');
+    document.getElementById('historial-titulo').textContent = histState.term ? 'Resultados' : 'Últimas guardadas';
     // No la que se está editando ahora mismo, y que traiga algo de las 3 secciones.
-    const conContenido = cotizacionesGuardadas
+    const conContenido = histState.items
         .filter(c => c.id !== currentCotizacionId)
         .map(c => ({ c, r: resumenHistorialCotizacion(c) }))
         .filter(({ r }) => r.tours.length || r.hoteles.length || r.modulos.length);
     container.innerHTML = '';
     if (!conContenido.length) {
-        container.innerHTML = `<p class="text-slate-400 text-sm text-center py-6">${histState.term ? 'Sin resultados.' : 'Todavía no hay cotizaciones guardadas con actividades, hoteles o itinerario.'}</p>`;
+        container.innerHTML = histState.term
+            ? `<p class="historial-vacio"><i class="fas fa-magnifying-glass"></i>Nada coincide con «${escapeHtml(histState.term)}».</p>`
+            : '<p class="historial-vacio"><i class="fas fa-box-open"></i>Todavía no hay cotizaciones guardadas con actividades, hoteles o itinerario.</p>';
     } else {
         conContenido.forEach(({ c, r }) => {
-            const nombre = c.data.pax?.nombre_pax || 'Sin nombre';
-            const div = document.createElement('div');
-            div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
-            div.innerHTML = `
-                <div class="min-w-0">
-                    <div class="font-medium truncate">${escapeHtml(c.id)} — ${escapeHtml(nombre)}</div>
-                    <div class="text-xs text-slate-500 truncate">${escapeHtml(r.resumen)}</div>
-                </div>
-                <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-[var(--accent-2)] hover:text-[var(--accent-2)] transition flex-shrink-0">Reusar</button>
-            `;
-            div.querySelector('button').addEventListener('click', () => reusarHistorialCotizacion(c));
-            container.appendChild(div);
+            const nombre = c.data.pax?.nombre_pax?.trim() || 'Sin nombre';
+            const fecha = fechaHistorial(c.fecha_guardado);
+            const conteo = (icono, n, texto) => n ? `<span title="${n} ${texto}"><i class="fas ${icono}"></i>${n}</span>` : '';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'historial-item';
+            btn.title = `Reusar ${r.resumen}`;
+            btn.innerHTML = `
+                <span class="historial-item-avatar" aria-hidden="true">${escapeHtml(inicialesHistorial(nombre))}</span>
+                <span class="historial-item-txt">
+                    <span class="historial-item-fila">
+                        <strong>${escapeHtml(nombre)}</strong>
+                        ${fecha ? `<time>${escapeHtml(fecha)}</time>` : ''}
+                    </span>
+                    <span class="historial-item-meta">
+                        <span class="historial-item-id">${escapeHtml(c.id)}</span>
+                        ${conteo('fa-ticket', r.tours.length, r.tours.length === 1 ? 'actividad' : 'actividades')}
+                        ${conteo('fa-bed', r.hoteles.length, r.hoteles.length === 1 ? 'hotel' : 'hoteles')}
+                        ${conteo('fa-route', r.modulos.length, r.modulos.length === 1 ? 'módulo de itinerario' : 'módulos de itinerario')}
+                    </span>
+                </span>
+                <span class="historial-item-reusar">Reusar</span>`;
+            btn.addEventListener('click', () => reusarHistorialCotizacion(c));
+            container.appendChild(btn);
         });
     }
-    const shown = histState.offset + cotizacionesGuardadas.length;
-    document.getElementById('historial-tours-page-info').textContent = total === 0 ? '' : `${histState.offset + 1}-${shown} de ${total}`;
-    document.getElementById('historial-tours-prev').disabled = histState.offset === 0;
-    document.getElementById('historial-tours-next').disabled = shown >= total;
+    const quedan = histState.offset < histState.total;
+    document.getElementById('historial-pie').hidden = !histState.total;
+    document.getElementById('historial-tours-page-info').textContent = `${histState.offset} de ${histState.total}`;
+    document.getElementById('historial-tours-mas').hidden = !quedan;
 }
 
 // Trae TODAS las actividades, hoteles e itinerario de esa cotización guardada a la vista
@@ -1495,8 +1561,7 @@ async function init() {
     });
     actualizarEstadosCamposFecha();
 
-    document.getElementById('historial-tours-btn').addEventListener('click', abrirHistorialTours);
-    document.getElementById('close-historial-tours-btn').addEventListener('click', cerrarHistorialTours);
+    document.getElementById('historial-tours-btn').addEventListener('click', () => historialAbierto() ? cerrarHistorialTours() : abrirHistorialTours());
     // Itinerario embebido: sigue el idioma de Datos Pax en vez de sus propias pestañas
     // (que no se renderizan acá), y el Nombre PAX es el pasajero del itinerario. El nombre
     // del itinerario se escribe aparte (#itinerary-title, sobre las tarjetas).
@@ -1505,26 +1570,38 @@ async function init() {
         document.getElementById('itinerary-passenger').value = e.target.value;
     });
     document.querySelector('input[name="f_llegada"]').addEventListener('change', resincronizarFechasConLlegada);
-    document.getElementById('historial-tours-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'historial-tours-modal') cerrarHistorialTours();
+    // Se cierra al tocar fuera o con Escape (que devuelve el foco al botón).
+    document.addEventListener('pointerdown', (e) => {
+        if (historialAbierto() && !document.getElementById('historial-drop').contains(e.target)) cerrarHistorialTours();
+    });
+    document.getElementById('historial-drop').addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && historialAbierto()) {
+            e.preventDefault();
+            cerrarHistorialTours();
+            document.getElementById('historial-tours-btn').focus();
+            return;
+        }
+        // Flechas: del buscador a la lista y entre las cotizaciones.
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        const items = [...document.querySelectorAll('#historial-tours-list .historial-item')];
+        if (!items.length) return;
+        const i = items.indexOf(document.activeElement);
+        if (e.target.id === 'historial-tours-search' && e.key === 'ArrowDown') { e.preventDefault(); items[0].focus(); return; }
+        if (i < 0) return;
+        e.preventDefault();
+        if (e.key === 'ArrowDown') items[Math.min(i + 1, items.length - 1)].focus();
+        else if (i === 0) document.getElementById('historial-tours-search').focus();
+        else items[i - 1].focus();
     });
     document.getElementById('historial-tours-search').addEventListener('input', (e) => {
         clearTimeout(histSearchDebounce);
         const term = e.target.value.trim();
         histSearchDebounce = setTimeout(() => {
             histState.term = term;
-            histState.offset = 0;
             cargarHistorialTours();
         }, 300);
     });
-    document.getElementById('historial-tours-prev').addEventListener('click', () => {
-        histState.offset = Math.max(0, histState.offset - HIST_PAGE_SIZE);
-        cargarHistorialTours();
-    });
-    document.getElementById('historial-tours-next').addEventListener('click', () => {
-        histState.offset += HIST_PAGE_SIZE;
-        cargarHistorialTours();
-    });
+    document.getElementById('historial-tours-mas').addEventListener('click', () => cargarHistorialTours(true));
 
     document.getElementById('close-pdf-preview-btn').addEventListener('click', cerrarModalPdf);
     document.getElementById('pdf-preview-modal').addEventListener('click', (e) => {

@@ -412,4 +412,106 @@ input[readonly] {
     outline: none;
 }
 .historial-cta:hover .historial-cta-icono, .historial-cta:focus-visible .historial-cta-icono { background: var(--accent-1, #e80c13); color: white; }
-.historial-cta:hover .historial-cta-flecha { color: var(--accent-1, #e80c13); transform: translateX(3px); }
+.historial-cta:hover .historial-cta-flecha { color: var(--accent-1, #e80c13); }
+
+/* ===== Historial desplegable (buscador + últimas guardadas) ===== */
+.historial-drop { position: relative; z-index: 30; }
+.historial-drop.is-abierto .historial-cta { border-color: var(--accent-1, #e80c13); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1, #e80c13) 12%, transparent); }
+.historial-drop.is-abierto .historial-cta-icono { background: var(--accent-1, #e80c13); color: white; }
+.historial-drop.is-abierto .historial-cta-flecha { color: var(--accent-1, #e80c13); transform: rotate(180deg); }
+.historial-panel {
+    position: absolute; top: calc(100% + 6px); left: 0;
+    /* En escritorio la columna es angosta: el panel se abre más ancho, hacia la derecha. */
+    width: max(100%, 380px); max-width: calc(100vw - 32px);
+    display: flex; flex-direction: column;
+    max-height: min(480px, 70vh);
+    border: 1px solid #e2e8f0; border-radius: 14px;
+    background: white;
+    box-shadow: 0 18px 44px -12px rgba(15, 23, 42, 0.28), 0 2px 6px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+    animation: historial-entra 0.14s ease-out;
+}
+.historial-panel[hidden] { display: none; }
+@keyframes historial-entra { from { opacity: 0; transform: translateY(-4px); } }
+.historial-buscar { position: relative; padding: 10px 10px 6px; }
+.historial-buscar i { position: absolute; left: 22px; top: 50%; margin-top: 2px; transform: translateY(-50%); font-size: 0.78rem; color: #94a3b8; pointer-events: none; }
+.historial-buscar input {
+    width: 100%; height: 38px; padding: 0 12px 0 34px;
+    border: 1px solid #e2e8f0; border-radius: 10px;
+    background: #f8fafc;
+    font-size: 0.85rem; color: #0f172a;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.historial-buscar input:focus { outline: none; background: white; border-color: var(--accent-1, #e80c13); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1, #e80c13) 12%, transparent); }
+.historial-titulo { padding: 6px 16px 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; }
+.historial-lista { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 6px; }
+.historial-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 8px 10px;
+    border-radius: 10px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.historial-item + .historial-item { margin-top: 1px; }
+.historial-item:hover, .historial-item:focus-visible { background: #f1f5f9; outline: none; }
+.historial-item:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-1, #e80c13); }
+.historial-item-avatar {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: #f1f5f9; color: #475569;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.historial-item:hover .historial-item-avatar, .historial-item:focus-visible .historial-item-avatar { background: white; }
+.historial-item-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.historial-item-fila { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.historial-item-fila strong { flex: 1; min-width: 0; font-size: 0.84rem; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.historial-item-fila time { flex-shrink: 0; font-size: 0.7rem; color: #94a3b8; }
+.historial-item-meta { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 0.72rem; color: #64748b; white-space: nowrap; overflow: hidden; }
+.historial-item-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.historial-item-meta i { font-size: 0.66rem; color: #94a3b8; }
+.historial-item-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; color: #475569; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex-shrink: 1; }
+.historial-item-reusar {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: 1px solid #e2e8f0; border-radius: 999px;
+    font-size: 0.72rem; font-weight: 600; color: #475569;
+    background: white;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.historial-item:hover .historial-item-reusar, .historial-item:focus-visible .historial-item-reusar { border-color: var(--accent-1, #e80c13); background: var(--accent-1, #e80c13); color: white; }
+.historial-vacio { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 16px; text-align: center; font-size: 0.8rem; color: #94a3b8; }
+.historial-vacio i { font-size: 1.1rem; color: #cbd5e1; }
+.historial-vacio.is-error, .historial-vacio.is-error i { color: #dc2626; }
+.historial-cargando { display: grid; gap: 6px; padding: 4px 4px 8px; }
+.historial-cargando span { height: 46px; border-radius: 10px; background: linear-gradient(90deg, #f1f5f9 25%, #f8fafc 50%, #f1f5f9 75%); background-size: 200% 100%; animation: historial-brillo 1.1s linear infinite; }
+@keyframes historial-brillo { to { background-position: -200% 0; } }
+.historial-pie {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 12px 8px 16px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 0.72rem; color: #94a3b8;
+}
+.historial-pie[hidden] { display: none; }
+.historial-pie button { padding: 5px 10px; border-radius: 8px; font-size: 0.76rem; font-weight: 600; color: var(--accent-1, #e80c13); }
+.historial-pie button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-1, #e80c13) 8%, white); }
+.historial-pie button:disabled { color: #94a3b8; cursor: wait; }
+/* Tablet y celular: la columna ocupa todo el ancho, el panel también. */
+@media (max-width: 1023px) {
+    .historial-panel { width: 100%; max-width: none; max-height: min(520px, 65vh); }
+}
+@media (max-width: 639px) {
+    .historial-buscar input { height: 42px; font-size: 16px; } /* 16px: iOS no hace zoom al enfocar */
+    .historial-item { padding: 10px 8px; min-height: 56px; }
+    .historial-item-reusar { padding: 6px 10px; }
+    .historial-item-meta { gap: 8px; }
+}
+@media (hover: none) {
+    /* Sin hover, "Reusar" se ve siempre activo para que se note que la fila se toca. */
+    .historial-item-reusar { color: var(--accent-1, #e80c13); border-color: color-mix(in srgb, var(--accent-1, #e80c13) 35%, white); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .historial-panel, .historial-cargando span { animation: none; }
+}

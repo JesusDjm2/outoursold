@@ -826,7 +826,7 @@ try {
             $countStmt->execute($params);
             $total = (int)$countStmt->fetchColumn();
 
-            $stmt = $db->prepare("SELECT id, data FROM $tablaCotizaciones$where ORDER BY fecha_guardado DESC LIMIT $limit OFFSET $offset");
+            $stmt = $db->prepare("SELECT id, data, fecha_guardado FROM $tablaCotizaciones$where ORDER BY fecha_guardado DESC LIMIT $limit OFFSET $offset");
             $stmt->execute($params);
             $results = [];
             while ($row = $stmt->fetch()) {
