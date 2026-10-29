@@ -358,6 +358,44 @@ function moverItinerario(uid, destino, antes) {
     iselToast(`${titulo} ahora es el Día ${tr.dataset.dia}`);
 }
 
+// Cambio de fecha (o de número de día) desde el detalle. Los días siguen correlativos:
+// - Único itinerario del primer día: sigue siendo el Día 1. Su nueva fecha pasa a ser la
+//   F. Llegada y todo el viaje se corre con él (Actividades y Hoteles también).
+// - Fecha de otro día con itinerario: lo reemplaza en la línea de tiempo y los de en medio
+//   ceden su día (se corren uno), en vez de juntarse los dos en el mismo día.
+// - Fecha de un día libre o posterior al último: va a ese día tal cual.
+function iselCambiarDiaDeFila(tr, dia) {
+    const actual = Number(tr.dataset.dia);
+    if (dia === actual) return;
+    const items = itemsArmado();
+    const inicio = items[0]?.dia ?? 1;
+    const llegadaInput = document.querySelector('input[name="f_llegada"]');
+    const soloEnPrimerDia = actual === inicio && items.filter(x => x.dia === inicio).length === 1;
+    if (soloEnPrimerDia && llegadaInput?.value) {
+        if (inicio > 1) filasArmado().forEach(f => { f.dataset.dia = String(Number(f.dataset.dia) - (inicio - 1)); });
+        llegadaInput.value = sumarDiasFechaISO(llegadaInput.value, dia - 1 - (inicio - 1));
+        llegadaInput.dispatchEvent(new Event('change', { bubbles: true }));
+        iselToast('Sigue siendo el Día 1: la F. Llegada y los demás días se corrieron');
+        return;
+    }
+    if (dia < 1) { notifyWarning('La fecha no puede ser anterior a la Fecha de llegada.'); return; }
+    if (!items.some(x => x.dia === dia && x.tr !== tr)) {
+        tr.dataset.dia = String(dia);
+        refrescarArmadoItinerario();
+        return;
+    }
+    const linea = iselLineaDeTiempo();
+    const origen = linea[iselIndiceDeFila(linea, tr)];
+    origen.filas = origen.filas.filter(f => f !== tr);
+    const destino = items.find(x => x.dia === dia && x.tr !== tr).tr;
+    const i = iselIndiceDeFila(linea, destino);
+    // Hacia adelante, si su día queda vacío los de en medio se adelantan uno y el destino
+    // cede su lugar yendo antes; si no, el destino se corre después.
+    const despues = dia > actual && !origen.filas.length;
+    linea.splice(despues ? i + 1 : i, 0, { tipo: 'dia', filas: [tr] });
+    iselAplicarLineaDeTiempo(linea, Math.min(inicio, dia));
+}
+
 // Mueve un bloque de días libres para que quede antes o después del día de la tarjeta
 // destino. Un día libre siempre va entre dos días con itinerario: no antes del primero ni
 // después del último.
@@ -963,6 +1001,8 @@ function renderDetalle() {
     const llegada = iselLlegada();
     const diasDelItinerario = [...new Set(itemsArmado().map(x => x.dia))];
     const esPrimerDia = dia !== null && dia === diasDelItinerario[0];
+    // Solo en el primer día puede ir antes de la llegada: su fecha pasa a ser la F. Llegada.
+    const minFecha = esPrimerDia && itemsArmado().filter(x => x.dia === dia).length === 1 ? '' : ` min="${llegada}"`;
     caja.innerHTML = `
         <div class="idet-media">
             ${iselMediaHtml(e)}
@@ -976,7 +1016,7 @@ function renderDetalle() {
                 <label>
                     <span>${llegada ? 'Fecha' : 'Día'}</span>
                     ${llegada
-                        ? `<input type="date" class="idet-fecha-input" value="${iselFechaDia(dia)}" min="${llegada}">`
+                        ? `<input type="date" class="idet-fecha-input" value="${iselFechaDia(dia)}"${minFecha}>`
                         : `<input type="number" class="idet-dia-input" value="${dia}" min="1" max="366">`}
                 </label>
                 <span class="idet-fecha-dia">Día ${dia}${iselFechaCorta(dia) ? ` · ${escapeHtml(iselFechaCorta(dia))}` : ''}</span>
@@ -1010,9 +1050,7 @@ function enlazarDetalle(caja, e) {
     // reenfocar: volver al campo tras aplicar (no cuando se aplicó porque el usuario salió de él).
     const cambiarDia = (dia, reenfocar = true) => {
         if (!tr || !Number.isFinite(dia) || !detalleActual) return;
-        if (dia < 1) { notifyWarning('La fecha no puede ser anterior a la Fecha de llegada.'); renderDetalle(); return; }
-        tr.dataset.dia = String(dia);
-        refrescarArmadoItinerario();
+        iselCambiarDiaDeFila(tr, dia);
         renderDetalle();
         if (reenfocar) caja.querySelector('.idet-fecha-input, .idet-dia-input')?.focus();
     };
