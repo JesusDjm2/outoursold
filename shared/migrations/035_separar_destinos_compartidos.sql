@@ -1,15 +1,3 @@
--- Destinos que se pasaron a Con / Sin pernocte cuando los destinos todavía eran compartidos
--- (antes de la 034), pero que también usan Actividades / Hoteles. Desde la 034 un destino
--- con grupo es SOLO de Itinerarios, así que sus actividades, hoteles y categorías quedaron
--- "Sin clasificar". Se separa cada uno en dos:
---   - el destino original vuelve a ser de Actividades / Hoteles (grupo_id NULL), con sus
---     tours, hoteles y categorías de siempre;
---   - en su grupo queda un destino de Itinerarios con el mismo nombre (se crea, o se usa el
---     que ya exista con ese nombre en ese grupo), y a él pasan los itinerarios (es/en/pt) y
---     las categorías de itinerarios.
--- Si no hay ningún destino en esa situación, no cambia nada. Correr TODO junto (usa una
--- tabla temporal de la sesión).
-
 CREATE TEMPORARY TABLE tmp_destinos_a_separar AS
 SELECT d.id AS viejo_id, d.nombre, d.grupo_id, d.creado_por, CAST(NULL AS SIGNED) AS nuevo_id
 FROM destinos d
