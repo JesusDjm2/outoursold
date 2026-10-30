@@ -52,6 +52,10 @@
         padding-right: 0.5rem;
     }
 }
+/* Sin menú lateral fijo el hero llega al borde de la pantalla: ahí sí necesita su margen. */
+@media (min-width: 768px) and (max-width: 900px) {
+    .page-hero .md\:px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+}
 
 /* Modal de "arrastrar para reposicionar" (hero-edit.js) — se arma por JS, inyectado al
    elegir una imagen nueva de Hero, antes de subirla. Dos marcos, mismo valor sincronizado:

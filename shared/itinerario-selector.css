@@ -186,8 +186,9 @@
 .itin-card-nuevo:hover, .itin-card-nuevo.is-destino { border-color: var(--ia-accent); color: var(--ia-accent); background: var(--ia-accent-soft); }
 .itin-card-nuevo.is-destino { border-style: solid; }
 
-/* Sin itinerarios todavía. */
+/* Sin itinerarios todavía. Ocupa toda la grilla (en tablet y celular .itin-grilla es grid). */
 .itin-vacio {
+    grid-column: 1 / -1;
     width: 100%;
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     padding: 18px;
@@ -199,6 +200,7 @@
 }
 .itin-vacio:hover { border-color: var(--ia-accent); background: var(--ia-accent-soft); }
 .itin-vacio-icono { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--ia-accent-soft); color: var(--ia-accent); font-size: 1.1rem; }
+.itin-vacio > span:nth-child(2) { flex: 1 1 200px; min-width: 0; }
 .itin-vacio strong { display: block; color: var(--ia-ink); font-size: 0.9rem; }
 .itin-vacio small { display: block; color: var(--ia-muted); font-size: 0.78rem; margin-top: 2px; }
 .itin-vacio-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; background: var(--ia-accent); color: #fff; font-size: 0.8rem; font-weight: 600; }
@@ -580,7 +582,8 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .itin-libre-card small { font-size: 0.56rem; }
     .itin-libre-card-ctrl button, .itin-libre-card-quitar { width: 22px; height: 22px; }
     .itin-libre-card-quitar { top: 3px; right: 3px; }
-    .itin-vacio-cta { margin-left: 0; }
+    .itin-vacio { padding: 14px; gap: 10px 12px; }
+    .itin-vacio-cta { margin-left: 0; width: 100%; justify-content: center; padding: 10px 12px; }
     .itin-panel { margin-left: -6px; margin-right: -6px; padding: 12px 10px; }
     .itin-panel-destino { width: 100%; flex-wrap: wrap; }
     .itin-panel-destino select { flex: 1; }

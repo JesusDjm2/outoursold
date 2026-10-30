@@ -83,6 +83,9 @@
     cursor: pointer;
     transition: transform 0.15s ease, background 0.15s ease;
 }
+/* Al bajar por la página se esconde para no tapar el contenido; reaparece al subir. */
+.sidebar-toggle-btn { transition: transform 0.2s ease, opacity 0.2s ease; }
+.sidebar-toggle-btn.is-oculto { transform: translateY(-70px); opacity: 0; pointer-events: none; }
 .sidebar-toggle-btn:hover {
     background: #ffffff;
 }
@@ -114,11 +117,11 @@
 @media (max-width: 900px) {
     .app-sidebar {
         transform: translateX(-100%);
-        box-shadow: 0 0 25px rgba(0, 0, 0, 0.25);
         width: min(var(--sidebar-w), 85vw);
         z-index: 55;
     }
-    .app-sidebar.open { transform: translateX(0); }
+    /* La sombra solo abierto: cerrado se asomaba como una franja gris en el borde izquierdo. */
+    .app-sidebar.open { transform: translateX(0); box-shadow: 0 0 25px rgba(0, 0, 0, 0.25); }
     .app-content { margin-left: 0 !important; padding-top: 0 !important; }
     .sidebar-toggle-btn { display: flex; align-items: center; justify-content: center; }
     .app-sidebar.open ~ .sidebar-toggle-btn { display: none; }

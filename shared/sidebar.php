@@ -66,6 +66,15 @@
         });
         backdrop.addEventListener('click', close);
 
+        // Botón flotante: se esconde al bajar (taparía el contenido) y vuelve al subir.
+        let scrollPrevio = window.scrollY;
+        window.addEventListener('scroll', () => {
+            const y = window.scrollY;
+            if (Math.abs(y - scrollPrevio) < 8) return;
+            toggle.classList.toggle('is-oculto', y > scrollPrevio && y > 80);
+            scrollPrevio = y;
+        }, { passive: true });
+
         collapseBtn.addEventListener('click', () => {
             const collapsed = document.body.classList.toggle('sidebar-collapsed');
             localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');

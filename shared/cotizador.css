@@ -379,6 +379,185 @@ input[readonly] {
     }
 }
 
+/* Sin el encabezado de la tabla hace falta el nombre de cada sección también abierta. */
+@media (max-width: 1279px) {
+    .accordion-label-collapsed { display: inline; font-size: 0.95rem; font-weight: 500; color: #1e293b; }
+    .accordion-section.is-collapsed .accordion-label-collapsed { font-size: 0.95rem; }
+}
+
+/* De 1024 a 1279 el menú lateral fijo le quita 240px al contenido: con Datos Pax al costado
+   las tablas quedaban en ~520px. Como en tablet, todo a una columna. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+    #cotizador-section > main { grid-template-columns: minmax(0, 1fr); }
+    #cotizador-section > main > * { grid-column: 1 / -1; }
+    #form-pax { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Tablet: Actividades y Hoteles caben sin deslizar si se compactan; con los precios
+   confidenciales visibles ya no, y ahí vuelve el scroll de la tabla. */
+@media (min-width: 768px) and (max-width: 1279px) {
+    #tours-table, #hotels-table { min-width: 0; }
+    #tours-table.mostrar-confidencial { min-width: 690px; }
+    #hotels-table.mostrar-confidencial { min-width: 880px; }
+    #tours-table th, #hotels-table th { padding-left: 4px; padding-right: 4px; font-size: 0.72rem; }
+    #tours-table td, #hotels-table td { padding-left: 2px; padding-right: 2px; }
+    #tours-body td:nth-child(2), #hotels-body td:nth-child(2), #hotels-body td:nth-child(3) { min-width: 124px; }
+    #tours-body td:nth-child(3), #hotels-body td:nth-child(4) { min-width: 130px; }
+    #hotels-body .nhab, #hotels-body .noches { min-width: 46px; }
+}
+
+/* Celular: cada fila de Actividades y Hoteles es una tarjeta con sus campos etiquetados. El
+   tirador se oculta porque arrastrar filas no funciona con el dedo. La grilla convierte los
+   <td> en bloques sin tocar su display, así que hidden y .col-confidencial siguen mandando. */
+@media (max-width: 767px) {
+    #tours-table, #hotels-table { display: block; min-width: 0; }
+    #tours-table thead, #hotels-table thead { display: none; }
+    #tours-body, #hotels-body { display: flex; flex-direction: column; gap: 10px; }
+    #tours-body tr, #hotels-body tr {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 8px 6px;
+        padding: 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        cursor: default;
+    }
+    #tours-body td, #hotels-body td { min-width: 0; padding: 0; white-space: normal; }
+    #tours-body td:first-child, #hotels-body td:first-child { display: none; }
+    #tours-body .input, #hotels-body .input { width: 100%; max-width: none; height: 38px; }
+    #tours-body td::before, #hotels-body td::before {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 0.66rem; font-weight: 600; letter-spacing: 0.02em;
+        color: #94a3b8;
+    }
+    #tours-body td.total-line, #hotels-body td.total-line { font-weight: 600; font-size: 0.85rem; color: #0f172a; line-height: 38px; }
+    #tours-body td.total-line::before, #hotels-body td.total-line::before { line-height: 1.3; text-align: right; }
+    #tours-body td:last-child, #hotels-body td:last-child { align-self: end; text-align: right; }
+    #tours-body td:last-child button, #hotels-body td:last-child button { width: 38px; height: 38px; border-radius: 8px; }
+
+    #tours-body tr {
+        grid-template-areas:
+            "fecha fecha fecha fecha fecha fecha fecha fecha fecha fecha acc acc"
+            "tour tour tour tour tour tour tour tour tour tour tour tour"
+            "cant cant cant distr distr distr distr total total total total total";
+    }
+    #tours-table.mostrar-confidencial #tours-body tr {
+        grid-template-areas:
+            "fecha fecha fecha fecha fecha fecha fecha fecha fecha fecha acc acc"
+            "tour tour tour tour tour tour tour tour tour tour tour tour"
+            "cant cant cant distr distr distr distr total total total total total"
+            "pconf pconf pconf pconf pconf pconf pctotal pctotal pctotal pctotal pctotal pctotal";
+    }
+    #tours-body td:nth-child(2) { grid-area: fecha; }
+    #tours-body td:nth-child(2)::before { content: 'Fecha'; }
+    #tours-body td:nth-child(3) { grid-area: tour; }
+    #tours-body td:nth-child(3)::before { content: 'Tour / Actividad'; }
+    #tours-body td:nth-child(4) { grid-area: cant; }
+    #tours-body td:nth-child(4)::before { content: 'Cant.'; }
+    #tours-body td:nth-child(5) { grid-area: distr; }
+    #tours-body td:nth-child(5)::before { content: 'Distr.'; }
+    #tours-body td:nth-child(8) { grid-area: pconf; }
+    #tours-body td:nth-child(8)::before { content: 'Precio Conf.'; }
+    #tours-body td:nth-child(9) { grid-area: pctotal; }
+    #tours-body td:nth-child(9)::before { content: 'Precio C. Total'; }
+    #tours-body td:nth-child(10) { grid-area: total; }
+    #tours-body td:nth-child(10)::before { content: 'Total línea'; }
+    #tours-body td:nth-child(11) { grid-area: acc; }
+
+    #hotels-body tr {
+        grid-template-areas:
+            "cin cin cin cin cin cin cout cout cout cout cout cout"
+            "hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel"
+            "nhab nhab nhab noches noches noches total total total total acc acc";
+    }
+    #hotels-table.mostrar-confidencial #hotels-body tr {
+        grid-template-areas:
+            "cin cin cin cin cin cin cout cout cout cout cout cout"
+            "hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel"
+            "pconf pconf pconf pconf pconf pconf pctotal pctotal pctotal pctotal pctotal pctotal"
+            "nhab nhab nhab noches noches noches total total total total acc acc";
+    }
+    #hotels-body td:nth-child(2) { grid-area: cin; }
+    #hotels-body td:nth-child(2)::before { content: 'Check-in'; }
+    #hotels-body td:nth-child(3) { grid-area: cout; }
+    #hotels-body td:nth-child(3)::before { content: 'Check-out'; }
+    #hotels-body td:nth-child(4) { grid-area: hotel; }
+    #hotels-body td:nth-child(4)::before { content: 'Hotel / Hospedaje'; }
+    #hotels-body td:nth-child(5) { grid-area: nhab; }
+    #hotels-body td:nth-child(5)::before { content: 'N° Hab.'; }
+    #hotels-body td:nth-child(6) { grid-area: noches; }
+    #hotels-body td:nth-child(6)::before { content: 'Noches'; }
+    #hotels-body td:nth-child(9) { grid-area: pconf; }
+    #hotels-body td:nth-child(9)::before { content: 'Precio Conf.'; }
+    #hotels-body td:nth-child(10) { grid-area: pctotal; }
+    #hotels-body td:nth-child(10)::before { content: 'Precio C. Total'; }
+    #hotels-body td:nth-child(11) { grid-area: total; }
+    #hotels-body td:nth-child(11)::before { content: 'Total línea'; }
+    #hotels-body td:nth-child(12) { grid-area: acc; }
+    /* El selector abre un panel fijo: la envoltura ya no necesita recortar nada. */
+    .overflow-x-auto:has(> #tours-table), .overflow-x-auto:has(> #hotels-table) { overflow: visible; }
+}
+
+/* Usuarios y Agencias: sus columnas no caben ni en tablet ni en laptop chica con el menú
+   fijo. Tarjetas en 2 columnas o más, y en 1 en celular. */
+@media (max-width: 1365px) {
+    #panel-usuarios table { display: block; min-width: 0; }
+    #panel-usuarios thead { display: none; }
+    #usuarios-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 10px; }
+    #usuarios-body tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "nombre estado" "email email" "rol agencia" "ultimo creado" "acc acc";
+        gap: 8px 12px;
+        padding: 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+    }
+    #usuarios-body td { padding: 0; white-space: normal; min-width: 0; overflow-wrap: anywhere; }
+    #usuarios-body td::before { display: block; margin-bottom: 2px; font-size: 0.66rem; font-weight: 600; color: #94a3b8; }
+    #usuarios-body td:nth-child(1) { grid-area: nombre; font-size: 0.92rem; }
+    #usuarios-body td:nth-child(2) { grid-area: email; margin-top: -6px; color: #64748b; }
+    #usuarios-body td:nth-child(3) { grid-area: rol; }
+    #usuarios-body td:nth-child(3)::before { content: 'Rol'; }
+    #usuarios-body td:nth-child(3) select { width: 100%; }
+    #usuarios-body td:nth-child(4) { grid-area: agencia; }
+    #usuarios-body td:nth-child(4)::before { content: 'Agencia'; }
+    #usuarios-body td:nth-child(5) { grid-area: estado; justify-self: end; }
+    #usuarios-body td:nth-child(6) { grid-area: ultimo; }
+    #usuarios-body td:nth-child(6)::before { content: 'Último acceso'; }
+    #usuarios-body td:nth-child(7) { grid-area: creado; }
+    #usuarios-body td:nth-child(7)::before { content: 'Creado'; }
+    #usuarios-body td:nth-child(8) { grid-area: acc; display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+
+    /* Agencias: logo + nombre + acciones / datos de contacto / colores y principal. */
+    #panel-agencias #agsub-listado table { display: block; min-width: 0; }
+    #panel-agencias #agsub-listado thead { display: none; }
+    #agencias-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 10px; }
+    #agencias-body tr {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 6px 10px;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+    }
+    #agencias-body td { padding: 0; white-space: normal; min-width: 0; overflow-wrap: anywhere; }
+    #agencias-body td[colspan] { grid-column: 1 / -1; }
+    #agencias-body td:nth-child(n+3):not(:last-child) { grid-column: 1 / -1; font-size: 0.8rem; color: #475569; }
+    #agencias-body td:nth-child(3)::before { content: 'RUC: '; color: #94a3b8; }
+    #agencias-body td:nth-child(4)::before { content: 'Teléfono: '; color: #94a3b8; }
+    #agencias-body td:nth-child(5)::before { content: 'WhatsApp: '; color: #94a3b8; }
+    #agencias-body td:last-child:not([colspan]) { grid-column: 3; grid-row: 1; }
+}
+@media (max-width: 767px) {
+    #panel-usuarios .card, #panel-agencias .card { padding: 14px; }
+    #panel-usuarios .card > .flex.justify-between { flex-wrap: wrap; gap: 10px; }
+    #abrir-nuevo-usuario-btn { width: 100%; justify-content: center; }
+}
+
 /* Historial (sobre Datos Pax): tarjeta-botón con icono, título y ayuda; al pasar se tiñe
    con el acento de la agencia. */
 .historial-cta {
