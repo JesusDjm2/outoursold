@@ -104,22 +104,14 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 <div class="lg:col-span-1 space-y-3">
                 <!-- Historial de cotizaciones guardadas (actividades, hoteles e itinerarios para
                      reusar en esta): es de toda la cotización, por eso va sobre Datos Pax. -->
-                <!-- Se despliega debajo del botón: buscador + últimas guardadas (ver
-                     abrirHistorialTours en cotizador.js). -->
+                <!-- El buscador siempre está a la vista; al hacer clic despliega las últimas
+                     guardadas debajo (ver abrirHistorialTours en cotizador.js). -->
                 <div id="historial-drop" class="solo-cotizacion historial-drop">
-                    <button id="historial-tours-btn" type="button" class="historial-cta" aria-expanded="false" aria-controls="historial-panel" title="Ver actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
-                        <span class="historial-cta-icono"><i class="fas fa-clock-rotate-left"></i></span>
-                        <span class="historial-cta-texto">
-                            <strong>Historial</strong>
-                            <small>Reusa lo de cotizaciones guardadas</small>
-                        </span>
-                        <i class="fas fa-chevron-down historial-cta-flecha"></i>
-                    </button>
+                    <div class="historial-buscar">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <input id="historial-tours-search" type="search" role="combobox" autocomplete="off" placeholder="Buscar en historial (ID, pasajero...)" aria-label="Buscar en el historial por ID, pasajero o contacto" aria-expanded="false" aria-controls="historial-panel" title="Actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
+                    </div>
                     <div id="historial-panel" class="historial-panel" hidden>
-                        <div class="historial-buscar">
-                            <i class="fas fa-magnifying-glass"></i>
-                            <input id="historial-tours-search" type="search" autocomplete="off" placeholder="Buscar por ID, pasajero o contacto" aria-label="Buscar en el historial" aria-controls="historial-tours-list">
-                        </div>
                         <p id="historial-titulo" class="historial-titulo">Últimas guardadas</p>
                         <div id="historial-tours-list" class="historial-lista"></div>
                         <div id="historial-pie" class="historial-pie" hidden>
@@ -185,44 +177,44 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
-                                <span class="accordion-label-collapsed">Itinerario</span>
+                                <h2 class="text-base font-medium">Itinerario</h2>
                             </button>
-                            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en
-                                 #paquete-aplicado, con un lápiz para editarlo ahí mismo). Uno nuevo
-                                 se crea armando la cotización normal y usando "Guardar como paquete"
-                                 (pide el nombre al guardar). -->
-                            <div id="paquete-toolbar" class="solo-cotizacion flex items-center gap-2 flex-wrap justify-end">
-                                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
-                                    <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
-                                    <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
-                                </span>
-                                <select id="aplicar-paquete-select" class="rounded-md small border px-2 py-1 bg-white">
-                                    <option value="">Aplicar paquete...</option>
-                                </select>
-                            </div>
                         </div>
                         <div class="accordion-body">
                         <!-- El pasajero sale del Nombre PAX (input oculto, lo lee itinerario.js). El
                              nombre del itinerario va en la portada y en las páginas finales del PDF;
                              vacío, el PDF usa "Itinerario de <pasajero>". -->
                         <input type="text" id="itinerary-passenger" class="hidden">
-                        <div class="field field-prefix itin-nombre-campo">
-                            <span class="field-prefix-label">Nombre del itinerario</span>
-                            <input type="text" id="itinerary-title" maxlength="120" placeholder="Ej.: Perú Mágico 8 días / 7 noches" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
+                        <div class="itin-datos small">
+                            <div class="field">
+                                <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
+                            </div>
+                            <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en
+                                 #paquete-aplicado, con un lápiz para editarlo ahí mismo). Uno nuevo
+                                 se crea armando la cotización normal y usando "Guardar como paquete"
+                                 (pide el nombre al guardar). Cubre itinerario, actividades y hoteles. -->
+                            <div id="paquete-toolbar" class="solo-cotizacion">
+                                <span id="paquete-aplicado" class="hidden items-center gap-1 text-xs pl-2 pr-1 py-1 rounded-full" style="background:rgba(187,49,53,0.12);color:var(--accent-2)" title="Paquete predefinido aplicado a esta cotización">
+                                    <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
+                                    <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
+                                </span>
+                                <div class="field">
+                                    <select id="aplicar-paquete-select" aria-label="Aplicar paquete">
+                                        <option value="">Aplicar paquete...</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        <!-- El "aplicar itinerario predeterminado" viejo (solo itinerario) se quitó: el
-                             selector "Aplicar paquete..." de arriba ya cubre itinerario junto con
-                             actividades y hoteles (ver #aplicar-paquete-select). -->
                         <!-- Armado del itinerario (shared/itinerario-selector.js): tarjetas por día,
-                             panel desplegable para elegir (Con / Sin hotel → destino → tarjetas con
-                             imagen) y popup de detalles/edición. La tabla de abajo queda oculta como
+                             popup para elegir (Con / Sin hotel → destino → tarjetas con imagen) y
+                             popup de detalles/edición. La tabla de abajo queda oculta como
                              almacén: la leen guardar, paquetes y el PDF (itinerario.js). -->
                         <div class="itin-armado">
                             <div class="itin-armado-barra">
                                 <span id="itin-resumen" class="itin-resumen"></span>
                             </div>
                             <div id="itin-grilla" class="itin-grilla"></div>
-                            <div id="itin-panel" class="itin-panel" hidden></div>
+                            <div id="itin-panel" class="ipan-overlay" hidden></div>
                         </div>
                         <div class="itinerary-table-container" hidden>
                             <table class="w-full small itin-armador-visual">
@@ -235,7 +227,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
                     </div>
                     <div class="card p-3 accordion-section" data-accordion-key="actividades">
-                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                        <div class="accordion-cab-tabla flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
                                 <span class="accordion-label-collapsed">Actividades</span>
@@ -271,7 +263,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
                     </div>
                     <div class="card p-3 accordion-section" data-accordion-key="hoteles">
-                         <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+                         <div class="accordion-cab-tabla flex items-center justify-between mb-2 flex-wrap gap-2">
                             <button type="button" class="accordion-toggle" aria-expanded="true">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
                                 <span class="accordion-label-collapsed">Hoteles</span>
@@ -307,14 +299,18 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
                         </div>
                     </div>
-                    <div class="card p-0 overflow-hidden">
+                    <!-- Empieza plegado y no recuerda su estado: se despliega solo al haber datos en
+                         Actividades u Hoteles (ver sincronizarResumenPlegado en cotizador.js). -->
+                    <div id="resumen-section" class="card p-0 overflow-hidden accordion-section is-collapsed" data-accordion-key="resumen" data-accordion-recordar="no">
                         <div class="px-4 py-3 accent-header flex items-center justify-between">
-                            <h3 class="text-white font-semibold">Resumen de Factura</h3>
+                            <button type="button" class="accordion-toggle" aria-expanded="false">
+                                <i class="fas fa-chevron-down accordion-caret"></i>
+                                <h3 class="text-white font-semibold">Resumen de Factura</h3>
+                            </button>
                         </div>
                         <div class="p-4 small">
                             <div id="resumen-campos" class="grid grid-cols-1 xl:grid-cols-10 gap-4">
                                 <div class="xl:col-span-6 flex flex-col">
-                                    <label class="block text-slate-700 font-medium mb-1">Notas Adicionales</label>
                                     <div class="rte">
                                         <div class="rte-toolbar" role="toolbar" aria-label="Formato de texto">
                                             <button type="button" class="rte-btn" data-cmd="bold" title="Negrita"><i class="fas fa-bold"></i></button>
@@ -327,23 +323,21 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     </div>
                                 </div>
                                 <div class="xl:col-span-4 col-costo">
-                                    <div class="grid grid-cols-2 gap-2 items-center">
-                                        <div class="text-slate-600">P.V. Regular</div>
-                                        <div class="text-right font-semibold" id="pv-regular"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
-                                        <div class="text-slate-600">P.V. Promo</div>
-                                        <div class="text-right font-semibold" id="pv-promo"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
-                                        <div class="text-slate-600">Total descuento</div>
-                                        <div class="text-right" id="total-desc"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
-                                        <div class="text-slate-600">Precio adicional</div>
-                                        <div><input id="precio-adicional" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></input></div>
-                                        <div class="text-slate-600">Descuento especial</div>
-                                        <div><input id="descuento-especial" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></input></div>
+                                    <div class="resumen-filas">
+                                        <div class="resumen-detalle text-slate-600">P.V. Regular</div>
+                                        <div class="resumen-detalle text-right font-semibold" id="pv-regular"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
+                                        <div class="resumen-detalle text-slate-600">P.V. Promo</div>
+                                        <div class="resumen-detalle text-right font-semibold" id="pv-promo"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
+                                        <div class="resumen-detalle text-slate-600">Total descuento</div>
+                                        <div class="resumen-detalle text-right" id="total-desc"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
+                                        <label for="precio-adicional" class="resumen-detalle text-slate-600">Precio adicional</label>
+                                        <div class="resumen-detalle"><input id="precio-adicional" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></div>
+                                        <label for="descuento-especial" class="resumen-detalle text-slate-600">Descuento especial</label>
+                                        <div class="resumen-detalle"><input id="descuento-especial" class="input w-full text-right rounded px-2 py-1 border" type="number" step="0.01" min="0" value="0"></div>
                                         <div class="text-slate-700 font-medium">P.V. Final</div>
                                         <div class="text-right text-2xl font-bold" id="pv-final"><?= htmlspecialchars($currencySymbol) ?>0.00</div>
-                                    </div>
-                                    <div class="mt-3 pt-3 border-t">
-                                        <label for="porcentaje_reserva" class="block text-slate-700 font-medium mb-1">Reserva (%)</label>
-                                        <input id="porcentaje_reserva" class="input w-full text-right rounded px-2 py-1 border" type="number" value="30">
+                                        <label for="porcentaje_reserva" class="text-slate-700 font-medium">Reserva (%)</label>
+                                        <div><input id="porcentaje_reserva" class="input w-full text-right rounded px-2 py-1 border" type="number" value="30"></div>
                                     </div>
                                 </div>
                             </div>

@@ -25,21 +25,25 @@ verificarSesion();
 
 // Acordeones de Datos Pax / Actividades / Hoteles / Itinerario: colapsan/expanden y
 // recuerdan el estado por sección en localStorage, para que la vista siga compacta en la
-// próxima carga si el usuario así la dejó (ej. Datos Pax, que tiene muchos campos).
+// próxima carga si el usuario así la dejó (ej. Datos Pax, que tiene muchos campos). Con
+// data-accordion-recordar="no" (Resumen de Factura) arranca como venga en el HTML.
 function inicializarAcordeones() {
     document.querySelectorAll('.accordion-section[data-accordion-key]').forEach(section => {
         const key = section.dataset.accordionKey;
         const toggle = section.querySelector('.accordion-toggle');
         if (!toggle) return;
-        let colapsado = false;
-        try { colapsado = localStorage.getItem(`acc-${key}`) === '1'; } catch (e) {}
-        section.classList.toggle('is-collapsed', colapsado);
-        toggle.setAttribute('aria-expanded', String(!colapsado));
+        const recordar = section.dataset.accordionRecordar !== 'no';
+        if (recordar) {
+            let colapsado = false;
+            try { colapsado = localStorage.getItem(`acc-${key}`) === '1'; } catch (e) {}
+            section.classList.toggle('is-collapsed', colapsado);
+            toggle.setAttribute('aria-expanded', String(!colapsado));
+        }
 
         toggle.addEventListener('click', () => {
             const ahoraColapsado = section.classList.toggle('is-collapsed');
             toggle.setAttribute('aria-expanded', String(!ahoraColapsado));
-            try { localStorage.setItem(`acc-${key}`, ahoraColapsado ? '1' : '0'); } catch (e) {}
+            if (recordar) try { localStorage.setItem(`acc-${key}`, ahoraColapsado ? '1' : '0'); } catch (e) {}
         });
     });
 }
@@ -327,22 +331,17 @@ function historialAbierto() {
 
 function abrirHistorialTours() {
     document.getElementById('historial-panel').hidden = false;
-    document.getElementById('historial-drop').classList.add('is-abierto');
-    document.getElementById('historial-tours-btn').setAttribute('aria-expanded', 'true');
     const input = document.getElementById('historial-tours-search');
-    input.value = '';
-    histState.term = '';
+    input.setAttribute('aria-expanded', 'true');
+    histState.term = input.value.trim();
     cargarHistorialTours();
-    // En celular/tablet no se enfoca: el teclado taparía la lista recién abierta.
-    if (window.matchMedia('(hover: hover)').matches) input.focus();
 }
 
 function cerrarHistorialTours() {
     if (!historialAbierto()) return;
     clearTimeout(histSearchDebounce);
     document.getElementById('historial-panel').hidden = true;
-    document.getElementById('historial-drop').classList.remove('is-abierto');
-    document.getElementById('historial-tours-btn').setAttribute('aria-expanded', 'false');
+    document.getElementById('historial-tours-search').setAttribute('aria-expanded', 'false');
 }
 
 async function cargarHistorialTours(mas = false) {
@@ -843,6 +842,19 @@ function calcularResumen() {
     document.getElementById('pv-promo').textContent = fmt(pvPromo);
     document.getElementById('total-desc').textContent = fmt(totalDesc);
     document.getElementById('pv-final').textContent = fmt(pvFinal);
+    const conNombre = (sel) => [...document.querySelectorAll(sel)].some(el => el.value);
+    sincronizarResumenPlegado(pvReg > 0 || pvPromo > 0 || conNombre('#tours-body .tour-name') || conNombre('#hotels-body .hotel-name'));
+}
+
+// Resumen de Factura: plegado mientras Actividades y Hoteles están vacíos. Solo cambia al
+// aparecer o desaparecer esos datos, para respetar lo que el usuario pliegue a mano después.
+let resumenConDatos = false;
+function sincronizarResumenPlegado(conDatos) {
+    if (conDatos === resumenConDatos) return;
+    resumenConDatos = conDatos;
+    const section = document.getElementById('resumen-section');
+    section.classList.toggle('is-collapsed', !conDatos);
+    section.querySelector('.accordion-toggle').setAttribute('aria-expanded', String(conDatos));
 }
 
 // Guarda el Itinerario/Actividades/Hoteles que ya tiene armados la vista como un paquete
@@ -1561,7 +1573,7 @@ async function init() {
     });
     actualizarEstadosCamposFecha();
 
-    document.getElementById('historial-tours-btn').addEventListener('click', () => historialAbierto() ? cerrarHistorialTours() : abrirHistorialTours());
+    document.getElementById('historial-tours-search').addEventListener('click', () => { if (!historialAbierto()) abrirHistorialTours(); });
     // Itinerario embebido: sigue el idioma de Datos Pax en vez de sus propias pestañas
     // (que no se renderizan acá), y el Nombre PAX es el pasajero del itinerario. El nombre
     // del itinerario se escribe aparte (#itinerary-title, sobre las tarjetas).
@@ -1570,7 +1582,7 @@ async function init() {
         document.getElementById('itinerary-passenger').value = e.target.value;
     });
     document.querySelector('input[name="f_llegada"]').addEventListener('change', resincronizarFechasConLlegada);
-    // Se cierra al tocar fuera o con Escape (que devuelve el foco al botón).
+    // Se cierra al tocar fuera o con Escape (que devuelve el foco al buscador).
     document.addEventListener('pointerdown', (e) => {
         if (historialAbierto() && !document.getElementById('historial-drop').contains(e.target)) cerrarHistorialTours();
     });
@@ -1578,11 +1590,12 @@ async function init() {
         if (e.key === 'Escape' && historialAbierto()) {
             e.preventDefault();
             cerrarHistorialTours();
-            document.getElementById('historial-tours-btn').focus();
+            document.getElementById('historial-tours-search').focus();
             return;
         }
         // Flechas: del buscador a la lista y entre las cotizaciones.
         if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        if (!historialAbierto()) { if (e.key === 'ArrowDown') abrirHistorialTours(); return; }
         const items = [...document.querySelectorAll('#historial-tours-list .historial-item')];
         if (!items.length) return;
         const i = items.indexOf(document.activeElement);
@@ -1595,6 +1608,7 @@ async function init() {
     });
     document.getElementById('historial-tours-search').addEventListener('input', (e) => {
         clearTimeout(histSearchDebounce);
+        if (!historialAbierto()) { abrirHistorialTours(); return; }
         const term = e.target.value.trim();
         histSearchDebounce = setTimeout(() => {
             histState.term = term;
@@ -1678,6 +1692,15 @@ async function init() {
     const paqueteEditarId = paramsUrl.get('editarPaquete');
     if (paqueteEditarId) {
         await cargarPaqueteParaEditar(paqueteEditarId);
+        history.replaceState(null, '', window.location.pathname);
+    }
+    // Deep link desde Historial de paquetes ("Usar"): ?usarPaquete=ID lo aplica a una
+    // cotización nueva, igual que elegirlo en "Aplicar paquete...".
+    const paqueteUsarId = paramsUrl.get('usarPaquete');
+    if (paqueteUsarId) {
+        const paquete = paquetesData.find(p => String(p.id) === String(paqueteUsarId));
+        if (paquete) await aplicarPaquete(paquete);
+        else notifyError('No se encontró el paquete. Puede que ya no exista.');
         history.replaceState(null, '', window.location.pathname);
     }
     // Lápiz del paquete aplicado: lo edita acá mismo. Reemplaza la vista por el paquete,
