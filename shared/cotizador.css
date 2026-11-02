@@ -40,11 +40,43 @@ body {
 }
 .accordion-section.is-collapsed .accordion-caret { transform: rotate(-90deg); }
 .accordion-section.is-collapsed .accordion-body { display: none; }
-/* Actividades / Hoteles / Itinerario ya no llevan título propio (el encabezado de la
-   tabla hace de título); el nombre solo se muestra, en gris, con la sección colapsada,
-   que es cuando la tabla deja de verse. */
+/* Actividades / Hoteles no llevan título propio (el encabezado de la tabla hace de título);
+   el nombre solo se muestra, en gris, con la sección colapsada, que es cuando la tabla deja
+   de verse. */
 .accordion-label-collapsed { display: none; font-size: 0.8rem; color: #64748b; }
 .accordion-section.is-collapsed .accordion-label-collapsed { display: inline; }
+/* Con la tabla a la vista, su flecha va en la primera columna del encabezado (vacía), a la
+   altura de Fecha, Actividad, precios... En celular la tabla se desliza mucho: la sección
+   muestra su nombre y la flecha va en su propia fila. */
+.accordion-section { position: relative; }
+@media (min-width: 768px) {
+    #tours-table thead th, #hotels-table thead th { height: 26px; }
+    .accordion-section:not(.is-collapsed) > .accordion-cab-tabla { position: absolute; top: 12px; left: 12px; z-index: 1; width: 32px; height: 26px; margin: 0; }
+    /* Con fondo: si la tabla se desliza, sus títulos pasan por debajo de la flecha. */
+    .accordion-section:not(.is-collapsed) > .accordion-cab-tabla .accordion-toggle { width: 100%; height: 100%; justify-content: center; background: #f8fafc; }
+    .accordion-section:not(.is-collapsed) > .accordion-cab-tabla .accordion-label-collapsed { display: none; }
+}
+/* Nombre del itinerario (portada y páginas finales del PDF) y Aplicar paquete: comparten el
+   ancho del acordeón; sin espacio, uno debajo del otro. */
+.itin-datos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.itin-datos > .field, #paquete-toolbar { flex: 1 1 260px; min-width: 0; }
+.itin-datos .field { height: 34px; }
+#paquete-toolbar { display: flex; align-items: center; gap: 8px; }
+#paquete-toolbar .field { flex: 1; min-width: 0; }
+/* Resumen de Factura: la flecha va sobre el encabezado de color. Plegado solo deja P.V. Final,
+   Reserva y las notas, que se ajustan a ese alto. */
+.accent-header .accordion-toggle { width: 100%; }
+.accent-header .accordion-caret { color: white; font-size: 0.8rem; }
+.resumen-filas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(32px, auto);
+    align-items: center;
+    gap: 6px 12px;
+}
+.resumen-filas .input { height: 32px; }
+.is-collapsed .resumen-detalle { display: none; }
+#resumen-section.is-collapsed .rte-editor { min-height: 44px; max-height: 72px; }
 /* Edición de un paquete predefinido (ver activarModoEdicionPaquete en cotizador.js): misma
    vista del Cotizador. Datos Pax y Resumen de Factura quedan visibles pero deshabilitados;
    se ocultan las opciones que solo tienen sentido en una cotización (Aplicar paquete,
@@ -406,98 +438,17 @@ input[readonly] {
     #hotels-body .nhab, #hotels-body .noches { min-width: 46px; }
 }
 
-/* Celular: cada fila de Actividades y Hoteles es una tarjeta con sus campos etiquetados. El
-   tirador se oculta porque arrastrar filas no funciona con el dedo. La grilla convierte los
-   <td> en bloques sin tocar su display, así que hidden y .col-confidencial siguen mandando. */
+/* Celular: Actividades y Hoteles conservan la fila de PC, en una sola línea; lo que no cabe
+   se desliza dentro de su tabla (.overflow-x-auto) sin ensanchar la página. */
 @media (max-width: 767px) {
-    #tours-table, #hotels-table { display: block; min-width: 0; }
-    #tours-table thead, #hotels-table thead { display: none; }
-    #tours-body, #hotels-body { display: flex; flex-direction: column; gap: 10px; }
-    #tours-body tr, #hotels-body tr {
-        display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
-        gap: 8px 6px;
-        padding: 10px;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        background: #fff;
-        cursor: default;
-    }
-    #tours-body td, #hotels-body td { min-width: 0; padding: 0; white-space: normal; }
-    #tours-body td:first-child, #hotels-body td:first-child { display: none; }
-    #tours-body .input, #hotels-body .input { width: 100%; max-width: none; height: 38px; }
-    #tours-body td::before, #hotels-body td::before {
-        display: block;
-        margin-bottom: 3px;
-        font-size: 0.66rem; font-weight: 600; letter-spacing: 0.02em;
-        color: #94a3b8;
-    }
-    #tours-body td.total-line, #hotels-body td.total-line { font-weight: 600; font-size: 0.85rem; color: #0f172a; line-height: 38px; }
-    #tours-body td.total-line::before, #hotels-body td.total-line::before { line-height: 1.3; text-align: right; }
-    #tours-body td:last-child, #hotels-body td:last-child { align-self: end; text-align: right; }
-    #tours-body td:last-child button, #hotels-body td:last-child button { width: 38px; height: 38px; border-radius: 8px; }
-
-    #tours-body tr {
-        grid-template-areas:
-            "fecha fecha fecha fecha fecha fecha fecha fecha fecha fecha acc acc"
-            "tour tour tour tour tour tour tour tour tour tour tour tour"
-            "cant cant cant distr distr distr distr total total total total total";
-    }
-    #tours-table.mostrar-confidencial #tours-body tr {
-        grid-template-areas:
-            "fecha fecha fecha fecha fecha fecha fecha fecha fecha fecha acc acc"
-            "tour tour tour tour tour tour tour tour tour tour tour tour"
-            "cant cant cant distr distr distr distr total total total total total"
-            "pconf pconf pconf pconf pconf pconf pctotal pctotal pctotal pctotal pctotal pctotal";
-    }
-    #tours-body td:nth-child(2) { grid-area: fecha; }
-    #tours-body td:nth-child(2)::before { content: 'Fecha'; }
-    #tours-body td:nth-child(3) { grid-area: tour; }
-    #tours-body td:nth-child(3)::before { content: 'Tour / Actividad'; }
-    #tours-body td:nth-child(4) { grid-area: cant; }
-    #tours-body td:nth-child(4)::before { content: 'Cant.'; }
-    #tours-body td:nth-child(5) { grid-area: distr; }
-    #tours-body td:nth-child(5)::before { content: 'Distr.'; }
-    #tours-body td:nth-child(8) { grid-area: pconf; }
-    #tours-body td:nth-child(8)::before { content: 'Precio Conf.'; }
-    #tours-body td:nth-child(9) { grid-area: pctotal; }
-    #tours-body td:nth-child(9)::before { content: 'Precio C. Total'; }
-    #tours-body td:nth-child(10) { grid-area: total; }
-    #tours-body td:nth-child(10)::before { content: 'Total línea'; }
-    #tours-body td:nth-child(11) { grid-area: acc; }
-
-    #hotels-body tr {
-        grid-template-areas:
-            "cin cin cin cin cin cin cout cout cout cout cout cout"
-            "hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel"
-            "nhab nhab nhab noches noches noches total total total total acc acc";
-    }
-    #hotels-table.mostrar-confidencial #hotels-body tr {
-        grid-template-areas:
-            "cin cin cin cin cin cin cout cout cout cout cout cout"
-            "hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel hotel"
-            "pconf pconf pconf pconf pconf pconf pctotal pctotal pctotal pctotal pctotal pctotal"
-            "nhab nhab nhab noches noches noches total total total total acc acc";
-    }
-    #hotels-body td:nth-child(2) { grid-area: cin; }
-    #hotels-body td:nth-child(2)::before { content: 'Check-in'; }
-    #hotels-body td:nth-child(3) { grid-area: cout; }
-    #hotels-body td:nth-child(3)::before { content: 'Check-out'; }
-    #hotels-body td:nth-child(4) { grid-area: hotel; }
-    #hotels-body td:nth-child(4)::before { content: 'Hotel / Hospedaje'; }
-    #hotels-body td:nth-child(5) { grid-area: nhab; }
-    #hotels-body td:nth-child(5)::before { content: 'N° Hab.'; }
-    #hotels-body td:nth-child(6) { grid-area: noches; }
-    #hotels-body td:nth-child(6)::before { content: 'Noches'; }
-    #hotels-body td:nth-child(9) { grid-area: pconf; }
-    #hotels-body td:nth-child(9)::before { content: 'Precio Conf.'; }
-    #hotels-body td:nth-child(10) { grid-area: pctotal; }
-    #hotels-body td:nth-child(10)::before { content: 'Precio C. Total'; }
-    #hotels-body td:nth-child(11) { grid-area: total; }
-    #hotels-body td:nth-child(11)::before { content: 'Total línea'; }
-    #hotels-body td:nth-child(12) { grid-area: acc; }
-    /* El selector abre un panel fijo: la envoltura ya no necesita recortar nada. */
-    .overflow-x-auto:has(> #tours-table), .overflow-x-auto:has(> #hotels-table) { overflow: visible; }
+    #tours-table { min-width: 720px; }
+    #hotels-table { min-width: 860px; }
+    #tours-table.mostrar-confidencial { min-width: 900px; }
+    #hotels-table.mostrar-confidencial { min-width: 1040px; }
+    #tours-body td:nth-child(2), #hotels-body td:nth-child(2), #hotels-body td:nth-child(3) { min-width: 124px; }
+    #tours-body td:nth-child(3), #hotels-body td:nth-child(4) { min-width: 220px; }
+    #hotels-body .nhab, #hotels-body .noches { min-width: 46px; }
+    .overflow-x-auto:has(> #tours-table), .overflow-x-auto:has(> #hotels-table) { overscroll-behavior-x: contain; }
 }
 
 /* Usuarios y Agencias: sus columnas no caben ni en tablet ni en laptop chica con el menú
@@ -558,46 +509,8 @@ input[readonly] {
     #abrir-nuevo-usuario-btn { width: 100%; justify-content: center; }
 }
 
-/* Historial (sobre Datos Pax): tarjeta-botón con icono, título y ayuda; al pasar se tiñe
-   con el acento de la agencia. */
-.historial-cta {
-    display: flex; align-items: center; gap: 12px;
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--muted-border);
-    border-radius: 12px;
-    background: white;
-    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
-    text-align: left;
-    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-}
-.historial-cta-icono {
-    flex-shrink: 0;
-    width: 36px; height: 36px;
-    display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--accent-1, #e80c13) 10%, white);
-    color: var(--accent-1, #e80c13);
-    font-size: 0.95rem;
-    transition: background 0.15s, color 0.15s;
-}
-.historial-cta-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.historial-cta-texto strong { font-size: 0.85rem; font-weight: 600; color: #1e293b; }
-.historial-cta-texto small { font-size: 0.72rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.historial-cta-flecha { flex-shrink: 0; font-size: 0.7rem; color: #94a3b8; transition: transform 0.15s, color 0.15s; }
-.historial-cta:hover, .historial-cta:focus-visible {
-    border-color: var(--accent-1, #e80c13);
-    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.08);
-    outline: none;
-}
-.historial-cta:hover .historial-cta-icono, .historial-cta:focus-visible .historial-cta-icono { background: var(--accent-1, #e80c13); color: white; }
-.historial-cta:hover .historial-cta-flecha { color: var(--accent-1, #e80c13); }
-
-/* ===== Historial desplegable (buscador + últimas guardadas) ===== */
+/* ===== Historial (sobre Datos Pax): buscador siempre visible; al hacer clic, últimas guardadas ===== */
 .historial-drop { position: relative; z-index: 30; }
-.historial-drop.is-abierto .historial-cta { border-color: var(--accent-1, #e80c13); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1, #e80c13) 12%, transparent); }
-.historial-drop.is-abierto .historial-cta-icono { background: var(--accent-1, #e80c13); color: white; }
-.historial-drop.is-abierto .historial-cta-flecha { color: var(--accent-1, #e80c13); transform: rotate(180deg); }
 .historial-panel {
     position: absolute; top: calc(100% + 6px); left: 0;
     /* En escritorio la columna es angosta: el panel se abre más ancho, hacia la derecha. */
@@ -612,17 +525,18 @@ input[readonly] {
 }
 .historial-panel[hidden] { display: none; }
 @keyframes historial-entra { from { opacity: 0; transform: translateY(-4px); } }
-.historial-buscar { position: relative; padding: 10px 10px 6px; }
-.historial-buscar i { position: absolute; left: 22px; top: 50%; margin-top: 2px; transform: translateY(-50%); font-size: 0.78rem; color: #94a3b8; pointer-events: none; }
+.historial-buscar { position: relative; }
+.historial-buscar i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 0.78rem; color: #94a3b8; pointer-events: none; }
 .historial-buscar input {
     width: 100%; height: 38px; padding: 0 12px 0 34px;
-    border: 1px solid #e2e8f0; border-radius: 10px;
-    background: #f8fafc;
-    font-size: 0.85rem; color: #0f172a;
-    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    border: 1px solid var(--muted-border); border-radius: 10px;
+    background: white;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.04);
+    font-size: 0.82rem; color: #0f172a;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
-.historial-buscar input:focus { outline: none; background: white; border-color: var(--accent-1, #e80c13); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1, #e80c13) 12%, transparent); }
-.historial-titulo { padding: 6px 16px 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; }
+.historial-buscar input:focus { outline: none; border-color: var(--accent-1, #e80c13); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1, #e80c13) 12%, transparent); }
+.historial-titulo { padding: 10px 16px 4px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94a3b8; }
 .historial-lista { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 6px; }
 .historial-item {
     display: flex; align-items: center; gap: 10px;

@@ -1,9 +1,9 @@
 /* shared/itinerario-selector.css
    Armado del itinerario del Cotizador (ver itinerario-selector.js): grilla de tarjetas por
-   día, panel desplegable para elegir y popup de detalles/edición. Usa el color de marca de
-   la agencia (--accent-1). */
+   día, popup para elegir y popup de detalles/edición. Usa el color de marca de la agencia
+   (--accent-1). */
 
-.itin-armado {
+.itin-armado, .ipan-overlay {
     --ia-card: 128px;
     --ia-accent: var(--accent-1, #e80c13);
     --ia-accent-soft: color-mix(in srgb, var(--ia-accent) 10%, transparent);
@@ -136,7 +136,7 @@
 .itin-libre-card {
     position: relative;
     flex-shrink: 0;
-    width: 112px;
+    width: var(--ia-card);
     min-height: var(--ia-card);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     padding: 6px;
@@ -169,41 +169,22 @@
 .itin-libre-card-agregar i { margin-right: 3px; font-size: 0.55rem; }
 .itin-libre-card-agregar:hover { background: #fef3c7; }
 
-.itin-card-nuevo {
-    flex-shrink: 0;
-    width: var(--ia-card);
-    height: var(--ia-card);
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    border: 1.5px dashed #cbd5e1;
-    border-radius: 14px;
-    color: var(--ia-muted);
-    background: #fcfcfd;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.itin-card-nuevo i { font-size: 1rem; margin-bottom: 2px; }
-.itin-card-nuevo strong { font-size: 0.8rem; }
-.itin-card-nuevo small { font-size: 0.68rem; text-transform: capitalize; }
-.itin-card-nuevo:hover, .itin-card-nuevo.is-destino { border-color: var(--ia-accent); color: var(--ia-accent); background: var(--ia-accent-soft); }
-.itin-card-nuevo.is-destino { border-style: solid; }
-
-/* Sin itinerarios todavía. Ocupa toda la grilla (en tablet y celular .itin-grilla es grid). */
-.itin-vacio {
+/* "Agregar itinerarios" (sin itinerarios todavía) y "Editar itinerario" (tras el último día):
+   el mismo botón. En tablet y celular .itin-grilla es grid. */
+.itin-vacio, .itin-card-nuevo {
     grid-column: 1 / -1;
-    width: 100%;
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    padding: 18px;
-    border: 1.5px dashed #cbd5e1;
-    border-radius: 14px;
-    background: #fcfcfd;
-    text-align: left;
-    transition: border-color 0.15s, background 0.15s;
+    justify-self: start;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    border-radius: 9px;
+    background: var(--ia-accent);
+    color: #fff;
+    font-size: 0.8rem; font-weight: 600;
+    white-space: nowrap;
+    transition: filter 0.15s;
 }
-.itin-vacio:hover { border-color: var(--ia-accent); background: var(--ia-accent-soft); }
-.itin-vacio-icono { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--ia-accent-soft); color: var(--ia-accent); font-size: 1.1rem; }
-.itin-vacio > span:nth-child(2) { flex: 1 1 200px; min-width: 0; }
-.itin-vacio strong { display: block; color: var(--ia-ink); font-size: 0.9rem; }
-.itin-vacio small { display: block; color: var(--ia-muted); font-size: 0.78rem; margin-top: 2px; }
-.itin-vacio-cta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; background: var(--ia-accent); color: #fff; font-size: 0.8rem; font-weight: 600; }
+.itin-vacio:hover, .itin-card-nuevo:hover { filter: brightness(0.92); }
+.itin-card-nuevo { flex-shrink: 0; align-self: center; }
 
 /* ===== Imagen (o inicial sobre degradado) ===== */
 .isel-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -219,32 +200,57 @@
 }
 .isel-img-vacia.is-fuera { background: #fef3c7; color: #d97706; font-size: 1.4rem; }
 
-/* ===== Panel desplegable para elegir ===== */
-.itin-panel {
-    margin-top: 14px;
-    padding: 14px;
-    border: 1px solid var(--ia-line);
-    border-radius: 16px;
+/* ===== Popup para elegir ===== */
+html.ipan-abierto, html.ipan-abierto body { overflow: hidden; }
+html.ipan-abierto { scrollbar-gutter: stable; } /* la página no salta al ocultar su barra */
+.ipan-overlay {
+    position: fixed; inset: 0; z-index: 950; /* el popup de detalles (960) se abre encima */
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.5);
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.ipan-overlay[hidden] { display: none; }
+.ipan-overlay.is-visible { opacity: 1; }
+.ipan {
+    --ia-accent: var(--accent-1, #e80c13);
+    --ia-accent-soft: color-mix(in srgb, var(--ia-accent) 10%, transparent);
+    width: min(1040px, 100%);
+    height: min(780px, 100%);
+    display: flex; flex-direction: column;
+    padding: 18px 20px 0;
+    border-radius: 18px;
     background: #f8fafc;
-    animation: ia-baja 0.2s ease;
+    box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.45);
+    outline: none;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+    transition: transform 0.18s ease-in, opacity 0.16s ease-in;
 }
-.itin-panel[hidden] { display: none; }
-@keyframes ia-baja { from { opacity: 0; transform: translateY(-6px); } }
-.itin-panel-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.itin-panel-destino { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--ia-muted); }
-.itin-panel-destino > span:first-child { font-weight: 600; }
-.itin-panel-destino select {
-    height: 36px;
-    padding: 0 30px 0 10px;
-    border: 1.5px solid var(--ia-accent);
-    border-radius: 9px;
+.ipan-overlay.is-visible .ipan { opacity: 1; transform: none; transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
+.ipan.is-deslizando, .ipan-overlay.is-visible .ipan.is-deslizando { transition: none; }
+.ipan-asa { display: none; }
+.itin-panel-cab { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.itin-panel-tit { min-width: 0; }
+.itin-panel-tit h3 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; color: var(--ia-ink); }
+.itin-panel-tit p { margin-top: 1px; font-size: 0.8rem; font-weight: 600; color: var(--ia-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itin-panel-tit p span { text-transform: capitalize; }
+.itin-panel-cerrar { flex-shrink: 0; box-shadow: none; border: 1px solid var(--ia-line); background: #fff; }
+.itin-panel-cerrar:hover { background: #f1f5f9; }
+.itin-panel-pie {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 0 -20px;
+    padding: 12px 20px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--ia-line);
     background: #fff;
-    color: var(--ia-ink);
-    font-size: 0.82rem; font-weight: 600;
 }
-.itin-panel-destino.is-cambio { color: #1e293b; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 12px; }
-.itin-panel-destino.is-cambio i { color: var(--ia-accent); }
-.itin-panel-acciones { display: flex; gap: 6px; margin-left: auto; }
+.itin-panel-pie .itin-panel-btn:only-child { margin-left: auto; }
+.itin-panel-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .itin-panel-btn {
     display: inline-flex; align-items: center; gap: 6px;
     height: 36px;
@@ -261,8 +267,8 @@
 .itin-panel-btn.is-primario:hover { filter: brightness(0.94); }
 .itin-panel-btn i.fa-mug-hot { color: #d97706; }
 
-.itin-panel-filtros { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.itin-panel-grupos { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: #e2e8f0; }
+.itin-panel-filtros { flex-shrink: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.itin-panel-grupos { display: inline-flex; gap: 3px; max-width: 100%; overflow-x: auto; padding: 3px; border-radius: 10px; background: #e2e8f0; scrollbar-width: none; }
 .itin-panel-grupo { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: var(--ia-muted); white-space: nowrap; }
 .itin-panel-grupo span { padding: 0 6px; border-radius: 999px; font-size: 0.68rem; background: rgba(15, 23, 42, 0.07); }
 .itin-panel-grupo.is-activo { background: #fff; color: var(--ia-ink); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
@@ -274,7 +280,7 @@
 .itin-panel-buscar input { width: 100%; height: 36px; padding: 0 12px 0 32px; border: 1px solid var(--ia-line); border-radius: 9px; background: #fff; font-size: 0.82rem; }
 .itin-panel-buscar input:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
 
-.itin-panel-destinos { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; scrollbar-width: none; }
+.itin-panel-destinos { flex-shrink: 0; display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; scrollbar-width: none; }
 .itin-panel-destinos[hidden] { display: none; }
 .itin-panel-chip { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 5px 11px; border: 1px solid var(--ia-line); border-radius: 999px; background: #fff; font-size: 0.76rem; font-weight: 600; color: #475569; }
 .itin-panel-chip span { font-size: 0.66rem; color: var(--ia-faint); }
@@ -285,12 +291,16 @@
 .itin-panel-chip.is-arrastrando { border-color: var(--ia-accent); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18); transform: scale(1.05); position: relative; z-index: 1; }
 
 .itin-panel-grid {
+    flex: 1;
+    min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-    gap: 10px;
-    max-height: 430px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-auto-rows: max-content; /* con alto limitado, las filas se achicaban y las tarjetas se montaban */
+    align-content: start;
+    gap: 12px;
     overflow-y: auto;
-    padding: 2px 4px 4px 2px;
+    margin: 0 -6px;
+    padding: 4px 6px 16px;
     overscroll-behavior: contain;
 }
 .itin-panel-seccion { grid-column: 1 / -1; margin-top: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ia-muted); }
@@ -376,7 +386,7 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     opacity: 0;
     transition: opacity 0.16s ease;
 }
-.idet-overlay.is-visible { opacity: 1; }
+.idet-overlay.is-visible { opacity: 1; transition-duration: 0.2s; }
 .idet {
     --ia-accent: var(--accent-1, #e80c13);
     --ia-accent-soft: color-mix(in srgb, var(--ia-accent) 10%, transparent);
@@ -389,10 +399,11 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.45);
     overflow: hidden;
     outline: none;
-    transform: translateY(8px) scale(0.98);
-    transition: transform 0.18s ease;
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+    transition: transform 0.16s ease-in, opacity 0.14s ease-in;
 }
-.idet-overlay.is-visible .idet { transform: none; }
+.idet-overlay.is-visible .idet { opacity: 1; transform: none; transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; }
 .idet-media { position: relative; flex-shrink: 0; height: 220px; background: #e2e8f0; }
 .idet-media .isel-img-vacia { font-size: 4rem; }
 .idet-icon-btn {
@@ -421,7 +432,6 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .idet-fecha input { height: 34px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; color: #0f172a; background: #fff; }
 .idet-fecha input[type="number"] { width: 80px; }
 .idet-fecha input:focus { outline: none; border-color: var(--ia-accent); box-shadow: 0 0 0 3px var(--ia-accent-soft); }
-.idet-fecha-dia { align-self: center; font-size: 0.8rem; font-weight: 600; color: #334155; text-transform: capitalize; }
 .idet-fecha-acciones { margin-left: auto; display: flex; gap: 6px; }
 /* Acciones compactas de la tarjeta de fecha: misma altura que el campo de fecha. */
 .idet-chip {
@@ -550,13 +560,18 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 /* Tablets y celulares: grilla pareja de tarjetas que llenan el ancho, en vez de la fila
    flexible del escritorio. Cada tarjeta es una celda (los bloques de un mismo día se
    disuelven; el "Día N" de cada tarjeta ya dice a qué día pertenece). Otro itinerario en el
-   mismo día se agrega desde el popup ("Otro en este día") o eligiendo el día en
-   "Agregando al". */
+   mismo día se agrega desde el popup de detalles ("Otro"). */
 @media (max-width: 1023px) {
+    .ipan-overlay { padding: 16px; }
+    .ipan { height: 100%; }
+    .itin-panel-cerrar { width: 42px; height: 42px; }
+    .itin-panel-btn { height: 42px; padding: 0 16px; }
+    .itin-panel-grupo { padding: 8px 12px; }
+    .itin-panel-buscar input { height: 42px; }
+    .itin-panel-chip { padding: 7px 12px; }
     .itin-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: stretch; }
     .itin-dia-grupo, .itin-dia-grupo.is-varios { display: contents; }
     .itin-card { width: auto; }
-    .itin-card-nuevo { width: auto; height: auto; aspect-ratio: 1; }
     .itin-libre-card { width: auto; min-height: 0; aspect-ratio: 1; }
     .itin-dia-grupo.is-destino .itin-card { box-shadow: 0 0 0 2px var(--ia-accent), 0 0 0 5px var(--ia-accent-soft); }
     .itin-card-quitar { width: 28px; height: 28px; font-size: 0.78rem; opacity: 1; }
@@ -575,32 +590,35 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .itin-card-quitar { width: 22px; height: 22px; top: 5px; right: 5px; font-size: 0.62rem; }
     .itin-card-editar, .itin-card:hover .itin-card-editar { width: 22px; height: 22px; top: 31px; right: 5px; font-size: 0.56rem; }
     .itin-card .itin-card-badge-dia, .itin-card:hover .itin-card-badge-dia { max-width: none; }
-    .itin-card-nuevo { border-radius: 12px; font-size: 0.72rem; }
     .itin-libre-card { padding: 5px 4px; border-radius: 12px; gap: 1px; }
     .itin-libre-card-icono { display: none; }
     .itin-libre-card strong { font-size: 0.66rem; line-height: 1.2; }
     .itin-libre-card small { font-size: 0.56rem; }
     .itin-libre-card-ctrl button, .itin-libre-card-quitar { width: 22px; height: 22px; }
     .itin-libre-card-quitar { top: 3px; right: 3px; }
-    .itin-vacio { padding: 14px; gap: 10px 12px; }
-    .itin-vacio-cta { margin-left: 0; width: 100%; justify-content: center; padding: 10px 12px; }
-    .itin-panel { margin-left: -6px; margin-right: -6px; padding: 12px 10px; }
-    .itin-panel-destino { width: 100%; flex-wrap: wrap; }
-    .itin-panel-destino select { flex: 1; }
-    .itin-panel-acciones { width: 100%; }
-    .itin-panel-acciones .itin-panel-btn { flex: 1; justify-content: center; }
+    .itin-vacio, .itin-card-nuevo { justify-self: stretch; justify-content: center; padding: 10px 12px; }
+    /* Hoja inferior: sube desde abajo, se cierra deslizándola desde la cabecera. */
+    .ipan-overlay { align-items: flex-end; padding: 0; }
+    .ipan { height: 94vh; height: 94dvh; padding: 0 12px; border-radius: 18px 18px 0 0; opacity: 1; transform: translateY(100%); transition: transform 0.2s ease-in; }
+    .ipan-overlay.is-visible .ipan { transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
+    .ipan-asa { display: block; flex-shrink: 0; width: 42px; height: 5px; margin: 8px auto 6px; border-radius: 999px; background: #cbd5e1; touch-action: none; }
+    .itin-panel-cab { margin-bottom: 10px; touch-action: none; -webkit-user-select: none; user-select: none; }
+    .itin-panel-pie { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
+    .itin-panel-pie .itin-panel-btn { flex: 1; justify-content: center; }
     .itin-panel-grupos { width: 100%; }
-    .itin-panel-grupo { flex: 1; justify-content: center; padding: 6px 6px; font-size: 0.74rem; }
+    .itin-panel-grupo { flex: 1; justify-content: center; padding: 8px 6px; font-size: 0.74rem; }
     .itin-panel-grupo i { display: none; }
-    .itin-panel-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; max-height: 60vh; }
+    .itin-panel-buscar input { font-size: 16px; } /* menos de 16px hace zoom al enfocar en iOS */
+    .itin-panel-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 0 -4px; padding: 4px 4px 12px; }
 
     .idet-overlay { align-items: flex-end; padding: 0; }
-    .idet { width: 100%; max-height: 92%; border-radius: 18px 18px 0 0; transform: translateY(24px); }
+    .idet { width: 100%; max-height: 92%; border-radius: 18px 18px 0 0; opacity: 1; transform: translateY(100%); transition: transform 0.2s ease-in; }
+    .idet-overlay.is-visible .idet { transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1); }
     .idet-media { height: 180px; }
     .idet-body { padding: 16px 16px 18px; }
     .idet-acciones { padding-left: 16px; padding-right: 16px; }
     .idet-acciones .idet-btn { flex: 1; padding: 0 10px; }
-    .idet-acciones .idet-btn:first-child { margin-right: 0; flex-basis: 100%; }
+    .idet-acciones .idet-btn:first-child { margin-right: 0; }
     .idet-campos-2 { grid-template-columns: 1fr; }
     /* Fecha y su día en una línea; acciones y día libre a todo el ancho, en partes iguales. */
     .idet-fecha { gap: 8px; }
@@ -614,12 +632,9 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .itin-armado *, .idet-overlay, .idet { transition: none !important; animation: none !important; }
+    .itin-armado *, .idet-overlay, .idet, .ipan-overlay, .ipan { transition: none !important; animation: none !important; }
 }
 
-/* Nombre del itinerario (portada y páginas finales del PDF), sobre las tarjetas. */
-.itin-nombre-campo { margin-bottom: 12px; max-width: 560px; }
-.itin-nombre-campo .field-prefix-label { color: #64748b; font-weight: 600; }
 
 /* Clasificación del popup de edición: Con / Sin hotel primero, luego destino y categoría. */
 .if-clasif { margin: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; min-width: 0; }

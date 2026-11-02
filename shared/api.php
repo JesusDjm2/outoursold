@@ -697,10 +697,10 @@ try {
             // (que pide los paquetes al cargar): siguen funcionando como paquetes de solo tours.
             [$fd, $pd] = filtroDueno();
             try {
-                $stmt = $db->prepare("SELECT id, nombre, tours, hoteles, itinerario FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
+                $stmt = $db->prepare("SELECT id, nombre, tours, hoteles, itinerario, creado_en FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
                 $stmt->execute($pd);
             } catch (PDOException $e) {
-                $stmt = $db->prepare("SELECT id, nombre, tours, NULL AS hoteles, NULL AS itinerario FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
+                $stmt = $db->prepare("SELECT id, nombre, tours, NULL AS hoteles, NULL AS itinerario, creado_en FROM $tablaPaquetesTours WHERE $fd ORDER BY nombre");
                 $stmt->execute($pd);
             }
             $paquetes = [];
