@@ -5,7 +5,7 @@
 //   $navRoot   ruta relativa hasta la raíz del proyecto (siempre '../' para pen/, usd/ y shared/)
 //   $navShared ruta relativa hasta la carpeta shared/ ('../shared/' desde pen//usd/, '' desde shared/)
 //   $navActive clave de la sección activa: 'pen' | 'usd' | 'gestion-pen' | 'gestion-usd' |
-//              'historial-paquetes' | 'mi-empresa' | 'usuarios'
+//              'historial-cotizaciones' | 'mi-empresa' | 'usuarios'
 // y haber cargado auth.php (usa is_admin() y $_SESSION).
 ?>
 <script>
@@ -27,8 +27,8 @@
         <a href="<?= htmlspecialchars($navRoot) ?>usd/gestion.php" class="sidebar-link<?= ($navActive === 'gestion-usd' || $navActive === 'gestion-pen') ? ' active' : '' ?>" title="Gestión de Datos">
             <i class="fas fa-database"></i><span>Gestión de Datos</span>
         </a>
-        <a href="<?= htmlspecialchars($navShared) ?>historial-paquetes.php" class="sidebar-link<?= $navActive === 'historial-paquetes' ? ' active' : '' ?>" title="Historial de paquetes">
-            <i class="fas fa-clock-rotate-left"></i><span>Historial de paquetes</span>
+        <a href="<?= htmlspecialchars($navShared) ?>historial-cotizaciones.php" class="sidebar-link<?= $navActive === 'historial-cotizaciones' ? ' active' : '' ?>" title="Historial de cotizaciones">
+            <i class="fas fa-clock-rotate-left"></i><span>Historial de cotizaciones</span>
         </a>
         <?php if (is_admin()): ?>
         <a href="<?= htmlspecialchars($navShared) ?>usuarios.php" class="sidebar-link<?= $navActive === 'usuarios' ? ' active' : '' ?>" title="Usuarios">

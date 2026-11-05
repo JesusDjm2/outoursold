@@ -186,9 +186,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                              vacío, el PDF usa "Itinerario de <pasajero>". -->
                         <input type="text" id="itinerary-passenger" class="hidden">
                         <div class="itin-datos small">
-                            <div class="field">
-                                <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
-                            </div>
                             <!-- Paquetes predefinidos: aplicar uno (queda visible su nombre en
                                  #paquete-aplicado, con un lápiz para editarlo ahí mismo). Uno nuevo
                                  se crea armando la cotización normal y usando "Guardar como paquete"
@@ -203,6 +200,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <option value="">Aplicar paquete...</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div class="field">
+                                <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
                             </div>
                         </div>
                         <!-- Armado del itinerario (shared/itinerario-selector.js): tarjetas por día,
