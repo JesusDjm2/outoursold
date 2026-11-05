@@ -27,8 +27,8 @@
         <a href="<?= htmlspecialchars($navRoot) ?>usd/gestion.php" class="sidebar-link<?= ($navActive === 'gestion-usd' || $navActive === 'gestion-pen') ? ' active' : '' ?>" title="Gestión de Datos">
             <i class="fas fa-database"></i><span>Gestión de Datos</span>
         </a>
-        <a href="<?= htmlspecialchars($navShared) ?>historial-cotizaciones.php" class="sidebar-link<?= $navActive === 'historial-cotizaciones' ? ' active' : '' ?>" title="Historial de cotizaciones">
-            <i class="fas fa-clock-rotate-left"></i><span>Historial de cotizaciones</span>
+        <a href="<?= htmlspecialchars($navShared) ?>historial-cotizaciones.php" class="sidebar-link<?= $navActive === 'historial-cotizaciones' ? ' active' : '' ?>" title="Historial">
+            <i class="fas fa-clock-rotate-left"></i><span>Historial</span>
         </a>
         <?php if (is_admin()): ?>
         <a href="<?= htmlspecialchars($navShared) ?>usuarios.php" class="sidebar-link<?= $navActive === 'usuarios' ? ' active' : '' ?>" title="Usuarios">
