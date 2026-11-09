@@ -108,16 +108,40 @@ function resolverAccentColorStyle($db) {
 // no personalizó uno — en ese caso el Hero muestra el título/subtítulo de texto normal en
 // vez del logo. Mismo criterio que resolverHeroImagenUrl(), pero sin fallback a una imagen
 // por defecto del sistema (acá "sin logo" es un estado válido, no un error).
+// El encabezado usa su propio logo (logo_hero, migración 040), independiente del de los
+// PDF (logo); mientras no tenga uno propio, muestra el de los PDF. Sin la migración
+// corrida, también el de los PDF.
 function resolverLogoUrl($db, $navShared) {
     $agenciaId = resolverAgenciaPropiaId($db);
     if (!$agenciaId) return null;
-    $stmt = $db->prepare("SELECT logo FROM agencias WHERE id = ?");
-    $stmt->execute([$agenciaId]);
-    $logo = $stmt->fetchColumn();
-    if (!$logo) return null;
-    $ruta = __DIR__ . '/uploads/agencias/' . $logo;
-    if (!file_exists($ruta)) return null;
-    return $navShared . 'uploads/agencias/' . $logo . '?v=' . filemtime($ruta);
+    try {
+        $stmt = $db->prepare("SELECT logo_hero, logo FROM agencias WHERE id = ?");
+        $stmt->execute([$agenciaId]);
+        $fila = $stmt->fetch();
+    } catch (PDOException $e) {
+        $stmt = $db->prepare("SELECT NULL AS logo_hero, logo FROM agencias WHERE id = ?");
+        $stmt->execute([$agenciaId]);
+        $fila = $stmt->fetch();
+    }
+    if (!$fila) return null;
+    foreach ([$fila['logo_hero'], $fila['logo']] as $logo) {
+        if (!$logo) continue;
+        $ruta = __DIR__ . '/uploads/agencias/' . $logo;
+        if (file_exists($ruta)) return $navShared . 'uploads/agencias/' . $logo . '?v=' . filemtime($ruta);
+    }
+    return null;
+}
+
+// true si la agencia ya tiene logo propio para el encabezado (si no, el encabezado muestra
+// el de los PDF y cambiar ese también cambia el encabezado). false sin la migración 040.
+function agenciaTieneLogoHero($db, $agenciaId) {
+    try {
+        $stmt = $db->prepare("SELECT logo_hero FROM agencias WHERE id = ?");
+        $stmt->execute([$agenciaId]);
+        return (bool) $stmt->fetchColumn();
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 function sanitizarHtmlTerminos($html) {

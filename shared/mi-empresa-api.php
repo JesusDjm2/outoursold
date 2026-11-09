@@ -206,7 +206,53 @@ try {
             if ($anterior && file_exists($uploadDir . $anterior)) {
                 @unlink($uploadDir . $anterior);
             }
-            echo json_encode(['success' => true, 'filename' => $logo, 'v' => filemtime($uploadDir . $logo)]);
+            // hero_propio: si es false, el encabezado sigue mostrando este logo (no tiene uno
+            // propio todavía) y hero-edit.js lo actualiza en vivo también ahí.
+            echo json_encode(['success' => true, 'filename' => $logo, 'v' => filemtime($uploadDir . $logo),
+                              'hero_propio' => agenciaTieneLogoHero($db, $id)]);
+            break;
+
+        // Logo del encabezado (Hero) de las vistas, independiente del de los PDF (columna
+        // logo_hero, migración 040). Botón "Logo del encabezado" del Hero.
+        case 'subir-logo-hero':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $id = resolverAgenciaPropiaId($db);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No tienes una agencia/empresa asignada. Contacta a tu administrador.']);
+                break;
+            }
+            try {
+                $stmt = $db->prepare("SELECT logo_hero, logo FROM agencias WHERE id = ?");
+                $stmt->execute([$id]);
+                $actual = $stmt->fetch();
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode(['error' => 'Falta actualizar la base de datos (migración 040) para tener un logo de encabezado propio.']);
+                break;
+            }
+            [$logoHero, $logoError] = guardarLogoAgencia($_FILES['logo'] ?? null, $uploadDir);
+            if ($logoError) {
+                http_response_code(400);
+                echo json_encode(['error' => $logoError]);
+                break;
+            }
+            if (!$logoHero) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No se recibió ningún logo.']);
+                break;
+            }
+            $db->prepare("UPDATE agencias SET logo_hero = ? WHERE id = ?")->execute([$logoHero, $id]);
+            // El anterior se borra solo si no es el mismo archivo que el logo de los PDF.
+            $anterior = $actual['logo_hero'] ?? null;
+            if ($anterior && $anterior !== ($actual['logo'] ?? null) && file_exists($uploadDir . $anterior)) {
+                @unlink($uploadDir . $anterior);
+            }
+            echo json_encode(['success' => true, 'filename' => $logoHero, 'v' => filemtime($uploadDir . $logoHero)]);
             break;
 
         // Color de marca (color_principal) de MI agencia, autoservicio instantáneo desde

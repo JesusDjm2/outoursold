@@ -36,7 +36,7 @@ $heroPosY = resolverHeroPosY($db);
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>');--hero-pos-y:<?= (int) $heroPosY ?>%">
             <div class="hero-actions">
-                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-mountain-sun"></i><span class="hero-edit-txt">Portada</span></button>
                 <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">

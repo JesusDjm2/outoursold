@@ -632,6 +632,21 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .idet-seg button { flex: 1; padding: 0 6px; height: 34px; }
 }
 
+/* Tablets: los popups de agregar y de editar aprovechan el alto de la pantalla.
+   - Vertical (640–1023): hoja inferior casi a pantalla completa; editando, igual de alta.
+   - Horizontal o iPad Pro (táctil desde 1024): el popup de agregar ya no se queda en 780px. */
+@media (min-width: 640px) and (max-width: 1023px) {
+    .ipan { height: 97vh; height: 97dvh; }
+    .idet { max-height: 97%; }
+    .idet.is-editando { height: 97%; }
+}
+@media (hover: none) and (min-width: 1024px) {
+    .ipan-overlay { padding: 16px; }
+    .ipan { width: min(1180px, 100%); height: 100%; }
+    .idet-overlay { padding: 16px; }
+    .idet.is-editando { width: min(720px, 100%); height: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .itin-armado *, .idet-overlay, .idet, .ipan-overlay, .ipan { transition: none !important; animation: none !important; }
 }

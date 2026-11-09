@@ -164,8 +164,13 @@
     -webkit-backdrop-filter: blur(4px);
     transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.2s;
 }
+/* Etiqueta corta junto al ícono (Portada, Logo, Logo PDF, Color) para que se entienda qué
+   cambia cada botón sin tener que pasar el mouse. En celular, solo el ícono. */
+.hero-edit-txt { display: none; }
 @media (min-width: 768px) {
     .hero-actions { top: 14px; right: 14px; gap: 8px; }
+    .hero-edit-btn:has(.hero-edit-txt) { width: auto; gap: 7px; padding: 0 13px; border-radius: 999px; }
+    .hero-edit-txt { display: inline; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; }
 }
 .hero-edit-btn:hover {
     background: rgba(15, 23, 42, 0.6);

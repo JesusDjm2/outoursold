@@ -1000,10 +1000,21 @@ function activarSoloLectura(activo) {
     document.getElementById('guardar-como-paquete').disabled = activo;
 }
 
+// Fecha de hoy (YYYY-MM-DD) en la hora local: toISOString() da la de UTC, que en Perú
+// después de las 7 p. m. ya es el día siguiente.
+function hoyLocalISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 async function guardarCotizacion() {
     if (soloLectura) { notifyWarning('Esta cotización es de otra agencia: solo puedes verla y descargar su PDF.'); return; }
     if (!validarFechas()) return;
     let id = currentCotizacionId || 'COT-' + Date.now();
+    // La fecha de la cotización es el día en que se crea: una nueva toma la de hoy al
+    // guardarse por primera vez; una ya guardada conserva la suya.
+    const fechaCot = document.querySelector('input[name="fecha_cot"]');
+    if (!currentCotizacionId || !fechaCot.value) fechaCot.value = hoyLocalISO();
     const form = document.getElementById('form-pax');
     const tours = Array.from(document.getElementById('tours-body').querySelectorAll('tr')).map(tr => ({
         fecha: tr.querySelector('td:nth-child(2) input').value,
@@ -1156,7 +1167,7 @@ function nuevaCotizacion(showAlert = true) {
     currentCotizacionId = null;
     activarSoloLectura(false);
     document.getElementById('current-cot-id-display').textContent = 'Nueva';
-    document.querySelector('input[name="fecha_cot"]').value = new Date().toISOString().split('T')[0];
+    document.querySelector('input[name="fecha_cot"]').value = hoyLocalISO();
     actualizarEstadosCamposFecha();
     document.getElementById('tours-body').appendChild(createTourRow());
     document.getElementById('hotels-body').appendChild(createHotelRow());

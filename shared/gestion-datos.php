@@ -45,11 +45,13 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>');--hero-pos-y:<?= (int) $heroPosY ?>%">
             <div class="hero-actions">
-                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de tu agencia" data-tooltip="Logo de tu agencia — se muestra en el encabezado y en el PDF de tus cotizaciones."><i class="fas fa-image"></i></button>
+                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo del encabezado" data-tooltip="Logo del encabezado — el que se ve aquí arriba, en todas las vistas. No cambia el de los PDF."><i class="fas fa-signature"></i><span class="hero-edit-txt">Logo</span></button>
                 <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
-                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-eye-dropper"></i></button>
+                <button type="button" id="pdf-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de los PDF" data-tooltip="Logo de los PDF — el que sale en el PDF de tus cotizaciones e itinerarios. No cambia el del encabezado."><i class="fas fa-file-pdf"></i><span class="hero-edit-txt">Logo PDF</span></button>
+                <input type="file" id="pdf-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
+                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-palette"></i><span class="hero-edit-txt">Color</span></button>
                 <input type="color" id="hero-color-input" class="hidden">
-                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-mountain-sun"></i><span class="hero-edit-txt">Portada</span></button>
                 <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">

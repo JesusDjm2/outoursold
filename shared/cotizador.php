@@ -42,11 +42,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <div class="app-content">
         <header class="page-hero" style="--hero-bg-image:url('<?= htmlspecialchars($heroImagenUrl) ?>');--hero-pos-y:<?= (int) $heroPosY ?>%">
             <div class="hero-actions">
-                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de tu agencia" data-tooltip="Logo de tu agencia — se muestra en el encabezado y en el PDF de tus cotizaciones."><i class="fas fa-image"></i></button>
+                <button type="button" id="hero-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo del encabezado" data-tooltip="Logo del encabezado — el que se ve aquí arriba, en todas las vistas. No cambia el de los PDF."><i class="fas fa-signature"></i><span class="hero-edit-txt">Logo</span></button>
                 <input type="file" id="hero-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
-                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-eye-dropper"></i></button>
+                <button type="button" id="pdf-logo-btn" class="hero-edit-btn" aria-label="Cambiar el logo de los PDF" data-tooltip="Logo de los PDF — el que sale en el PDF de tus cotizaciones e itinerarios. No cambia el del encabezado."><i class="fas fa-file-pdf"></i><span class="hero-edit-txt">Logo PDF</span></button>
+                <input type="file" id="pdf-logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden">
+                <button type="button" id="hero-color-btn" class="hero-edit-btn" aria-label="Elegir el color de marca con el cuentagotas" data-tooltip="Color de marca — captura cualquier color con el cuentagotas y se aplica al instante a botones y acentos."><i class="fas fa-palette"></i><span class="hero-edit-txt">Color</span></button>
                 <input type="color" id="hero-color-input" class="hidden">
-                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-camera"></i></button>
+                <button type="button" id="hero-edit-btn" class="hero-edit-btn" aria-label="Cambiar la imagen de portada" data-tooltip="Imagen de portada — la foto de fondo de esta página."><i class="fas fa-mountain-sun"></i><span class="hero-edit-txt">Portada</span></button>
                 <input type="file" id="hero-edit-input" accept="image/jpeg,image/png,image/webp" class="hidden">
             </div>
             <div class="max-w-7xl mx-auto px-4 md:px-6">
@@ -102,11 +104,13 @@ $logoUrl = resolverLogoUrl($db, $navShared);
             </div>
             <main class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
                 <div class="lg:col-span-1 space-y-3">
+                <section id="datos-pax-section" class="card p-3 accordion-section" data-accordion-key="datos-pax">
                 <!-- Historial de cotizaciones guardadas (actividades, hoteles e itinerarios para
-                     reusar en esta): es de toda la cotización, por eso va sobre Datos Pax. -->
-                <!-- El buscador siempre está a la vista; al hacer clic despliega las últimas
-                     guardadas debajo (ver abrirHistorialTours en cotizador.js). -->
-                <div id="historial-drop" class="solo-cotizacion historial-drop">
+                     reusar en esta): dentro de la tarjeta de Datos Pax, antes de su título, así
+                     sigue a la vista con Datos Pax plegado. El buscador siempre está a la vista;
+                     al hacer clic despliega las últimas guardadas debajo (ver
+                     abrirHistorialTours en cotizador.js). -->
+                <div id="historial-drop" class="solo-cotizacion historial-drop mb-3">
                     <div class="historial-buscar">
                         <i class="fas fa-magnifying-glass"></i>
                         <input id="historial-tours-search" type="search" role="combobox" autocomplete="off" placeholder="Buscar en historial (ID, pasajero...)" aria-label="Buscar en el historial por ID, pasajero o contacto" aria-expanded="false" aria-controls="historial-panel" title="Actividades, hoteles e itinerarios usados en cotizaciones guardadas, para reusarlos en esta">
@@ -120,7 +124,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         </div>
                     </div>
                 </div>
-                <section id="datos-pax-section" class="card p-3 accordion-section" data-accordion-key="datos-pax">
                     <div class="flex items-center justify-between mb-2">
                         <button type="button" class="accordion-toggle" aria-expanded="true">
                             <i class="fas fa-chevron-down accordion-caret"></i>
@@ -146,10 +149,9 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <div class="field"><input type="number" name="edad" placeholder="Edad" title="Edad del pasajero"></div>
                         <div class="field"><input type="text" name="contacto" placeholder="Contacto (tel./correo)" title="Teléfono o correo de contacto"></div>
                         <div class="field"><input type="text" name="canal" placeholder="Canal (WhatsApp, Web...)" title="Canal por el que llegó el cliente"></div>
-                        <div class="field field-prefix">
-                            <span class="field-prefix-label">F. Cot.</span>
-                            <input type="date" name="fecha_cot" title="Fecha de la cotización">
-                        </div>
+                        <!-- Fecha de la cotización: no se edita, es el día en que se crea (ver
+                             nuevaCotizacion/guardarCotizacion); al abrir una guardada, la suya. -->
+                        <input type="hidden" name="fecha_cot">
                         <div class="field field-prefix">
                             <span class="field-prefix-label">N° PAX</span>
                             <input type="number" name="n_pax" value="1" min="1" title="Número de pasajeros">

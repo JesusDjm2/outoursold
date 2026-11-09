@@ -1149,6 +1149,8 @@ function onKeydownDetalle(ev) {
 function renderDetalle() {
     const caja = document.querySelector('#idet .idet');
     if (!caja || !detalleActual) return;
+    // Editando, en tablets el popup toma casi todo el alto (ver itinerario-selector.css).
+    caja.classList.toggle('is-editando', !!detalleActual.editando && !!iselEntradaDe(detalleActual.filename));
     const e = iselEntradaDe(detalleActual.filename);
     if (!e) {
         caja.innerHTML = `<div class="idet-body"><button type="button" class="idet-icon-btn idet-cerrar" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>

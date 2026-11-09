@@ -136,50 +136,64 @@
         }
     }
 
-    // ===== Logo de la empresa =====
-    // Reemplaza el bloque de título/subtítulo del Hero (título + "Plataforma B2B...") por
-    // el logo, ver #page-hero-content en cotizador.php/itinerario/index.php — y también se
-    // usa en el PDF de cotización/itinerario.
-    const logoBtn = document.getElementById('hero-logo-btn');
-    const logoInput = document.getElementById('hero-logo-input');
-    if (logoBtn && logoInput) {
-        logoBtn.addEventListener('click', () => logoInput.click());
-
-        logoInput.addEventListener('change', async () => {
-            const file = logoInput.files[0];
-            logoInput.value = '';
+    // ===== Logos: el del encabezado y el de los PDF son independientes =====
+    // - Logo del encabezado (#hero-logo-btn, subir-logo-hero): reemplaza el título/subtítulo
+    //   del Hero (ver #page-hero-content en cotizador.php/itinerario/index.php).
+    // - Logo de los PDF (#pdf-logo-btn, subir-logo): el de la agencia en el PDF de la
+    //   cotización y del itinerario. Mientras la agencia no tenga logo propio de encabezado,
+    //   el encabezado muestra este, así que también se actualiza ahí (hero_propio = false).
+    function pintarLogoEnHero(result) {
+        // Fade-in en vez de un pop abrupto: arranca en opacity:0 y sube al siguiente frame
+        // (ver transition en .page-hero-logo, hero.css).
+        const url = `${assetBase}uploads/agencias/${result.filename}?v=${result.v}`;
+        document.querySelectorAll('.page-hero-content').forEach(content => {
+            content.innerHTML = `<img src="${url}" alt="Logo" class="page-hero-logo" style="opacity:0">`;
+            const img = content.querySelector('img');
+            requestAnimationFrame(() => { img.style.opacity = '1'; });
+        });
+    }
+    function enlazarSubidaLogo({ btnId, inputId, ruta, pregunta, exito, alSubir }) {
+        const boton = document.getElementById(btnId);
+        const entrada = document.getElementById(inputId);
+        if (!boton || !entrada) return;
+        boton.addEventListener('click', () => entrada.click());
+        entrada.addEventListener('change', async () => {
+            const file = entrada.files[0];
+            entrada.value = '';
             if (!file) return;
+            if (!await confirmAction(pregunta, 'Sí, reemplazar')) return;
 
-            if (!await confirmAction('¿Reemplazar el logo de tu empresa?', 'Sí, reemplazar')) return;
-
-            logoBtn.disabled = true;
-            const iconoOriginal = logoBtn.innerHTML;
-            logoBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
+            boton.disabled = true;
+            const iconoOriginal = boton.innerHTML;
+            boton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             try {
                 const formData = new FormData();
                 formData.append('logo', file);
-                const res = await fetch(`${meApiUrl}?path=subir-logo`, { method: 'POST', body: formData });
+                const res = await fetch(`${meApiUrl}?path=${ruta}`, { method: 'POST', body: formData });
                 const result = await res.json();
                 if (!result.success) throw new Error(result.error || 'No se pudo actualizar el logo.');
-
-                // Fade-in en vez de un pop abrupto: arranca en opacity:0 y sube al
-                // siguiente frame (ver transition en .page-hero-logo, hero.css).
-                const url = `${assetBase}uploads/agencias/${result.filename}?v=${result.v}`;
-                document.querySelectorAll('.page-hero-content').forEach(content => {
-                    content.innerHTML = `<img src="${url}" alt="Logo" class="page-hero-logo" style="opacity:0">`;
-                    const img = content.querySelector('img');
-                    requestAnimationFrame(() => { img.style.opacity = '1'; });
-                });
-                notifySuccess('Logo actualizado.');
+                alSubir(result);
+                notifySuccess(exito);
             } catch (err) {
                 notifyError(err.message);
             } finally {
-                logoBtn.disabled = false;
-                logoBtn.innerHTML = iconoOriginal;
+                boton.disabled = false;
+                boton.innerHTML = iconoOriginal;
             }
         });
     }
+    enlazarSubidaLogo({
+        btnId: 'hero-logo-btn', inputId: 'hero-logo-input', ruta: 'subir-logo-hero',
+        pregunta: '¿Reemplazar el logo del encabezado? El de los PDF no cambia.',
+        exito: 'Logo del encabezado actualizado.',
+        alSubir: pintarLogoEnHero
+    });
+    enlazarSubidaLogo({
+        btnId: 'pdf-logo-btn', inputId: 'pdf-logo-input', ruta: 'subir-logo',
+        pregunta: '¿Reemplazar el logo de tus PDF (cotización e itinerario)?',
+        exito: 'Logo de los PDF actualizado.',
+        alSubir: (result) => { if (!result.hero_propio) pintarLogoEnHero(result); }
+    });
 
     // ===== Color de marca (cuentagotas) =====
     // Reemplaza --accent-1/--accent-2 (botones/degradados actualmente rojos, definidos en
