@@ -60,9 +60,19 @@ body {
    ancho del acordeón; sin espacio, uno debajo del otro. */
 .itin-datos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .itin-datos > .field, #paquete-toolbar { flex: 1 1 260px; min-width: 0; }
-.itin-datos .field { height: 34px; }
 #paquete-toolbar { display: flex; align-items: center; gap: 8px; }
 #paquete-toolbar .field { flex: 1; min-width: 0; }
+/* Mismo diseño que los campos de Actividades y Hoteles (.cascade-select-trigger en
+   cascade-select.css): borde, radio, letra, texto guía gris y flecha chica. */
+.itin-datos .itin-campo { position: relative; height: auto; padding: 6px 8px; border-radius: 8px; background: white; transition: border-color 0.15s, box-shadow 0.15s; }
+.itin-datos .itin-campo:hover { border-color: #94a3b8; }
+.itin-datos .itin-campo:focus-within { border-color: var(--accent-1, #e80c13); }
+.itin-datos .itin-campo input, .itin-datos .itin-campo select { font-size: 0.78rem; line-height: 1.25rem; color: #1e293b; }
+.itin-datos .itin-campo input::placeholder { color: #94a3b8; }
+/* Siempre muestra "Aplicar paquete...": al elegir uno se aplica y vuelve a vacío. */
+.itin-datos .itin-campo select { -webkit-appearance: none; appearance: none; padding-right: 18px; color: #94a3b8; cursor: pointer; }
+.itin-datos .itin-campo select option { color: #1e293b; }
+.itin-campo-caret { position: absolute; right: 9px; font-size: 0.65rem; color: #94a3b8; pointer-events: none; }
 /* Resumen de Factura: la flecha va sobre el encabezado de color. Plegado solo deja P.V. Final,
    Reserva y las notas, que se ajustan a ese alto. */
 .accent-header .accordion-toggle { width: 100%; }

@@ -195,14 +195,15 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     <i class="fas fa-box-archive"></i><span id="paquete-aplicado-nombre"></span>
                                     <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
                                 </span>
-                                <div class="field">
+                                <div class="field itin-campo">
                                     <select id="aplicar-paquete-select" aria-label="Aplicar paquete">
                                         <option value="">Aplicar paquete...</option>
                                     </select>
+                                    <i class="fas fa-chevron-down itin-campo-caret" aria-hidden="true"></i>
                                 </div>
                             </div>
-                            <div class="field">
-                                <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Si lo dejas vacío, se usa «Itinerario de» y el nombre del pasajero.">
+                            <div class="field itin-campo">
+                                <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Por defecto son los días y noches de la cotización; puedes cambiarlo.">
                             </div>
                         </div>
                         <!-- Armado del itinerario (shared/itinerario-selector.js): tarjetas por día,
@@ -214,6 +215,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <span id="itin-resumen" class="itin-resumen"></span>
                             </div>
                             <div id="itin-grilla" class="itin-grilla"></div>
+                            <!-- "Agregar itinerarios" / "Editar itinerario · Día N", debajo de las tarjetas. -->
+                            <div id="itin-pie" class="itin-pie"></div>
                             <div id="itin-panel" class="ipan-overlay" hidden></div>
                         </div>
                         <div class="itinerary-table-container" hidden>
@@ -221,9 +224,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                 <tbody id="itinerary-builder-body"></tbody>
                             </table>
                         </div>
-                        <!-- Sin botón propio de generar: "Guardar" (Resumen de Factura) ya genera el PDF
-                             del itinerario junto con el de la cotización si hay módulos armados acá. -->
-                        <p class="solo-cotizacion small text-slate-500 mt-3">El PDF del itinerario se genera junto con la cotización al presionar Guardar.</p>
                         </div>
                     </div>
                     <div class="card p-3 accordion-section" data-accordion-key="actividades">

@@ -22,18 +22,21 @@
 .itin-resumen-aviso { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; color: #b45309; }
 
 /* ===== Grilla de elegidos ===== */
-.itin-grilla { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+/* Columnas de al menos --ia-card que se estiran hasta llenar el ancho del acordeón: sin
+   hueco al final de cada fila. */
+.itin-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--ia-card), 1fr)); align-items: start; gap: 12px; }
+.itin-grilla:empty { display: none; }
 
-/* Varios itinerarios del mismo día van juntos en un mismo bloque. */
-.itin-dia-grupo { display: flex; align-items: stretch; gap: 6px; border-radius: 18px; transition: box-shadow 0.15s, background 0.15s; }
+/* Varios itinerarios del mismo día van juntos en un mismo bloque, que ocupa una columna por
+   itinerario (--n, ver renderGrilla). */
+.itin-dia-grupo { grid-column: span var(--n, 1); display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: 6px; border-radius: 18px; transition: box-shadow 0.15s, background 0.15s; }
 .itin-dia-grupo.is-varios { padding: 5px; background: #f1f5f9; }
 .itin-dia-grupo.is-destino { box-shadow: 0 0 0 2px var(--ia-accent), 0 0 0 6px var(--ia-accent-soft); }
 .itin-dia-grupo:not(.is-varios).is-destino { border-radius: 14px; }
 
 .itin-card {
     position: relative;
-    flex-shrink: 0;
-    width: var(--ia-card);
+    min-width: 0;
     aspect-ratio: 1;
     border-radius: 14px;
     overflow: hidden;
@@ -135,9 +138,8 @@
 /* Días libres entre días: − / + cambia cuántos (corre los días siguientes). */
 .itin-libre-card {
     position: relative;
-    flex-shrink: 0;
-    width: var(--ia-card);
-    min-height: var(--ia-card);
+    min-width: 0;
+    aspect-ratio: 1;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     padding: 6px;
     border: 1.5px dashed #fcd34d;
@@ -169,11 +171,11 @@
 .itin-libre-card-agregar i { margin-right: 3px; font-size: 0.55rem; }
 .itin-libre-card-agregar:hover { background: #fef3c7; }
 
-/* "Agregar itinerarios" (sin itinerarios todavía) y "Editar itinerario" (tras el último día):
-   el mismo botón. En tablet y celular .itin-grilla es grid. */
+/* "Agregar itinerarios" (sin itinerarios todavía) y "Editar itinerario" (con itinerarios):
+   el mismo botón, debajo de las tarjetas. */
+.itin-pie { display: flex; }
+.itin-grilla:not(:empty) ~ .itin-pie { margin-top: 12px; }
 .itin-vacio, .itin-card-nuevo {
-    grid-column: 1 / -1;
-    justify-self: start;
     display: inline-flex; align-items: center; gap: 6px;
     padding: 7px 12px;
     border-radius: 9px;
@@ -184,7 +186,6 @@
     transition: filter 0.15s;
 }
 .itin-vacio:hover, .itin-card-nuevo:hover { filter: brightness(0.92); }
-.itin-card-nuevo { flex-shrink: 0; align-self: center; }
 
 /* ===== Imagen (o inicial sobre degradado) ===== */
 .isel-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -596,7 +597,7 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
     .itin-libre-card small { font-size: 0.56rem; }
     .itin-libre-card-ctrl button, .itin-libre-card-quitar { width: 22px; height: 22px; }
     .itin-libre-card-quitar { top: 3px; right: 3px; }
-    .itin-vacio, .itin-card-nuevo { justify-self: stretch; justify-content: center; padding: 10px 12px; }
+    .itin-vacio, .itin-card-nuevo { flex: 1; justify-content: center; padding: 10px 12px; }
     /* Hoja inferior: sube desde abajo, se cierra deslizándola desde la cabecera. */
     .ipan-overlay { align-items: flex-end; padding: 0; }
     .ipan { height: 94vh; height: 94dvh; padding: 0 12px; border-radius: 18px 18px 0 0; opacity: 1; transform: translateY(100%); transition: transform 0.2s ease-in; }

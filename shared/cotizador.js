@@ -1175,9 +1175,46 @@ function nuevaCotizacion(showAlert = true) {
 // addItineraryBuilderRow() que ya usa el armador standalone — no hay lógica propia acá.
 function limpiarItinerarioArmado() {
     document.getElementById('itinerary-passenger').value = '';
-    document.getElementById('itinerary-title').value = '';
+    const titulo = document.getElementById('itinerary-title');
+    titulo.value = '';
+    delete titulo.dataset.manual;
     document.getElementById('itinerary-builder-body').innerHTML = '';
     addItineraryBuilderRow('itinerary-builder-body', true);
+    actualizarTituloItinerarioAuto();
+}
+
+// Nombre del itinerario por defecto: los días y noches de la cotización, en su idioma
+// ("5 días / 4 noches"). Sale de F. Llegada y F. Salida; sin ellas, de los días armados en
+// el itinerario. Se recalcula solo mientras el usuario no lo haya escrito a mano
+// (data-manual); si lo borra, vuelve al automático.
+const TITULO_ITIN_TEXTOS = {
+    es: (d, n) => `${d} ${d === 1 ? 'día' : 'días'} / ${n} ${n === 1 ? 'noche' : 'noches'}`,
+    en: (d, n) => `${d} ${d === 1 ? 'day' : 'days'} / ${n} ${n === 1 ? 'night' : 'nights'}`,
+    pt: (d, n) => `${d} ${d === 1 ? 'dia' : 'dias'} / ${n} ${n === 1 ? 'noite' : 'noites'}`
+};
+const TITULO_ITIN_AUTO_RE = /^\d+ (días?|days?|dias?) \/ \d+ (noches?|nights?|noites?)$/i;
+
+function tituloItinerarioAuto() {
+    const llegada = document.querySelector('input[name="f_llegada"]')?.value;
+    const salida = document.querySelector('input[name="f_salida"]')?.value;
+    let noches = null;
+    if (llegada && salida) {
+        const diff = Math.round((new Date(salida + 'T00:00:00') - new Date(llegada + 'T00:00:00')) / 86400000);
+        if (diff >= 0) noches = diff;
+    }
+    if (noches === null) {
+        const dias = typeof maxDiaArmado === 'function' ? maxDiaArmado() : 0;
+        if (!dias) return '';
+        noches = dias - 1;
+    }
+    const idioma = document.querySelector('select[name="idioma"]')?.value;
+    return (TITULO_ITIN_TEXTOS[idioma] || TITULO_ITIN_TEXTOS.es)(noches + 1, noches);
+}
+
+function actualizarTituloItinerarioAuto() {
+    const input = document.getElementById('itinerary-title');
+    if (!input || input.dataset.manual === '1') return;
+    input.value = tituloItinerarioAuto();
 }
 
 // Título que se autogeneraba antes de existir el campo "Nombre del itinerario". Una
@@ -1190,8 +1227,14 @@ function tituloItinerarioPara(nombrePax) {
 function restaurarItinerarioArmado(armado) {
     const nombrePax = document.querySelector('input[name="nombre_pax"]').value || '';
     document.getElementById('itinerary-passenger').value = armado?.pasajero || nombrePax;
-    const titulo = armado?.titulo || '';
-    document.getElementById('itinerary-title').value = titulo === tituloItinerarioPara(armado?.pasajero || nombrePax) ? '' : titulo;
+    let titulo = armado?.titulo || '';
+    if (titulo === tituloItinerarioPara(armado?.pasajero || nombrePax)) titulo = '';
+    // Un nombre escrito a mano se respeta; vacío o con la forma "N días / M noches", se
+    // recalcula (ver actualizarTituloItinerarioAuto).
+    const inputTitulo = document.getElementById('itinerary-title');
+    inputTitulo.value = titulo;
+    if (titulo && !TITULO_ITIN_AUTO_RE.test(titulo)) inputTitulo.dataset.manual = '1';
+    else delete inputTitulo.dataset.manual;
     document.getElementById('itinerary-builder-body').innerHTML = '';
     // Con el armador vacío se respetan los días guardados tal cual (ver aplicarPaqueteItinerario).
     aplicarPaqueteItinerario({ modulos: armado?.modulos || [], dias: armado?.dias });
@@ -1582,6 +1625,19 @@ async function init() {
         document.getElementById('itinerary-passenger').value = e.target.value;
     });
     document.querySelector('input[name="f_llegada"]').addEventListener('change', resincronizarFechasConLlegada);
+    // Nombre del itinerario automático (días / noches): sigue las fechas y el idioma hasta que
+    // el usuario lo escribe a mano; si lo deja vacío, vuelve al automático.
+    ['f_llegada', 'f_salida'].forEach(n => document.querySelector(`input[name="${n}"]`).addEventListener('change', actualizarTituloItinerarioAuto));
+    document.querySelector('select[name="idioma"]').addEventListener('change', actualizarTituloItinerarioAuto);
+    const inputTituloItin = document.getElementById('itinerary-title');
+    inputTituloItin.addEventListener('input', () => {
+        if (inputTituloItin.value.trim()) inputTituloItin.dataset.manual = '1';
+        else delete inputTituloItin.dataset.manual;
+    });
+    inputTituloItin.addEventListener('change', () => {
+        if (!inputTituloItin.value.trim()) actualizarTituloItinerarioAuto();
+    });
+    actualizarTituloItinerarioAuto();
     // Se cierra al tocar fuera o con Escape (que devuelve el foco al buscador).
     document.addEventListener('pointerdown', (e) => {
         if (historialAbierto() && !document.getElementById('historial-drop').contains(e.target)) cerrarHistorialTours();

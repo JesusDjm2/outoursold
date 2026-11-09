@@ -195,8 +195,12 @@ function renderGrilla() {
         if (items.length && !iselLlegada()) resumen.innerHTML += ' <span class="itin-resumen-aviso" title="Completa la F. Llegada en Datos Pax"><i class="fas fa-circle-info"></i>Sin fechas: falta la F. Llegada</span>';
     }
 
+    // El botón para abrir el popup va debajo de las tarjetas (#itin-pie), no en la grilla.
+    const pie = document.getElementById('itin-pie');
     if (!items.length) {
-        cont.innerHTML = '<button type="button" class="itin-vacio" data-accion="abrir-nuevo"><i class="fas fa-plus"></i>Agregar itinerarios</button>';
+        cont.innerHTML = '';
+        if (pie) pie.innerHTML = '<button type="button" class="itin-vacio" data-accion="abrir-nuevo"><i class="fas fa-plus"></i>Agregar itinerarios</button>';
+        if (typeof actualizarTituloItinerarioAuto === 'function') actualizarTituloItinerarioAuto();
         return;
     }
 
@@ -207,7 +211,8 @@ function renderGrilla() {
     dias.forEach(dia => {
         if (anterior !== null && dia - anterior > 1) html += tarjetaLibreHtml(anterior + 1, dia - 1, esDestino(anterior + 1), bloques++);
         const grupo = porDia.get(dia);
-        html += `<div class="itin-dia-grupo${grupo.length > 1 ? ' is-varios' : ''}${esDestino(dia) ? ' is-destino' : ''}" data-dia="${dia}">
+        // --n: cuántas columnas de la grilla ocupa el bloque (una por itinerario del día).
+        html += `<div class="itin-dia-grupo${grupo.length > 1 ? ' is-varios' : ''}${esDestino(dia) ? ' is-destino' : ''}" data-dia="${dia}" style="--n:${grupo.length}">
             ${grupo.map(x => tarjetaElegidaHtml(x)).join('')}
         </div>`;
         anterior = dia;
@@ -223,9 +228,14 @@ function renderGrilla() {
     }
     const nuevo = diaNuevo();
     const fechaNuevo = iselFechaCorta(nuevo);
-    html += `<button type="button" class="itin-card-nuevo" data-accion="abrir-nuevo" title="Agregar o quitar itinerarios${fechaNuevo ? `. Próximo día: ${escapeHtml(fechaNuevo)}` : ''}"><i class="fas fa-pen"></i>Editar itinerario · Día ${nuevo}</button>`;
+    if (pie) pie.innerHTML = `<button type="button" class="itin-card-nuevo" data-accion="abrir-nuevo" title="Agregar o quitar itinerarios${fechaNuevo ? `. Próximo día: ${escapeHtml(fechaNuevo)}` : ''}"><i class="fas fa-pen"></i>Editar itinerario · Día ${nuevo}</button>`;
     cont.innerHTML = html;
+    if (typeof actualizarTituloItinerarioAuto === 'function') actualizarTituloItinerarioAuto();
 }
+
+document.getElementById('itin-pie')?.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-accion="abrir-nuevo"]')) abrirPanelItinerarios({ destino: null });
+});
 
 function tarjetaElegidaHtml(x) {
     const n = x.dia;
@@ -622,7 +632,7 @@ function cerrarPanelItinerarios() {
     if (panelEnHistorial) { panelEnHistorial = false; history.back(); }
     renderGrilla();
     // La tarjeta que lo abrió pudo volver a dibujarse.
-    const foco = document.contains(panelFocoPrevio) ? panelFocoPrevio : document.querySelector('#itin-grilla .itin-card-nuevo, #itin-grilla .itin-vacio');
+    const foco = document.contains(panelFocoPrevio) ? panelFocoPrevio : document.querySelector('#itin-pie .itin-card-nuevo, #itin-pie .itin-vacio');
     foco?.focus({ preventScroll: true });
 }
 
