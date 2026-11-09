@@ -174,10 +174,12 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
                 <section id="cotizador-main-col" class="lg:col-span-3 space-y-4">
                     <div class="card p-3 accordion-section" data-accordion-key="itinerario">
-                        <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
-                            <button type="button" class="accordion-toggle" aria-expanded="true">
+                        <!-- Como Actividades/Hoteles: abierto, la flecha va a la altura de Aplicar
+                             paquete y Nombre del itinerario, sin título; "Itinerario" solo plegado. -->
+                        <div class="accordion-cab-tabla flex items-center justify-between mb-2 flex-wrap gap-2">
+                            <button type="button" class="accordion-toggle" aria-expanded="true" aria-label="Itinerario">
                                 <i class="fas fa-chevron-down accordion-caret"></i>
-                                <h2 class="text-base font-medium">Itinerario</h2>
+                                <span class="accordion-label-collapsed">Itinerario</span>
                             </button>
                         </div>
                         <div class="accordion-body">

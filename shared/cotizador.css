@@ -55,6 +55,10 @@ body {
     /* Con fondo: si la tabla se desliza, sus títulos pasan por debajo de la flecha. */
     .accordion-section:not(.is-collapsed) > .accordion-cab-tabla .accordion-toggle { width: 100%; height: 100%; justify-content: center; background: #f8fafc; }
     .accordion-section:not(.is-collapsed) > .accordion-cab-tabla .accordion-label-collapsed { display: none; }
+    /* Itinerario: la flecha, a la izquierda de Aplicar paquete / Nombre del itinerario y de su alto. */
+    [data-accordion-key="itinerario"]:not(.is-collapsed) > .accordion-cab-tabla { height: 34px; }
+    [data-accordion-key="itinerario"]:not(.is-collapsed) > .accordion-cab-tabla .accordion-toggle { border-radius: 8px; }
+    [data-accordion-key="itinerario"]:not(.is-collapsed) .itin-datos { padding-left: 40px; }
 }
 /* Nombre del itinerario (portada y páginas finales del PDF) y Aplicar paquete: comparten el
    ancho del acordeón; sin espacio, uno debajo del otro. */
