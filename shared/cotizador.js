@@ -461,7 +461,54 @@ function renderHistorialTours() {
 // filas vacías que ya haya en las tablas (ver agregarFilasTours/agregarFilasHoteles) y
 // recién luego agrega al final; el itinerario siempre se agrega al final (mismo criterio
 // que aplicarPaquete, vía aplicarPaqueteItinerario).
+// ¿La vista ya tiene algo armado en Actividades, Hoteles o Itinerario?
+function vistaTieneContenido() {
+    const conValor = (sel) => [...document.querySelectorAll(sel)].some(el => el.value);
+    return conValor('#tours-body .tour-name') || conValor('#hotels-body .hotel-name')
+        || conValor('#itinerary-builder-body .module-filename');
+}
+
+// Reusar desde el historial con la vista ya armada: Reemplazar (lo de la cotización elegida
+// toma el lugar de Actividades, Hoteles e Itinerario) o Agregar (se suma a lo que hay).
+// Devuelve 'reemplazar' | 'agregar' | null (canceló). Con la vista vacía no pregunta.
+async function preguntarModoReuso(c) {
+    if (!vistaTieneContenido()) return 'agregar';
+    const nombre = c.data.pax?.nombre_pax?.trim() || c.id;
+    const r = await Swal.fire({
+        icon: 'question',
+        title: '¿Reemplazar o agregar?',
+        text: `Ya tienes actividades, hoteles o itinerario en esta cotización. ¿Quieres reemplazarlos por los de «${nombre}» o agregarlos a lo que ya tienes?`,
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Reemplazar',
+        denyButtonText: 'Agregar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e80c13',
+        denyButtonColor: '#475569',
+        cancelButtonColor: '#94a3b8'
+    });
+    if (r.isConfirmed) return 'reemplazar';
+    if (r.isDenied) return 'agregar';
+    return null;
+}
+
+// Vacía Actividades, Hoteles e Itinerario (no toca Datos Pax, precios ni notas) para
+// reemplazarlos por los de otra cotización. El paquete aplicado deja de valer.
+function vaciarContenidoParaReemplazar() {
+    document.getElementById('tours-body').innerHTML = '';
+    document.getElementById('hotels-body').innerHTML = '';
+    document.getElementById('itinerary-builder-body').innerHTML = '';
+    if (typeof refrescarArmadoItinerario === 'function') refrescarArmadoItinerario();
+    paqueteAplicadoId = null;
+    paqueteAplicadoNombre = '';
+    renderPaqueteAplicado();
+}
+
 async function reusarHistorialCotizacion(c) {
+    const modo = await preguntarModoReuso(c);
+    if (!modo) return; // canceló: no se toca nada
+    if (modo === 'reemplazar') vaciarContenidoParaReemplazar();
+
     // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
     // mano o un paquete aplicado) y sigue a N° PAX hasta que el usuario la edite — antes
     // se fijaba con la cantidad de la cotización histórica y quedaba sorda a N° PAX.
@@ -519,7 +566,15 @@ async function reusarHistorialCotizacion(c) {
         }
     }
 
+    // Reemplazado sin actividades u hoteles: una fila en blanco, como en una cotización nueva.
+    if (modo === 'reemplazar') {
+        if (!document.querySelector('#tours-body tr')) document.getElementById('tours-body').appendChild(createTourRow());
+        if (!document.querySelector('#hotels-body tr')) document.getElementById('hotels-body').appendChild(createHotelRow());
+    }
+    calcularResumen();
     cerrarHistorialTours();
+    // Aviso breve que se va solo (iselToast, itinerario-selector.js), no un modal a cerrar.
+    if (typeof iselToast === 'function') iselToast(modo === 'reemplazar' ? 'Se reemplazó con lo de la cotización elegida' : 'Se agregó lo de la cotización elegida');
 }
 
 // Sugiere la fecha de una nueva fila de actividad: el día siguiente a la fecha más
