@@ -177,7 +177,7 @@ async function cargarDatosIniciales() {
 
 function renderAplicarPaqueteSelect() {
     const select = document.getElementById('aplicar-paquete-select');
-    select.innerHTML = '<option value="">Aplicar paquete...</option>';
+    select.innerHTML = '<option value="">Aplicar paquete predefinido...</option>';
     paquetesData.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.id;
@@ -901,7 +901,7 @@ async function guardarComoPaquete() {
         }
         await notifySuccess(eraEdicion
             ? `Paquete "${nombre}" actualizado.`
-            : `Paquete "${nombre}" guardado. Ya está disponible en "Aplicar paquete" y en Gestión de Datos > Paquetes.`);
+            : `Paquete "${nombre}" guardado. Ya está disponible en "Aplicar paquete predefinido" y en Gestión de Datos > Paquetes.`);
         await refrescarPaquetesData();
     } catch (e) {
         notifyError('Error al guardar el paquete: ' + e.message);

@@ -196,8 +196,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     <button type="button" id="paquete-aplicado-editar" class="ml-1 w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-white" title="Editar este paquete predefinido"><i class="fas fa-pen text-[10px]"></i></button>
                                 </span>
                                 <div class="field itin-campo">
-                                    <select id="aplicar-paquete-select" aria-label="Aplicar paquete">
-                                        <option value="">Aplicar paquete...</option>
+                                    <select id="aplicar-paquete-select" aria-label="Aplicar paquete predefinido">
+                                        <option value="">Aplicar paquete predefinido...</option>
                                     </select>
                                     <i class="fas fa-chevron-down itin-campo-caret" aria-hidden="true"></i>
                                 </div>

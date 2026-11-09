@@ -368,8 +368,24 @@ function moverItinerario(uid, destino, antes) {
 // Cambio de fecha (o de número de día) desde el detalle. Los días siguen correlativos:
 // - Único itinerario del primer día: sigue siendo el Día 1. Su nueva fecha pasa a ser la
 //   F. Llegada y todo el viaje se corre con él (Actividades y Hoteles también).
-// - Cualquier otro: solo hacia adelante. Él y los días siguientes se corren lo mismo y los
-//   días que deja atrás quedan libres (Día 4 → Día 5: el 4 queda libre y el 5 pasa al 6).
+// - Cualquier otro, hacia adelante: él y los días siguientes se corren lo mismo y los días
+//   que deja atrás quedan libres (Día 4 → Día 5: el 4 queda libre y el 5 pasa al 6).
+// - Cualquier otro, hacia atrás: solo a uno de los días libres que tiene justo antes (ver
+//   iselPrimerLibreAntes). Ocupa ese día libre y nada más se mueve; si su día queda vacío,
+//   pasa a ser libre (o, si era el último, el viaje termina antes).
+//   Ej.: Día 1 el 2 oct, libres 3 y 4, itinerario el 5 → puede pasar al 3 o al 4.
+
+// Primer día del bloque de días libres que está justo antes de `dia` (sin otro itinerario
+// en medio); `dia` si no tiene libres antes. Nunca antes del primer día del itinerario.
+function iselPrimerLibreAntes(dia) {
+    const items = itemsArmado();
+    const inicio = items[0]?.dia ?? 1;
+    const ocupados = new Set(items.map(x => x.dia));
+    let d = dia;
+    while (d - 1 > inicio && !ocupados.has(d - 1)) d--;
+    return d;
+}
+
 function iselCambiarDiaDeFila(tr, dia) {
     const actual = Number(tr.dataset.dia);
     if (dia === actual) return;
@@ -385,7 +401,21 @@ function iselCambiarDiaDeFila(tr, dia) {
         iselToast('Sigue siendo el Día 1: la F. Llegada y los demás días se corrieron');
         return;
     }
-    if (dia < actual) { notifyWarning('Solo se puede cambiar a una fecha posterior. Para adelantar este día, arrástralo.'); return; }
+    if (dia < actual) {
+        const minimo = iselPrimerLibreAntes(actual);
+        if (dia < minimo) {
+            notifyWarning(minimo < actual
+                ? 'Hacia atrás solo puede ir a uno de los días libres que tiene justo antes.'
+                : 'Solo se puede cambiar a una fecha posterior: no hay días libres antes de este día.');
+            return;
+        }
+        tr.dataset.dia = String(dia);
+        refrescarArmadoItinerario();
+        resaltarTarjeta(tr.dataset.uid);
+        const titulo = iselEntradaDe(filenameDeFila(tr))?.m.titulo || filenameDeFila(tr);
+        iselToast(`${titulo} ahora es el Día ${dia}, en lugar del día libre`);
+        return;
+    }
     const delta = dia - actual;
     const quedaLibre = !items.some(x => x.dia === actual && x.tr !== tr);
     filasArmado().forEach(f => {
@@ -1141,8 +1171,10 @@ function renderDetalle() {
     // Un día libre va siempre entre dos días con itinerario: no antes del primero ni después del último.
     const esUltimoDia = dia !== null && dia === diasDelItinerario[diasDelItinerario.length - 1];
     const soloEnSuDia = dia !== null && itemsArmado().filter(x => x.dia === dia).length === 1;
-    // Solo el primer día puede ir a una fecha anterior: su fecha pasa a ser la F. Llegada.
-    const minFecha = esPrimerDia && soloEnSuDia ? '' : ` min="${iselFechaDia(dia)}"`;
+    // El primer día puede ir a cualquier fecha anterior (pasa a ser la F. Llegada); los demás,
+    // hacia atrás solo hasta los días libres que tienen justo antes (iselCambiarDiaDeFila).
+    const diaMinimo = dia !== null ? iselPrimerLibreAntes(dia) : null;
+    const minFecha = esPrimerDia && soloEnSuDia ? '' : ` min="${iselFechaDia(diaMinimo)}"`;
     const aQuitar = tr ? null : filaParaAlternar(m.filename);
     const libresHtml = [
         !esPrimerDia && '<button type="button" data-accion="libre-antes" title="Agrega un día libre antes: este día y los siguientes se corren uno">Antes</button>',
@@ -1162,7 +1194,7 @@ function renderDetalle() {
                     <span>${llegada ? `Día ${dia}` : 'Día'}</span>
                     ${llegada
                         ? `<input type="date" class="idet-fecha-input" value="${iselFechaDia(dia)}"${minFecha}>`
-                        : `<input type="number" class="idet-dia-input" value="${dia}" min="${dia}" max="366">`}
+                        : `<input type="number" class="idet-dia-input" value="${dia}" min="${esPrimerDia && soloEnSuDia ? dia : diaMinimo}" max="366">`}
                 </label>
                 <span class="idet-fecha-acciones">
                     <button type="button" class="idet-chip" data-accion="reemplazar" title="Poner otro itinerario en lugar de este, en el mismo día"><i class="fas fa-arrows-rotate"></i>Reemplazar</button>
