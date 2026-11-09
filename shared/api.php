@@ -732,9 +732,18 @@ try {
             }
             // Un paquete puede combinar Actividades, Hoteles e Itinerario; alcanza con que
             // tenga al menos uno de los tres.
+            // `dia` (opcional): día del viaje de la actividad (1 = llegada); varias pueden
+            // compartirlo. Se guarda solo si viene en todas y es válido (si no, el paquete
+            // se aplica como antes, una actividad por día).
             $tours = array_values(array_filter(array_map(function ($t) {
-                return ['tour' => trim($t['tour'] ?? ''), 'cant' => floatval($t['cant'] ?? 1)];
+                $fila = ['tour' => trim($t['tour'] ?? ''), 'cant' => floatval($t['cant'] ?? 1)];
+                $dia = intval($t['dia'] ?? 0);
+                if ($dia >= 1 && $dia <= 366) $fila['dia'] = $dia;
+                return $fila;
             }, $tours), fn($t) => $t['tour'] !== ''));
+            if ($tours && count(array_filter($tours, fn($t) => isset($t['dia']))) !== count($tours)) {
+                $tours = array_map(function ($t) { unset($t['dia']); return $t; }, $tours);
+            }
             $hoteles = array_values(array_filter(array_map(function ($h) {
                 return [
                     'aloj' => trim($h['aloj'] ?? ''),

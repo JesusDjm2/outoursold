@@ -226,6 +226,45 @@ function sumarDiasISO(fechaISO, dias) {
     d.setDate(d.getDate() + dias);
     return d.toISOString().split('T')[0];
 }
+// Días de `desde` a `hasta` (fechas YYYY-MM-DD); negativo si `hasta` es anterior.
+function diasEntreISO(desde, hasta) {
+    return Math.round((Date.parse(hasta + 'T00:00:00Z') - Date.parse(desde + 'T00:00:00Z')) / 86400000);
+}
+
+// Día del viaje (1 = F. Llegada) de cada actividad de la tabla, para guardarlo en un
+// paquete: sale de su fecha; sin fecha, del día de paquete que traiga (data-dia) o del de la
+// fila anterior. Si la llegada falta (o hay actividades antes de ella), el Día 1 es la
+// fecha más temprana. null si no hay forma de saberlo (paquete de los de antes).
+function diasDeActividades(filas) {
+    const llegada = document.querySelector('input[name="f_llegada"]')?.value || '';
+    const fechas = filas.map(f => f.fecha).filter(Boolean);
+    const primera = fechas.length ? fechas.reduce((a, b) => a < b ? a : b) : '';
+    const base = llegada && (!primera || primera >= llegada) ? llegada : primera;
+    let anterior = null;
+    const dias = filas.map(f => {
+        let dia = null;
+        if (f.fecha && base) dia = diasEntreISO(base, f.fecha) + 1;
+        else if (Number(f.dia) >= 1) dia = Number(f.dia);
+        else dia = anterior;
+        anterior = dia;
+        return dia;
+    });
+    return dias.every(d => d >= 1 && d <= 366) ? dias : null;
+}
+
+// Fechas de las actividades de un paquete desde la F. Llegada. Con `dia` guardado, cada
+// una va a su día (varias pueden compartirlo); los paquetes de antes, sin `dia`, siguen
+// con una por día. Sin F. Llegada quedan sin fecha (y con su día en data-dia).
+function filasToursDePaquete(tours, fLlegada) {
+    const conDia = tours.length > 0 && tours.every(t => Number(t.dia) >= 1);
+    let fecha = fLlegada;
+    return tours.map((t, i) => {
+        if (conDia) return { tour: t.tour, fecha: fLlegada ? sumarDiasISO(fLlegada, Number(t.dia) - 1) : '', dia: Number(t.dia) };
+        const fila = { tour: t.tour, fecha, dia: fLlegada ? null : i + 1 };
+        if (fecha) fecha = sumarDiasISO(fecha, 1);
+        return fila;
+    });
+}
 
 // Aplica un paquete a la cotización. Uno solo a la vez: REEMPLAZA Itinerario, Actividades y
 // Hoteles (lo que hubiera, de otro paquete o agregado a mano) y los arma desde el día 1
@@ -264,17 +303,13 @@ async function aplicarPaquete(paquete) {
         addItineraryBuilderRow('itinerary-builder-body', true);
     }
 
-    // Actividades: un día por tour desde la Fecha de Llegada. Sin "cant" explícito cada fila
-    // nace en modo "auto" y sigue a N° PAX, igual que una fila agregada a mano.
+    // Actividades: cada una en su día del paquete desde la Fecha de Llegada (varias pueden
+    // ser del mismo día; ver filasToursDePaquete). Sin "cant" explícito cada fila nace en
+    // modo "auto" y sigue a N° PAX, igual que una fila agregada a mano.
     const toursBody = document.getElementById('tours-body');
     toursBody.innerHTML = '';
     if (paquete.tours?.length) {
-        let fecha = fLlegada;
-        agregarFilasTours(paquete.tours.map(item => {
-            const fila = { tour: item.tour, fecha };
-            if (fecha) fecha = sumarDiasISO(fecha, 1);
-            return fila;
-        }), true);
+        agregarFilasTours(filasToursDePaquete(paquete.tours, fLlegada), true);
     } else {
         toursBody.appendChild(createTourRow({ fecha: fLlegada }));
     }
@@ -618,15 +653,30 @@ function sugerirSiguienteCheckinHotel() {
 // (antes solo llenaba fechas vacías; si una fila ya traía fecha de un cambio anterior, se
 // respetaba tal cual y quedaba "sorda" a la nueva Fecha de Llegada).
 function resincronizarFechasConLlegada() {
-    const fLlegada = document.querySelector('input[name="f_llegada"]').value;
+    const inputLlegada = document.querySelector('input[name="f_llegada"]');
+    const fLlegada = inputLlegada.value;
+    const previa = inputLlegada.dataset.previa || '';
+    inputLlegada.dataset.previa = fLlegada;
     if (!fLlegada) return;
 
-    // Actividades: día 1 = Fecha de Llegada, cada fila siguiente un día más, en el orden
-    // en que están las filas (se recalculan todas, tengan tour elegido o no).
-    let fecha = fLlegada;
-    document.querySelectorAll('#tours-body tr').forEach(tr => {
-        tr.querySelector('td:nth-child(2) input').value = fecha;
-        fecha = sumarDiasISO(fecha, 1);
+    // Actividades: se respetan los días (varias actividades pueden ser del mismo día).
+    // - Con fecha: se corre lo mismo que la F. Llegada (o, si antes no había llegada, la
+    //   más temprana pasa a ser el Día 1).
+    // - Sin fecha, de un paquete (data-dia): F. Llegada + (día − 1).
+    // - Sin fecha ni día: el día siguiente a la fila anterior (el Día 1 la primera).
+    const filas = [...document.querySelectorAll('#tours-body tr')];
+    const fechas = filas.map(tr => tr.querySelector('td:nth-child(2) input').value).filter(Boolean);
+    const base = previa || (fechas.length ? fechas.reduce((a, b) => a < b ? a : b) : '');
+    let anterior = null;
+    filas.forEach(tr => {
+        const input = tr.querySelector('td:nth-child(2) input');
+        let nueva;
+        if (input.value && base) nueva = sumarDiasISO(fLlegada, diasEntreISO(base, input.value));
+        else if (Number(tr.dataset.dia) >= 1) nueva = sumarDiasISO(fLlegada, Number(tr.dataset.dia) - 1);
+        else nueva = anterior ? sumarDiasISO(anterior, 1) : fLlegada;
+        input.value = nueva;
+        delete tr.dataset.dia; // ya tiene fecha: desde ahora manda la fecha
+        anterior = nueva;
     });
 
     // Hoteles: encadenados desde la Fecha de Llegada — el check-in del primero es la
@@ -672,6 +722,9 @@ function createTourRow(data = {}) {
         <td class="text-right total-line col-costo">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
+    // Día del viaje de un paquete aplicado sin F. Llegada (sin fecha todavía): lo usan
+    // resincronizarFechasConLlegada para ponerle fecha y guardarComoPaquete para no perderlo.
+    if (data.dia && !data.fecha) tr.dataset.dia = String(data.dia);
     tr.querySelector('button').onclick = () => { tr.remove(); calcularResumen(); };
     tr.querySelector('input.cant').addEventListener('input', () => {
         tr.dataset.autoCant = 'false';
@@ -919,9 +972,14 @@ function sincronizarResumenPlegado(conDatos) {
 // (precargado con el actual cuando se está editando uno).
 async function guardarComoPaquete() {
     if (soloLectura) { notifyWarning('Esta cotización es de otra agencia: solo puedes verla y descargar su PDF.'); return; }
-    const tours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
-        .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value }))
+    // Cada actividad con su día del viaje (1 = llegada): varias pueden compartir día y al
+    // aplicar el paquete se respeta (ver diasDeActividades / filasToursDePaquete).
+    const filasTours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
+        .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value,
+                      fecha: tr.querySelector('td:nth-child(2) input').value, dia: tr.dataset.dia }))
         .filter(t => t.tour);
+    const diasTours = diasDeActividades(filasTours);
+    const tours = filasTours.map((t, i) => ({ tour: t.tour, cant: t.cant, ...(diasTours ? { dia: diasTours[i] } : {}) }));
     const hoteles = Array.from(document.getElementById('hotels-body').querySelectorAll('tr'))
         .map(tr => ({ aloj: tr.querySelector('.hotel-name').value, nhab: tr.querySelector('.nhab').value, noches: tr.querySelector('.noches').value }))
         .filter(h => h.aloj);
@@ -974,9 +1032,18 @@ async function cargarPaqueteParaEditar(id) {
     }
     nuevaCotizacion(false);
 
+    // Para ver y editar en qué día va cada actividad, el paquete se arma desde hoy como
+    // F. Llegada de referencia (Datos Pax queda deshabilitado; al salir se limpia). Al
+    // guardar, los días se cuentan desde esa llegada (ver diasDeActividades).
+    const inputLlegada = document.querySelector('input[name="f_llegada"]');
+    inputLlegada.value = hoyLocalISO();
+    inputLlegada.dataset.previa = inputLlegada.value;
+    actualizarEstadosCamposFecha();
+    const fechasTours = filasToursDePaquete(paquete.tours, inputLlegada.value);
+
     const toursBody = document.getElementById('tours-body');
     toursBody.innerHTML = '';
-    (paquete.tours.length ? paquete.tours : [{}]).forEach(t => toursBody.appendChild(createTourRow(t)));
+    (paquete.tours.length ? paquete.tours : [{}]).forEach((t, i) => toursBody.appendChild(createTourRow({ ...t, fecha: fechasTours[i]?.fecha || '' })));
 
     const hotelsBody = document.getElementById('hotels-body');
     hotelsBody.innerHTML = '';
@@ -1172,6 +1239,9 @@ async function cargarCotizacion(id) {
             const input = form.querySelector(`[name="${key}"]`);
             if (input) input.value = data.pax[key];
         });
+        // Llegada de referencia: si después se cambia, las actividades se corren lo mismo.
+        const inputLlegada = form.querySelector('input[name="f_llegada"]');
+        inputLlegada.dataset.previa = inputLlegada.value;
         const idiomaCot = data.pax?.idioma || 'en';
         document.querySelector('select[name="idioma"]').value = idiomaCot;
         sincronizarTabsIdioma();
@@ -1212,6 +1282,7 @@ async function cargarCotizacion(id) {
 
 function nuevaCotizacion(showAlert = true) {
     document.getElementById('form-pax').reset();
+    delete document.querySelector('input[name="f_llegada"]').dataset.previa;
     sincronizarTabsIdioma();
     document.getElementById('tours-body').innerHTML = '';
     document.getElementById('hotels-body').innerHTML = '';
