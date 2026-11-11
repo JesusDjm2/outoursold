@@ -8,6 +8,8 @@ require_once __DIR__ . '/agencia-helpers.php';
 require_once __DIR__ . '/error-helpers.php';
 
 require_login();
+// Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
+exigirCsrf();
 
 header('Content-Type: application/json');
 $db = getDB();

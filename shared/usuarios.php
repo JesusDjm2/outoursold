@@ -268,7 +268,8 @@ $heroPosY = resolverHeroPosY($db);
                     <input id="usuario-email" class="input w-full rounded px-2 py-2 border mt-1" type="email" title="Con rol agencia, es el login de esa cuenta.">
                 </label>
                 <label class="text-sm block">Contraseña
-                    <input id="usuario-password" class="input w-full rounded px-2 py-2 border mt-1" type="text">
+                    <input id="usuario-password" class="input w-full rounded px-2 py-2 border mt-1" type="text" autocomplete="new-password" minlength="8">
+                    <span class="block text-xs text-slate-500 mt-1">Mínimo 8 caracteres, con letras y números.</span>
                 </label>
                 <label class="text-sm block">Rol
                     <select id="usuario-rol" class="input w-full rounded px-2 py-2 border mt-1">

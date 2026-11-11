@@ -9,6 +9,23 @@
 // y haber cargado auth.php (usa is_admin() y $_SESSION).
 ?>
 <script>
+    // CSRF (ver exigirCsrf en auth.php): todo fetch a este mismo sitio que no sea GET lleva
+    // el token de la sesión en la cabecera X-CSRF-Token. Va acá porque todas las vistas con
+    // sesión cargan el menú antes que sus scripts.
+    window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
+    (function () {
+        const fetchOriginal = window.fetch.bind(window);
+        window.fetch = function (recurso, opciones = {}) {
+            const metodo = String(opciones.method || (recurso instanceof Request ? recurso.method : 'GET')).toUpperCase();
+            const url = new URL(recurso instanceof Request ? recurso.url : String(recurso), location.href);
+            if (metodo !== 'GET' && metodo !== 'HEAD' && url.origin === location.origin) {
+                const cabeceras = new Headers(opciones.headers || (recurso instanceof Request ? recurso.headers : undefined));
+                cabeceras.set('X-CSRF-Token', window.CSRF_TOKEN);
+                opciones = { ...opciones, headers: cabeceras };
+            }
+            return fetchOriginal(recurso, opciones);
+        };
+    })();
     if (localStorage.getItem('sidebarCollapsed') === '1') {
         document.body.classList.add('sidebar-collapsed');
     }

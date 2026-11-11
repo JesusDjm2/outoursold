@@ -7,6 +7,8 @@ if (!is_logged_in()) {
     echo json_encode(['error' => 'Acceso denegado. Debes iniciar sesión.']);
     exit;
 }
+// Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
+exigirCsrf();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

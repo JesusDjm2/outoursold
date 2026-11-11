@@ -9,6 +9,8 @@ if (!is_admin()) {
     echo json_encode(['error' => 'Acceso denegado. Solo el administrador puede gestionar usuarios.']);
     exit;
 }
+// Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
+exigirCsrf();
 
 header('Content-Type: application/json');
 $db = getDB();
@@ -56,6 +58,12 @@ try {
             if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'El email no es válido.']);
+                break;
+            }
+
+            if ($motivo = motivoContrasenaDebil($password, $usuario)) {
+                http_response_code(400);
+                echo json_encode(['error' => $motivo]);
                 break;
             }
 
@@ -107,11 +115,19 @@ try {
                 break;
             }
 
+            if ($password !== '' && ($motivo = motivoContrasenaDebil($password, $usuario))) {
+                http_response_code(400);
+                echo json_encode(['error' => $motivo]);
+                break;
+            }
+
             try {
                 if ($password !== '') {
                     $hash = password_hash($password, PASSWORD_DEFAULT);
                     $stmt = $db->prepare("UPDATE usuarios SET usuario = ?, email = ?, password_hash = ?, rol = ?, agencia_id = ? WHERE id = ?");
                     $stmt->execute([$usuario, $email ?: null, $hash, $rol, $agenciaId, $id]);
+                    // Contraseña nueva: se cierran los "recordarme" de ese usuario en todos sus equipos.
+                    $db->prepare("UPDATE usuarios SET remember_token = NULL, remember_expires = NULL WHERE id = ?")->execute([$id]);
                 } else {
                     $stmt = $db->prepare("UPDATE usuarios SET usuario = ?, email = ?, rol = ?, agencia_id = ? WHERE id = ?");
                     $stmt->execute([$usuario, $email ?: null, $rol, $agenciaId, $id]);

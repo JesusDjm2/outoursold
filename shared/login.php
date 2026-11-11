@@ -12,8 +12,15 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = trim($_POST['user'] ?? '');
     $pass = $_POST['pass'] ?? '';
-    $result = authenticate($user, $pass);
-    if ($result && !isset($result['paused'])) {
+    $bloqueo = minutosBloqueoLogin($user);
+    $tokenOk = is_string($_POST['csrf_token'] ?? null) && !empty($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], $_POST['csrf_token']);
+    // Con el bloqueo activo no se prueba la contraseña (ni se cuenta otro intento).
+    $result = (!$bloqueo && $tokenOk) ? authenticate($user, $pass) : false;
+    if (!$tokenOk) {
+        $error = 'La página estuvo abierta mucho tiempo. Intenta de nuevo.';
+    } elseif ($bloqueo) {
+        $error = "Demasiados intentos fallidos. Espera $bloqueo " . ($bloqueo === 1 ? 'minuto' : 'minutos') . ' e intenta de nuevo.';
+    } elseif ($result && !isset($result['paused'])) {
         iniciarSesionUsuario($result);
         if (!empty($_POST['remember'])) {
             set_remember_cookie($result['id']);
@@ -69,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST" class="space-y-5">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken()) ?>">
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Usuario o Email</label>
                 <div class="relative">

@@ -12,6 +12,8 @@ if (!is_logged_in()) {
     echo json_encode(['error' => 'Acceso denegado. Debes iniciar sesión.']);
     exit;
 }
+// Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
+exigirCsrf();
 
 header('Content-Type: application/json');
 $db = getDB();
@@ -903,15 +905,11 @@ try {
                 break;
             }
             $data = json_decode(file_get_contents('php://input'), true);
+            // El ID de una cotización NUEVA lo genera el servidor (más abajo); el navegador solo
+            // manda el de una que ya existe, para actualizarla. Siempre letras, números, _ y -
+            // (se muestra en el panel del admin y en los PDF).
             $id = $data['id'] ?? null;
-            if (!$id) {
-                http_response_code(400);
-                echo json_encode(['error' => 'ID requerido']);
-                break;
-            }
-            // El ID lo arma el navegador ("COT-" + milisegundos): solo letras, números, _ y -,
-            // para que nunca pueda traer HTML/JS (se muestra en el panel del admin y en PDFs).
-            if (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{1,50}$/', $id)) {
+            if ($id !== null && $id !== '' && (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{1,50}$/', $id))) {
                 http_response_code(400);
                 echo json_encode(['error' => 'ID de cotización inválido.']);
                 break;
@@ -943,9 +941,23 @@ try {
             // vuelve a inyectar con innerHTML al reabrir la cotización o listarla.
             $data['notas'] = sanitizarHtmlTerminos($data['notas'] ?? '') ?? '';
 
-            $stmt = $db->prepare("SELECT creado_por FROM $tablaCotizaciones WHERE id = ?");
-            $stmt->execute([$id]);
-            $existente = $stmt->fetch();
+            $existente = false;
+            if ($id) {
+                $stmt = $db->prepare("SELECT creado_por FROM $tablaCotizaciones WHERE id = ?");
+                $stmt->execute([$id]);
+                $existente = $stmt->fetch();
+            }
+            // Nueva (o un ID que no existe): ID del servidor, "COT-" + milisegundos de ahora
+            // (el historial saca de ahí la fecha de creación); si choca con otra, el siguiente.
+            if (!$existente) {
+                $ms = (int) floor(microtime(true) * 1000);
+                $buscar = $db->prepare("SELECT 1 FROM $tablaCotizaciones WHERE id = ?");
+                do {
+                    $id = 'COT-' . $ms++;
+                    $buscar->execute([$id]);
+                } while ($buscar->fetchColumn());
+            }
+            $data['id'] = $id;
 
             // Nadie (admin incluido) guarda encima de una cotización de otra agencia.
             if ($existente && !cotizacionEsDelAmbito($db, $tablaCotizaciones, $id)) {

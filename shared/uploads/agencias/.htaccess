@@ -10,3 +10,10 @@
         Deny from all
     </FilesMatch>
 </IfModule>
+
+# SVG: ya no se aceptan como logo, pero si quedara alguno, abierto directo no ejecuta scripts.
+<FilesMatch "\.svg$">
+    <IfModule mod_headers.c>
+        Header set Content-Security-Policy "sandbox"
+    </IfModule>
+</FilesMatch>

@@ -35,4 +35,7 @@
     Header always set X-Frame-Options "SAMEORIGIN"
     # A otros sitios no se les pasa la URL completa (con ids de cotización) al salir.
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # HSTS: el navegador recuerda por un año que este sitio va solo por HTTPS (por HTTP lo
+    # ignora, así que no afecta a XAMPP local). Sin includeSubDomains: no tocar otros subdominios.
+    Header always set Strict-Transport-Security "max-age=31536000"
 </IfModule>

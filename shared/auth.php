@@ -20,10 +20,104 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// ===== CSRF =====
+// Token por sesión. Las páginas lo publican en window.CSRF_TOKEN (ver sidebar.php) y un
+// envoltorio de fetch lo manda en la cabecera X-CSRF-Token en todo pedido que no sea GET.
+// Las APIs llaman a exigirCsrf(): un sitio ajeno no conoce el token, así que no puede hacer
+// que el navegador de un usuario logueado cree, edite o borre nada.
+function csrfToken() {
+    if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf'];
+}
+
+function exigirCsrf() {
+    $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (in_array($metodo, ['GET', 'HEAD', 'OPTIONS'], true)) return;
+    // Origen distinto al del sitio: se rechaza aunque traiga token.
+    $origen = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origen !== '' && parse_url($origen, PHP_URL_HOST) !== parse_url('//' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST)) {
+        responderCsrfInvalido();
+    }
+    $enviado = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
+    if (!is_string($enviado) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $enviado)) {
+        responderCsrfInvalido();
+    }
+}
+
+function responderCsrfInvalido() {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    // Lo más común es una sesión renovada en otra pestaña: con recargar se arregla.
+    echo json_encode(['error' => 'Tu sesión se renovó. Recarga la página e intenta de nuevo.', 'csrf' => true]);
+    exit;
+}
+
+// ===== Límite de intentos de login =====
+// Usa la bitácora de accesos: con muchos intentos fallidos seguidos para el mismo usuario
+// (o desde la misma IP) se bloquea un rato, para frenar a quien prueba contraseñas.
+const LOGIN_MAX_POR_USUARIO = 5;   // fallidos en la ventana, por usuario/email
+const LOGIN_MAX_POR_IP = 20;       // fallidos en la ventana, por IP
+const LOGIN_VENTANA_MIN = 15;
+
+// Minutos que faltan para poder intentar de nuevo (0 = puede intentar ya).
+function minutosBloqueoLogin($identificador) {
+    $db = getDB();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $stmt = $db->prepare("SELECT
+            SUM(identificador = ?) AS por_usuario,
+            SUM(ip = ?) AS por_ip,
+            -- Segundos que faltan, calculados en MySQL (PHP y MySQL pueden tener otra zona horaria).
+            TIMESTAMPDIFF(SECOND, NOW(), MIN(creado_en) + INTERVAL " . LOGIN_VENTANA_MIN . " MINUTE) AS faltan
+        FROM bitacora_accesos
+        WHERE exito = 0 AND motivo = 'credenciales_invalidas'
+          AND creado_en >= NOW() - INTERVAL " . LOGIN_VENTANA_MIN . " MINUTE
+          AND (identificador = ? OR ip = ?)");
+    $stmt->execute([$identificador, $ip, $identificador, $ip]);
+    $r = $stmt->fetch();
+    if ((int) $r['por_usuario'] < LOGIN_MAX_POR_USUARIO && (int) $r['por_ip'] < LOGIN_MAX_POR_IP) return 0;
+    return max(1, (int) ceil(((int) $r['faltan']) / 60));
+}
+
+// ===== Política de contraseñas =====
+// null si es válida; si no, el motivo para mostrar.
+function motivoContrasenaDebil($password, $usuario = '') {
+    if (!is_string($password) || mb_strlen($password) < 8) return 'La contraseña debe tener al menos 8 caracteres.';
+    if (!preg_match('/[A-Za-z]/', $password) || !preg_match('/\d/', $password)) return 'La contraseña debe tener letras y números.';
+    if ($usuario !== '' && mb_strtolower($password) === mb_strtolower($usuario)) return 'La contraseña no puede ser igual al usuario.';
+    $comunes = ['password1', 'password123', 'contraseña1', 'qwerty123', '12345678a', 'abc12345', 'admin123', 'peru1234'];
+    if (in_array(mb_strtolower($password), $comunes, true)) return 'Esa contraseña es demasiado común.';
+    return null;
+}
+
+// ===== Content-Security-Policy =====
+// Lista de orígenes desde donde el navegador puede cargar scripts, estilos, imágenes, etc.
+// Si se inyectara código, no podría mandar datos a otro servidor (connect-src) ni cargar
+// scripts de otro sitio. 'unsafe-inline' sigue porque las vistas usan <script> en línea.
+// Al agregar una librería de un CDN nuevo, sumarlo acá.
+function politicaSeguridadContenido() {
+    $cdns = 'https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com';
+    return implode('; ', [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' $cdns https://www.youtube.com https://s.ytimg.com",
+        "style-src 'self' 'unsafe-inline' $cdns https://fonts.googleapis.com",
+        "font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://i.ytimg.com https://*.ytimg.com",
+        "connect-src 'self' blob: data: $cdns",
+        "frame-src 'self' blob: https://www.youtube.com https://www.youtube-nocookie.com",
+        "worker-src 'self' blob: https://cdnjs.cloudflare.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'self'",
+    ]);
+}
+if (!headers_sent()) header('Content-Security-Policy: ' . politicaSeguridadContenido());
+
 // Tras iniciar sesión (login o "recordarme"): id de sesión nuevo, para que uno fijado
 // antes del login no sirva después.
 function iniciarSesionUsuario($row) {
     session_regenerate_id(true);
+    unset($_SESSION['csrf']); // token nuevo para la sesión nueva
     $_SESSION['logged_in'] = true;
     $_SESSION['user_id'] = $row['id'];
     $_SESSION['usuario'] = $row['usuario'];

@@ -1179,7 +1179,8 @@ async function guardarCotizacion() {
     if (!validarFechas()) return;
     const estado = await preguntarEstadoAlGuardar();
     if (!estado) return;
-    let id = currentCotizacionId || 'COT-' + Date.now();
+    // Nueva: sin ID (lo genera el servidor y vuelve en la respuesta); ya guardada: la suya.
+    let id = currentCotizacionId || null;
     // La fecha de la cotización es el día en que se crea: una nueva toma la de hoy al
     // guardarse por primera vez; una ya guardada conserva la suya.
     const fechaCot = document.querySelector('input[name="fecha_cot"]');
@@ -1259,6 +1260,8 @@ async function guardarCotizacion() {
         });
         const result = await response.json();
         if (result.success) {
+            id = result.id; // el servidor genera el de una cotización nueva
+            data.id = id;
             cotizaciones[id] = data;
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;

@@ -47,6 +47,8 @@ $nombre = 'Itinerario - ' . trim(preg_replace('/[^\p{L}\p{N} _\-.]/u', '', (stri
 $nombreAscii = preg_replace('/[^A-Za-z0-9 _\-.]/', '_', $nombre);
 $disposicion = !empty($_GET['descargar']) ? 'attachment' : 'inline';
 
+// Sin la CSP de las páginas (auth.php): el visor de PDF del navegador la necesita libre.
+header_remove('Content-Security-Policy');
 header('Content-Type: application/pdf');
 header('Content-Length: ' . filesize($ruta));
 header("Content-Disposition: $disposicion; filename=\"$nombreAscii\"; filename*=UTF-8''" . rawurlencode($nombre));

@@ -142,7 +142,7 @@ $heroPosY = resolverHeroPosY($db);
                         <div class="flex items-center gap-3 mt-1">
                             <img id="me-logo-actual" src="" alt="Logo actual" class="h-14 w-14 object-contain rounded border bg-white p-1 hidden">
                             <span id="me-logo-actual-vacio" class="text-xs text-slate-400">Sin logo guardado todavía.</span>
-                            <input id="me-logo" class="block flex-1 text-sm text-slate-500" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                            <input id="me-logo" class="block flex-1 text-sm text-slate-500" type="file" accept="image/png,image/jpeg,image/webp">
                         </div>
                     </label>
                 </div>

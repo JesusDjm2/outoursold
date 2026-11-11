@@ -9,6 +9,8 @@ if (!is_admin()) {
     echo json_encode(['error' => 'Acceso denegado. Solo el administrador puede gestionar agencias.']);
     exit;
 }
+// Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
+exigirCsrf();
 
 header('Content-Type: application/json');
 $db = getDB();

@@ -1773,8 +1773,8 @@ async function duplicarCotizacionGuardada(id) {
         const res = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        const newId = 'COT-' + Date.now();
-        const copia = { ...data, id: newId, fechaGuardado: new Date().toISOString() };
+        // Sin ID: el servidor genera uno nuevo para la copia y lo devuelve.
+        const copia = { ...data, id: null, fechaGuardado: new Date().toISOString() };
         const saveRes = await fetch(`${API_URL}?path=guardar-cotizacion`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1782,7 +1782,7 @@ async function duplicarCotizacionGuardada(id) {
         });
         const result = await saveRes.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
-        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(newId)}`;
+        window.location.href = `../${MONEDA_CODIGO}/index.php?cotizacion=${encodeURIComponent(result.id)}`;
     } catch (e) {
         notifyError('Error al duplicar: ' + e.message);
     }
