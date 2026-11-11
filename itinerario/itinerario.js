@@ -177,7 +177,7 @@ function llenarCategoriasSelect(categoriaSelect, destinoId, selectedId = null) {
     }
     const opciones = itinCategoriasData.filter(c => c.destino_id === Number(destinoId));
     categoriaSelect.innerHTML = '<option value="">Sin categoría</option>' +
-        opciones.map(c => `<option value="${c.id}" ${selectedId != null && c.id === Number(selectedId) ? 'selected' : ''}>${c.nombre}</option>`).join('') +
+        opciones.map(c => `<option value="${c.id}" ${selectedId != null && c.id === Number(selectedId) ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('') +
         `<option value="${CATEGORIA_ITINERARIO_NUEVA}">+ Crear nueva categoría...</option>`;
     categoriaSelect.disabled = false;
     // Recuerda el último valor válido (no el sentinel) para poder restaurarlo si se
@@ -882,8 +882,8 @@ function buildPaginaFijaRow(p) {
     const tr = document.createElement('tr');
     tr.className = 'border-b';
     tr.innerHTML = `
-        <td class="p-2 font-medium text-slate-700">${p.titulo}</td>
-        <td class="p-2 text-slate-500 text-xs">${p.filename}</td>
+        <td class="p-2 font-medium text-slate-700">${escapeHtml(p.titulo)}</td>
+        <td class="p-2 text-slate-500 text-xs">${escapeHtml(p.filename)}</td>
         <td class="p-2 text-slate-500 text-xs">${p.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <div class="inline-flex flex-col items-center align-middle mr-2">
@@ -903,10 +903,10 @@ function buildPaginaFijaEditRow(p) {
     const tr = document.createElement('tr');
     tr.className = 'border-b';
     tr.innerHTML = `
-        <td class="p-2"><input type="text" class="w-full border rounded p-1 text-sm pagina-fija-titulo-input" value="${p.titulo}"></td>
+        <td class="p-2"><input type="text" class="w-full border rounded p-1 text-sm pagina-fija-titulo-input" value="${escapeHtml(p.titulo)}"></td>
         <td class="p-2">
             <input type="file" accept=".pdf" class="w-full text-xs pagina-fija-pdf-input">
-            <div class="text-slate-400" style="font-size:10px" title="Se mantiene si no eliges otro PDF">${p.filename}</div>
+            <div class="text-slate-400" style="font-size:10px" title="Se mantiene si no eliges otro PDF">${escapeHtml(p.filename)}</div>
         </td>
         <td class="p-2 text-slate-500 text-xs">${p.creado_por_nombre || '—'}</td>
         <td class="p-2 text-right whitespace-nowrap">
@@ -1356,7 +1356,7 @@ function buildPaginaFijaSelect(selectedFile) {
     select.className = 'module-filename w-full border rounded p-2 bg-white';
     const opciones = paginasFijasActivas().slice().sort((a, b) => a.titulo.localeCompare(b.titulo));
     let optionsHtml = '<option value="">Selecciona una página fija...</option>' +
-        opciones.map(p => `<option value="${p.filename}" ${p.filename === selectedFile ? 'selected' : ''}>${p.titulo}</option>`).join('');
+        opciones.map(p => `<option value="${escapeHtml(p.filename)}" ${p.filename === selectedFile ? 'selected' : ''}>${escapeHtml(p.titulo)}</option>`).join('');
     if (selectedFile && !opciones.some(p => p.filename === selectedFile)) {
         optionsHtml += `<option value="${selectedFile}" selected>${selectedFile} (fuera de catálogo)</option>`;
     }
@@ -1682,7 +1682,7 @@ function renderPaquetesListItinerario() {
         div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3 flex-wrap';
         div.innerHTML = `
             <div class="min-w-0">
-                <div class="font-medium">${p.nombre}</div>
+                <div class="font-medium">${escapeHtml(p.nombre)}</div>
                 <div class="text-xs text-slate-500 truncate">${preview}</div>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -1794,7 +1794,7 @@ function renderHistorialReusarList() {
             div.className = 'p-3 border rounded-lg flex items-center justify-between gap-3';
             div.innerHTML = `
                 <div class="min-w-0">
-                    <div class="font-medium truncate">${g.pasajero} — ${g.titulo}</div>
+                    <div class="font-medium truncate">${escapeHtml(g.pasajero)} — ${escapeHtml(g.titulo)}</div>
                     <div class="text-xs text-slate-500 truncate">${g.modulos.length} día(s): ${preview}</div>
                 </div>
                 <button class="text-xs px-2.5 py-1 rounded-md border border-slate-300 text-slate-600 hover:border-cyan-600 hover:text-cyan-700 transition flex-shrink-0">Reusar</button>
@@ -1870,10 +1870,11 @@ function buildHistorialGeneradoRow(g) {
     const tr = document.createElement('tr');
     tr.className = 'border-b';
     const fecha = new Date(g.generado_en.replace(' ', 'T')).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
-    const url = `${ITINERARIO_API_BASE}./uploads/${idiomaActivo}/generados/${encodeURIComponent(g.filename)}`;
+    // Por descargar-generado.php: la carpeta generados/ no se abre directo (datos de pasajeros).
+    const url = `${ITINERARIO_API_BASE}descargar-generado.php?idioma=${idiomaActivo}&id=${encodeURIComponent(g.id)}`;
     tr.innerHTML = `
-        <td class="p-2 font-medium text-slate-700">${g.pasajero}</td>
-        <td class="p-2">${g.titulo}</td>
+        <td class="p-2 font-medium text-slate-700">${escapeHtml(g.pasajero)}</td>
+        <td class="p-2">${escapeHtml(g.titulo)}</td>
         <td class="p-2 text-slate-500 text-xs">${g.generado_por_nombre || '—'}</td>
         <td class="p-2 text-slate-500 text-xs">${fecha}</td>
         <td class="p-2 text-right whitespace-nowrap">

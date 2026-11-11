@@ -66,6 +66,9 @@ $base = strtr($base, [
 ]);
 $base = trim(preg_replace('/[^A-Za-z0-9 _\-]/', '_', $base));
 if ($base === '') $base = 'documento';
+// Generados (datos de pasajeros): sufijo aleatorio, para que el nombre no se pueda adivinar
+// aunque la carpeta ya está cerrada al acceso directo (ver uploads/.htaccess).
+if ($subcarpeta === 'generados/') $base .= '_' . bin2hex(random_bytes(6));
 $fileName = $base . '.pdf';
 
 $uploadDir = __DIR__ . '/uploads/' . $idioma . '/' . $subcarpeta;

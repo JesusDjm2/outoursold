@@ -62,7 +62,7 @@ async function confirmAction(msg, confirmText = 'Sí', cancelText = 'Cancelar') 
     const detalle = corte === -1 ? '' : msg.slice(corte + 1).trim();
     const result = await Swal.fire({
         icon: 'question',
-        title: pregunta,
+        titleText: pregunta, // texto plano: los mensajes llevan nombres escritos por usuarios
         text: detalle || undefined,
         showCancelButton: true,
         confirmButtonText: confirmText,

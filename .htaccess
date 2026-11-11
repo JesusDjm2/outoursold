@@ -1,0 +1,38 @@
+# .htaccess (raíz del sistema)
+# Reglas de seguridad para todo el sitio. Ojo: no tocar /.well-known/ (lo usa el hosting
+# para renovar el certificado SSL).
+
+# ===== HTTPS obligatorio =====
+# Quien entra por http:// pasa a https:// (si no, la contraseña del login viajaría en claro).
+# No aplica en local (XAMPP sin certificado) ni a la validación del certificado.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ===== Archivos que nunca se sirven =====
+# Respaldos, volcados de base de datos, comprimidos, migraciones SQL, archivos ocultos
+# (.gitignore, .htaccess...) y la configuración (config.php solo se incluye desde PHP).
+<FilesMatch "(\.(sql|zip|rar|7z|tar|gz|bak|old|orig|log|md|dist)$|^\.|^nul$|^config(\.example)?\.php$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ===== Cabeceras de seguridad =====
+<IfModule mod_headers.c>
+    # El navegador no adivina el tipo de un archivo (un .jpg con HTML no se ejecuta).
+    Header always set X-Content-Type-Options "nosniff"
+    # Nadie puede meter el sistema dentro de un iframe de otro sitio (clickjacking).
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # A otros sitios no se les pasa la URL completa (con ids de cotización) al salir.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

@@ -1442,7 +1442,7 @@ function construirResumenHtmlCsv(data) {
     if (data.errores.length) {
         html += `<p class="csv-resumen-aviso">⚠️ ${data.errores.length} fila(s) con error — se omitirán:</p>
             <ul class="csv-resumen-lista">`;
-        data.errores.slice(0, 12).forEach(e => { html += `<li>Fila ${e.fila}: ${e.motivo}</li>`; });
+        data.errores.slice(0, 12).forEach(e => { html += `<li>Fila ${Number(e.fila)}: ${escapeHtml(e.motivo)}</li>`; });
         if (data.errores.length > 12) html += `<li>... y ${data.errores.length - 12} más.</li>`;
         html += `</ul>`;
     }

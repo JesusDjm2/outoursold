@@ -14,10 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pass = $_POST['pass'] ?? '';
     $result = authenticate($user, $pass);
     if ($result && !isset($result['paused'])) {
-        $_SESSION['logged_in'] = true;
-        $_SESSION['user_id'] = $result['id'];
-        $_SESSION['usuario'] = $result['usuario'];
-        $_SESSION['rol'] = $result['rol'];
+        iniciarSesionUsuario($result);
         if (!empty($_POST['remember'])) {
             set_remember_cookie($result['id']);
         }

@@ -41,7 +41,7 @@ function iselNormalizar(s) {
 }
 function iselToast(texto, icon = 'success') {
     // Con el popup abierto va arriba: abajo taparía sus botones.
-    Swal.fire({ toast: true, position: armadoUI.panelAbierto ? 'top' : 'bottom', icon, title: texto, showConfirmButton: false, timer: 2200 });
+    Swal.fire({ toast: true, position: armadoUI.panelAbierto ? 'top' : 'bottom', icon, titleText: texto, showConfirmButton: false, timer: 2200 });
 }
 function iselLista(texto) {
     return String(texto || '').split(/\r?\n/).map(s => s.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);

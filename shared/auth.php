@@ -1,6 +1,34 @@
 <?php
 // shared/auth.php
-session_start();
+// Cookie de sesión endurecida: HttpOnly (un script inyectado no puede leerla), SameSite=Lax
+// (no viaja en envíos de formularios desde otros sitios: freno a CSRF) y Secure con HTTPS.
+// use_strict_mode rechaza ids de sesión que no creó el servidor (fijación de sesión).
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        // Con HTTPS (directo o detrás de un proxy), o si el hosting ya lo exige en php.ini.
+        'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+            || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443'
+            || (bool) ini_get('session.cookie_secure'),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+}
+
+// Tras iniciar sesión (login o "recordarme"): id de sesión nuevo, para que uno fijado
+// antes del login no sirva después.
+function iniciarSesionUsuario($row) {
+    session_regenerate_id(true);
+    $_SESSION['logged_in'] = true;
+    $_SESSION['user_id'] = $row['id'];
+    $_SESSION['usuario'] = $row['usuario'];
+    $_SESSION['rol'] = $row['rol'];
+}
 require_once __DIR__ . '/db.php';
 require_once '../config.php';
 
@@ -89,10 +117,7 @@ function try_remember_login() {
         return false;
     }
 
-    $_SESSION['logged_in'] = true;
-    $_SESSION['user_id'] = $row['id'];
-    $_SESSION['usuario'] = $row['usuario'];
-    $_SESSION['rol'] = $row['rol'];
+    iniciarSesionUsuario($row);
     set_remember_cookie($row['id']);
     $db->prepare("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?")->execute([$row['id']]);
     return true;

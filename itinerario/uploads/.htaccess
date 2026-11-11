@@ -10,3 +10,7 @@
         Deny from all
     </FilesMatch>
 </IfModule>
+
+# Itinerarios generados (llevan datos de pasajeros): nunca por URL directa, solo vía
+# itinerario/descargar-generado.php, que verifica la sesión y la agencia.
+RedirectMatch 403 /generados/

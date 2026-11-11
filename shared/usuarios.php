@@ -443,6 +443,11 @@ $heroPosY = resolverHeroPosY($db);
         const API_URL = 'usuarios-api.php';
         const AGENCIAS_API_URL = 'agencias-api.php';
         const ROLES = ['admin', 'agencia', 'conta', 'reservas'];
+        // Todo dato escrito por un usuario (o por cualquiera en el login, ver la bitácora) pasa
+        // por acá antes de ir a innerHTML: sin esto, una agencia podía inyectar código que se
+        // ejecutaba en la sesión del admin.
+        const ESC_MAPA = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ESC_MAPA[c]);
         let agenciasData = [];
         let usuarioEditandoId = null;
 
@@ -547,13 +552,13 @@ $heroPosY = resolverHeroPosY($db);
                     : '<span class="px-2 py-1 rounded bg-red-100 text-red-700">Pausado</span>';
                 const rolOptions = ROLES.map(r => `<option value="${r}" ${r === u.rol ? 'selected' : ''}>${r}</option>`).join('');
                 tr.innerHTML = `
-                    <td class="p-3 font-medium">${u.usuario}</td>
-                    <td class="p-3">${u.email || '<span class="text-slate-400">—</span>'}</td>
+                    <td class="p-3 font-medium">${esc(u.usuario)}</td>
+                    <td class="p-3">${u.email ? esc(u.email) : '<span class="text-slate-400">—</span>'}</td>
                     <td class="p-3"><select class="input rounded px-2 py-1 border rol-select" data-id="${u.id}">${rolOptions}</select></td>
-                    <td class="p-3">${u.agencia_nombre || '<span class="text-slate-400">—</span>'}</td>
+                    <td class="p-3">${u.agencia_nombre ? esc(u.agencia_nombre) : '<span class="text-slate-400">—</span>'}</td>
                     <td class="p-3">${estadoBadge}</td>
                     <td class="p-3 whitespace-nowrap">${fmtUltimoAcceso(u.ultimo_acceso)}</td>
-                    <td class="p-3">${u.creado_en}</td>
+                    <td class="p-3">${esc(u.creado_en)}</td>
                     <td class="p-3 whitespace-nowrap">
                         <button class="text-slate-500 hover:text-slate-700 mr-2 editar-usuario-btn" title="Editar"><i class="fas fa-pen"></i></button>
                         <button class="btn ${u.activo == 1 ? 'btn-danger' : 'btn-primary'} toggle-btn" data-id="${u.id}" data-activo="${u.activo}">
@@ -714,21 +719,21 @@ $heroPosY = resolverHeroPosY($db);
             agenciasData.forEach(a => {
                 const tr = document.createElement('tr');
                 const logoImg = a.logo
-                    ? `<img src="uploads/agencias/${a.logo}" class="h-8 w-8 object-contain rounded border">`
+                    ? `<img src="uploads/agencias/${encodeURIComponent(a.logo)}" class="h-8 w-8 object-contain rounded border">`
                     : '<div class="h-8 w-8 rounded border bg-slate-50 flex items-center justify-center text-slate-300"><i class="fas fa-building"></i></div>';
                 const principalCell = a.es_principal == 1
                     ? '<span class="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs font-medium"><i class="fas fa-star mr-1"></i>Principal</span>'
                     : '<button class="marcar-principal-btn text-xs text-slate-500 hover:text-[#e80c13] transition">Marcar como principal</button>';
-                const swatch = (color) => `<span class="inline-block h-4 w-4 rounded-full border" style="background:${color}"></span>`;
+                const swatch = (color) => `<span class="inline-block h-4 w-4 rounded-full border" style="background:${/^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#ccc'}"></span>`;
                 const coloresCell = (a.color_principal || a.color_secundario)
                     ? `<span class="flex items-center gap-1">${swatch(a.color_principal || '#ff0000')}${swatch(a.color_secundario || '#0566cf')}</span>`
                     : '<span class="text-slate-400">Predeterminado</span>';
                 tr.innerHTML = `
                     <td class="p-3">${logoImg}</td>
-                    <td class="p-3 font-medium">${a.nombre}</td>
-                    <td class="p-3">${a.ruc || '<span class="text-slate-400">—</span>'}</td>
-                    <td class="p-3">${a.telefono || '<span class="text-slate-400">—</span>'}</td>
-                    <td class="p-3">${a.whatsapp || '<span class="text-slate-400">—</span>'}</td>
+                    <td class="p-3 font-medium">${esc(a.nombre)}</td>
+                    <td class="p-3">${a.ruc ? esc(a.ruc) : '<span class="text-slate-400">—</span>'}</td>
+                    <td class="p-3">${a.telefono ? esc(a.telefono) : '<span class="text-slate-400">—</span>'}</td>
+                    <td class="p-3">${a.whatsapp ? esc(a.whatsapp) : '<span class="text-slate-400">—</span>'}</td>
                     <td class="p-3">${coloresCell}</td>
                     <td class="p-3">${principalCell}</td>
                     <td class="p-3 text-right whitespace-nowrap">
@@ -787,7 +792,7 @@ $heroPosY = resolverHeroPosY($db);
             });
             const result = await res.json();
             if (result.success) {
-                notifySuccess(`"${a.nombre}" marcada como agencia principal.`);
+                notifySuccess(`"${esc(a.nombre)}" marcada como agencia principal.`);
                 await cargarAgencias();
             } else {
                 notifyError(result.error);
@@ -795,7 +800,7 @@ $heroPosY = resolverHeroPosY($db);
         }
 
         async function eliminarAgencia(a) {
-            if (!await confirmAction(`¿Eliminar la agencia "${a.nombre}"? Los usuarios asignados quedarán sin agencia. Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
+            if (!await confirmAction(`¿Eliminar la agencia "${esc(a.nombre)}"? Los usuarios asignados quedarán sin agencia. Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
             const res = await fetch(`${AGENCIAS_API_URL}?path=eliminar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -884,9 +889,9 @@ $heroPosY = resolverHeroPosY($db);
                         ? '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-xs">Activo</span>'
                         : '<span class="px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">Pausado</span>';
                     tr.innerHTML = `
-                        <td class="p-2">${u.usuario}</td>
-                        <td class="p-2">${u.email || '<span class="text-slate-400">—</span>'}</td>
-                        <td class="p-2">${u.rol}</td>
+                        <td class="p-2">${esc(u.usuario)}</td>
+                        <td class="p-2">${u.email ? esc(u.email) : '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-2">${esc(u.rol)}</td>
                         <td class="p-2">${estadoBadge}</td>
                         <td class="p-2 whitespace-nowrap">${fmtUltimoAcceso(u.ultimo_acceso)}</td>
                         <td class="p-2 text-right">
@@ -940,14 +945,14 @@ $heroPosY = resolverHeroPosY($db);
                 results.forEach(c => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="p-2 font-medium">${c.id}</td>
-                        <td class="p-2">${c.nombre_pax || '<span class="text-slate-400">—</span>'}</td>
-                        <td class="p-2 uppercase">${c.moneda}</td>
+                        <td class="p-2 font-medium">${esc(c.id)}</td>
+                        <td class="p-2">${c.nombre_pax ? esc(c.nombre_pax) : '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-2 uppercase">${esc(c.moneda)}</td>
                         <td class="p-2">${(c.fecha_guardado || '').substring(0, 10)}</td>
                         <td class="p-2 text-right">${fmtMoneda(c.moneda, c.total)}</td>
-                        <td class="p-2">${c.creado_por_nombre || '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-2">${c.creado_por_nombre ? esc(c.creado_por_nombre) : '<span class="text-slate-400">—</span>'}</td>
                         <td class="p-2 text-right">
-                            <a href="../${c.moneda}/index.php?cotizacion=${encodeURIComponent(c.id)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Ver en el cotizador (solo lectura)"><i class="fas fa-up-right-from-square"></i></a>
+                            <a href="../${c.moneda === 'pen' ? 'pen' : 'usd'}/index.php?cotizacion=${encodeURIComponent(c.id)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Ver en el cotizador (solo lectura)"><i class="fas fa-up-right-from-square"></i></a>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -975,13 +980,13 @@ $heroPosY = resolverHeroPosY($db);
                 results.forEach(it => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td class="p-2 font-medium">${it.pasajero}</td>
-                        <td class="p-2">${it.titulo}</td>
-                        <td class="p-2 uppercase">${it.idioma}</td>
+                        <td class="p-2 font-medium">${esc(it.pasajero)}</td>
+                        <td class="p-2">${esc(it.titulo)}</td>
+                        <td class="p-2 uppercase">${esc(it.idioma)}</td>
                         <td class="p-2">${(it.generado_en || '').substring(0, 10)}</td>
-                        <td class="p-2">${it.generado_por_nombre || '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-2">${it.generado_por_nombre ? esc(it.generado_por_nombre) : '<span class="text-slate-400">—</span>'}</td>
                         <td class="p-2 text-right">
-                            <a href="../itinerario/uploads/${it.idioma}/${encodeURIComponent(it.filename)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Descargar PDF"><i class="fas fa-download"></i></a>
+                            <a href="../itinerario/descargar-generado.php?idioma=${encodeURIComponent(it.idioma)}&id=${encodeURIComponent(it.id)}" target="_blank" class="text-slate-500 hover:text-[var(--accent-2)]" title="Descargar PDF"><i class="fas fa-download"></i></a>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -1013,13 +1018,13 @@ $heroPosY = resolverHeroPosY($db);
             contenido.classList.remove('hidden');
 
             listaDestinos.innerHTML = destinos.length
-                ? destinos.map(d => `<div class="px-2 py-1.5 border rounded">${d.nombre}</div>`).join('')
+                ? destinos.map(d => `<div class="px-2 py-1.5 border rounded">${esc(d.nombre)}</div>`).join('')
                 : '<p class="text-slate-400">Sin destinos propios.</p>';
 
             listaCategorias.innerHTML = categorias.length
                 ? categorias.map(c => `
                     <div class="px-2 py-1.5 border rounded flex items-center justify-between gap-2">
-                        <span class="truncate">${c.nombre} <span class="text-xs text-slate-400">· ${c.destino_nombre}</span></span>
+                        <span class="truncate">${esc(c.nombre)} <span class="text-xs text-slate-400">· ${esc(c.destino_nombre)}</span></span>
                         <span class="text-xs px-1.5 py-0.5 rounded ${c.tipo === 'tour' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'} flex-shrink-0">${c.tipo === 'tour' ? 'Tour' : 'Hotel'}</span>
                     </div>
                 `).join('')
@@ -1115,12 +1120,12 @@ $heroPosY = resolverHeroPosY($db);
                 const tr = document.createElement('tr');
                 tr.className = 'cursor-pointer hover:bg-slate-50';
                 const logoImg = a.logo
-                    ? `<img src="uploads/agencias/${a.logo}" class="h-6 w-6 object-contain rounded border inline-block mr-2 align-middle">`
+                    ? `<img src="uploads/agencias/${encodeURIComponent(a.logo)}" class="h-6 w-6 object-contain rounded border inline-block mr-2 align-middle">`
                     : '';
                 const principalBadge = a.es_principal == 1 ? ' <span class="text-xs text-emerald-600"><i class="fas fa-star"></i></span>' : '';
                 tr.innerHTML = `
                     <td class="p-3">${medallas[i] || (i + 1)}</td>
-                    <td class="p-3 font-medium">${logoImg}${a.nombre}${principalBadge}</td>
+                    <td class="p-3 font-medium">${logoImg}${esc(a.nombre)}${principalBadge}</td>
                     <td class="p-3 text-right">${a.destinos}</td>
                     <td class="p-3 text-right">${a.categorias}</td>
                     <td class="p-3 text-right">${a.cotizaciones}</td>
@@ -1326,8 +1331,8 @@ $heroPosY = resolverHeroPosY($db);
                 div.innerHTML = `
                     <span class="estado-dot en-linea" style="width:10px;height:10px;"></span>
                     <div class="min-w-0">
-                        <div class="font-medium truncate">${u.usuario}</div>
-                        <div class="text-xs text-slate-500 truncate">${u.agencia_nombre || u.rol}</div>
+                        <div class="font-medium truncate">${esc(u.usuario)}</div>
+                        <div class="text-xs text-slate-500 truncate">${esc(u.agencia_nombre || u.rol)}</div>
                     </div>
                     <div class="ml-auto text-xs text-slate-400 flex-shrink-0">${haceCuanto(u.ultimo_acceso)}</div>
                 `;
@@ -1390,12 +1395,12 @@ $heroPosY = resolverHeroPosY($db);
                 const tr = document.createElement('tr');
                 tr.className = 'cursor-pointer hover:bg-slate-50';
                 const logoImg = a.logo
-                    ? `<img src="uploads/agencias/${a.logo}" class="h-6 w-6 object-contain rounded border inline-block mr-2 align-middle">`
+                    ? `<img src="uploads/agencias/${encodeURIComponent(a.logo)}" class="h-6 w-6 object-contain rounded border inline-block mr-2 align-middle">`
                     : '';
                 const principalBadge = a.es_principal == 1 ? ' <span class="text-xs text-emerald-600"><i class="fas fa-star"></i></span>' : '';
                 tr.innerHTML = `
                     <td class="p-3">${medallas[i] || (i + 1)}</td>
-                    <td class="p-3 font-medium">${logoImg}${a.nombre}${principalBadge}</td>
+                    <td class="p-3 font-medium">${logoImg}${esc(a.nombre)}${principalBadge}</td>
                     <td class="p-3 text-right">${a.conexiones_exitosas}</td>
                     <td class="p-3 text-right">${a.conexiones_fallidas}</td>
                     <td class="p-3 text-right">${a.accesos_totales}</td>
@@ -1444,10 +1449,10 @@ $heroPosY = resolverHeroPosY($db);
                         ? '<span class="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs">Exitoso</span>'
                         : `<span class="px-2 py-1 rounded bg-red-100 text-red-700 text-xs">${b.motivo === 'pausado' ? 'Cuenta pausada' : 'Credenciales inválidas'}</span>`;
                     tr.innerHTML = `
-                        <td class="p-3 whitespace-nowrap">${b.creado_en}</td>
-                        <td class="p-3">${b.usuario_nombre || b.identificador}</td>
-                        <td class="p-3">${b.agencia_nombre || '<span class="text-slate-400">—</span>'}</td>
-                        <td class="p-3">${b.ip || '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-3 whitespace-nowrap">${esc(b.creado_en)}</td>
+                        <td class="p-3">${esc(b.usuario_nombre || b.identificador)}</td>
+                        <td class="p-3">${b.agencia_nombre ? esc(b.agencia_nombre) : '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-3">${b.ip ? esc(b.ip) : '<span class="text-slate-400">—</span>'}</td>
                         <td class="p-3">${resultadoBadge}</td>
                     `;
                     tbody.appendChild(tr);

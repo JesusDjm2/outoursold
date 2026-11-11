@@ -1572,9 +1572,9 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
         const tourRowsHtml = cotizacionActual.tours.map(t => `
             <tr>
                <td class="left">${formatDate(t.fecha)}</td>
-                <td class="left" colspan="2">${t.tour || labels.actividadNoEspecificada}</td>
+                <td class="left" colspan="2">${escapeHtml(t.tour || labels.actividadNoEspecificada)}</td>
                 <td></td>
-                <td class="left compact-cell">${t.cant || 1}</td> <td class="center compact-cell">${fmtCurrency(t.preg)}</td>
+                <td class="left compact-cell">${Number(t.cant) || 1}</td> <td class="center compact-cell">${fmtCurrency(t.preg)}</td>
                 <td class="center compact-cell">${fmtCurrency(t.ppromo)}</td>
                 <td class="right compact-cell">${fmtCurrency((Number(t.cant) || 1) * (Number(t.ppromo) || 0))}</td>
             </tr>
@@ -1603,9 +1603,9 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
             <tr>
                 <td class="left">${formatDate(h.cin)}</td>
 <td class="left">${formatDate(h.cout)}</td>
-                <td class="left">${h.aloj || ''}</td>
-                <td class="center compact-cell">${h.nhab || 1}</td>
-                <td class="center compact-cell">${h.noches || 1}</td>
+                <td class="left">${escapeHtml(h.aloj || '')}</td>
+                <td class="center compact-cell">${Number(h.nhab) || 1}</td>
+                <td class="center compact-cell">${Number(h.noches) || 1}</td>
                 <td class="center compact-cell">${fmtCurrency(h.preg)}</td>
                 <td class="center compact-cell">${fmtCurrency(h.ppromo)}</td>
                 <td class="right compact-cell">${fmtCurrency((Number(h.nhab) || 1) * (Number(h.noches) || 1) * (Number(h.ppromo) || 0))}</td>
@@ -1623,42 +1623,47 @@ async function construirPdfBytes(cotizacionActual, agencia, idioma = 'es') {
         // Acento de marca por agencia: si no configuró colores, no se agrega override y el
         // CSS usa sus valores originales (var(--accent-primary, #ff0000) etc.), así que el
         // PDF se ve exactamente igual que antes de existir estos campos.
+        // Solo colores hex válidos: el valor va dentro de una regla CSS.
+        const colorHex = (c) => /^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '';
         let colorOverridesCss = '';
-        if (agencia.color_principal || agencia.color_secundario) {
+        if (colorHex(agencia.color_principal) || colorHex(agencia.color_secundario)) {
             const vars = [];
-            if (agencia.color_principal) vars.push(`--accent-primary:${agencia.color_principal};`);
-            if (agencia.color_secundario) vars.push(`--accent-secondary:${agencia.color_secundario};`);
+            if (colorHex(agencia.color_principal)) vars.push(`--accent-primary:${agencia.color_principal};`);
+            if (colorHex(agencia.color_secundario)) vars.push(`--accent-secondary:${agencia.color_secundario};`);
             colorOverridesCss = `.pdf-page{${vars.join('')}}`;
         }
 
         // Solo se listan las líneas de contacto que la agencia realmente tiene cargadas
         // (no se muestra "Cel: " vacío si esa agencia no configuró un 2do número, etc).
+        // Todo dato escrito por un usuario va escapado: esta plantilla se pinta con innerHTML.
+        const e = escapeHtml;
         const companyInfoParts = [];
-        if (agencia.ruc) companyInfoParts.push(`<span class="company-ruc">${labels.ruc} ${agencia.ruc}</span>`);
-        if (agencia.direccion) companyInfoParts.push(`<span class="company-address">${agencia.direccion}</span>`);
-        if (agencia.telefono) companyInfoParts.push(`<span class="company-address">${labels.telf} ${agencia.telefono}</span>`);
-        if (agencia.telefono2) companyInfoParts.push(`<span class="company-address">${labels.cel} ${agencia.telefono2}</span>`);
-        if (agencia.whatsapp) companyInfoParts.push(`<span class="company-address">${labels.whatsapp} ${agencia.whatsapp}</span>`);
+        if (agencia.ruc) companyInfoParts.push(`<span class="company-ruc">${labels.ruc} ${e(agencia.ruc)}</span>`);
+        if (agencia.direccion) companyInfoParts.push(`<span class="company-address">${e(agencia.direccion)}</span>`);
+        if (agencia.telefono) companyInfoParts.push(`<span class="company-address">${labels.telf} ${e(agencia.telefono)}</span>`);
+        if (agencia.telefono2) companyInfoParts.push(`<span class="company-address">${labels.cel} ${e(agencia.telefono2)}</span>`);
+        if (agencia.whatsapp) companyInfoParts.push(`<span class="company-address">${labels.whatsapp} ${e(agencia.whatsapp)}</span>`);
 
+        // Reemplazos con función: así un "$&" o "$1" dentro de un nombre no se interpreta.
         let finalHtml = templateHtml
-            .replace('{{cotizacionId}}', cotizacionActual.id)
+            .replace('{{cotizacionId}}', () => e(cotizacionActual.id))
             .replace('{{fechaCotizacion}}', fechaCot.toLocaleDateString(localeIdioma))
-            .replace('{{agente}}', cotizacionActual.pax.agente || labels.na)
-            .replace('{{nombrePax}}', cotizacionActual.pax.nombre_pax || '')
-            .replace('{{contactoPax}}', cotizacionActual.pax.contacto || '')
+            .replace('{{agente}}', () => e(cotizacionActual.pax.agente || labels.na))
+            .replace('{{nombrePax}}', () => e(cotizacionActual.pax.nombre_pax || ''))
+            .replace('{{contactoPax}}', () => e(cotizacionActual.pax.contacto || ''))
             .replace('{{porcentajeReserva}}', `${porcentajeReserva}`)
             .replace('{{montoReserva}}', fmtCurrency(montoReserva))
             .replace('{{fechaLlegada}}', fLlegada ? fLlegada.toLocaleDateString(localeIdioma, dateOptions) : labels.na)
-            .replace('{{horaLlegada}}', cotizacionActual.pax.h_llegada || '')
+            .replace('{{horaLlegada}}', () => e(cotizacionActual.pax.h_llegada || ''))
             .replace('{{fechaSalida}}', fSalida ? fSalida.toLocaleDateString(localeIdioma, dateOptions) : labels.na)
-            .replace('{{horaSalida}}', cotizacionActual.pax.h_salida || '')
+            .replace('{{horaSalida}}', () => e(cotizacionActual.pax.h_salida || ''))
             .replace('{{tableRows}}', () => tableRows)
             .replace('{{notas}}', () => cotizacionActual.notas || labels.sinNotas)
             .replace('{{totalRegular}}', fmtCurrency(pvReg))
             .replace('{{descuentoTotal}}', fmtCurrency(totalDesc))
             .replace('{{precioAdicional}}', fmtCurrency(precioAd))
             .replace('{{totalFinal}}', fmtCurrency(pvFinal))
-            .replace('{{companyNombre}}', agencia.nombre || EMPRESA_FALLBACK.nombre)
+            .replace('{{companyNombre}}', () => escapeHtml(agencia.nombre || EMPRESA_FALLBACK.nombre))
             .replace('{{companyInfoLines}}', () => companyInfoParts.join(''))
             .replace('{{labelECotizacion}}', labels.eCotizacion)
             .replace('{{labelAgente}}', labels.agente)
@@ -2008,7 +2013,7 @@ async function llenarDepartamentosSelect(paisId, valorSeleccionado) {
             return;
         }
         select.innerHTML = '<option value="">Selecciona...</option>' +
-            departamentos.map(d => `<option value="${d.nombre}">${d.nombre}</option>`).join('');
+            departamentos.map(d => `<option value="${escapeHtml(d.nombre)}">${escapeHtml(d.nombre)}</option>`).join('');
         if (valorSeleccionado) select.value = valorSeleccionado;
     } catch (error) {
         select.innerHTML = '<option value="">Error al cargar departamentos</option>';

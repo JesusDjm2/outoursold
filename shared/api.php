@@ -909,6 +909,13 @@ try {
                 echo json_encode(['error' => 'ID requerido']);
                 break;
             }
+            // El ID lo arma el navegador ("COT-" + milisegundos): solo letras, números, _ y -,
+            // para que nunca pueda traer HTML/JS (se muestra en el panel del admin y en PDFs).
+            if (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]{1,50}$/', $id)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'ID de cotización inválido.']);
+                break;
+            }
             $paxCot = is_array($data['pax'] ?? null) ? $data['pax'] : [];
             $tienePax = trim($paxCot['nombre_pax'] ?? '') !== '';
             $toursCot = is_array($data['tours'] ?? null) ? $data['tours'] : [];

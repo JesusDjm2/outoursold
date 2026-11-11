@@ -92,6 +92,11 @@ function cerrarCascadeSelectAbierto() {
 // dentro del mismo panel (en vez de 3 selects separados), para que el catálogo se
 // navegue como un árbol: se despliega un destino, dentro se despliega una categoría,
 // y ahí aparecen los ítems para elegir.
+// Escapa texto de usuario antes de ir a innerHTML (nombres de tours, hoteles, destinos...).
+function cascadeEsc(v) {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onResolved) {
     const { labelKey, valueKey } = helpers;
     const wrap = document.createElement('div');
@@ -131,9 +136,9 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
         node.className = opts.leaf ? 'cascade-leaf' : 'cascade-node';
         const row = document.createElement('div');
         row.className = 'cascade-node-row';
-        row.innerHTML = opts.leaf
-            ? `<span>${texto}</span>`
-            : `<i class="fas fa-chevron-right cascade-caret"></i><span>${texto}</span>`;
+        // El nombre va como texto (no HTML): son datos escritos por usuarios.
+        row.innerHTML = opts.leaf ? '<span></span>' : '<i class="fas fa-chevron-right cascade-caret"></i><span></span>';
+        row.querySelector('span').textContent = texto;
         node.appendChild(row);
         if (opts.leaf) {
             row.addEventListener('click', opts.onSelect);
@@ -216,7 +221,7 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
             .sort((a, b) => a[labelKey].localeCompare(b[labelKey]));
         container.innerHTML = resultados.length
             ? ''
-            : `<div class="cascade-empty">Sin coincidencias para "${termino}".</div>`;
+            : `<div class="cascade-empty">Sin coincidencias para "${cascadeEsc(termino)}".</div>`;
         resultados.forEach(item => {
             const leaf = document.createElement('div');
             leaf.className = 'cascade-leaf cascade-search-result';
@@ -224,8 +229,8 @@ function buildClasificacionSelector(helpers, itemPlaceholder, initialValue, onRe
             leaf.innerHTML = `
                 <div class="cascade-node-row cascade-search-result-row">
                     <div class="cascade-search-result-text">
-                        <span>${item[labelKey]}</span>
-                        <small class="cascade-search-result-ruta">${rutaDe(item)}</small>
+                        <span>${cascadeEsc(item[labelKey])}</span>
+                        <small class="cascade-search-result-ruta">${cascadeEsc(rutaDe(item))}</small>
                     </div>
                 </div>
             `;
