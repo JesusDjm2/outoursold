@@ -46,6 +46,8 @@
 .hc-nombre:hover { color: var(--hc-accent); text-decoration: underline; }
 .hc-nombre.is-sin-nombre { font-weight: 500; font-style: italic; color: var(--hc-tenue); }
 .hc-recortar { overflow: hidden; text-overflow: ellipsis; }
+.hc-estado { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; vertical-align: 1px; white-space: nowrap; }
+.hc-estado.is-borrador { background: #fef3c7; color: #92400e; }
 .hc-chips { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 150px; }
 .hc-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; white-space: nowrap; }
 .hc-chip i { font-size: 0.68rem; color: #94a3b8; }

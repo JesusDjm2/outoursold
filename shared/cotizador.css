@@ -316,6 +316,10 @@ input[readonly] {
     background-color: #f1f5f9;
     cursor: not-allowed;
 }
+/* Estado de la cotización junto a su ID (Datos Pax): Terminada / Borrador. */
+.cot-estado { font-size: 0.72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: #dcfce7; color: #166534; white-space: nowrap; }
+.cot-estado.is-borrador { background: #fef3c7; color: #92400e; }
+.cot-estado[hidden] { display: none; }
 .modal-overlay {
     position: fixed; top: 0; left: 0;
     width: 100%; height: 100%;

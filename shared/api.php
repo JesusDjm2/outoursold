@@ -915,7 +915,17 @@ try {
             $hotelsCot = is_array($data['hotels'] ?? null) ? $data['hotels'] : [];
             $tieneItem = array_filter($toursCot, fn($t) => trim($t['tour'] ?? '') !== '')
                 || array_filter($hotelsCot, fn($h) => trim($h['aloj'] ?? '') !== '');
-            if (!$tienePax || !$tieneItem) {
+            // Estado: 'borrador' (a medio armar) o 'terminada'. Un borrador alcanza con el
+            // nombre del pasajero o algo armado; una terminada pide nombre y actividad/hotel.
+            $data['estado'] = ($data['estado'] ?? '') === 'borrador' ? 'borrador' : 'terminada';
+            $tieneItinerario = !empty(array_filter((array) ($data['itinerarioArmado']['modulos'] ?? [])));
+            if ($data['estado'] === 'borrador') {
+                if (!$tienePax && !$tieneItem && !$tieneItinerario) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Para guardar un borrador, escribe al menos el nombre del pasajero o agrega algo.']);
+                    break;
+                }
+            } elseif (!$tienePax || !$tieneItem) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Falta el nombre del pasajero o al menos una actividad/hotel.']);
                 break;

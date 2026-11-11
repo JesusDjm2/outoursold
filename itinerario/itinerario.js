@@ -275,7 +275,9 @@ function updateProgress(percent, status) {
 let pdfPreviewObjectUrl = null;
 function abrirVistaPreviaPDF(src, onDescargar, titulo = 'Vista previa', { seguirEditando = false } = {}) {
     document.getElementById('itinerario-pdf-preview-title').textContent = titulo;
-    document.getElementById('itinerario-pdf-preview-frame').src = src;
+    // PC: visor del navegador; celulares y tablets: páginas dibujadas (shared/pdf-visor.js).
+    const frame = document.getElementById('itinerario-pdf-preview-frame');
+    if (typeof pdfVisorMostrar === 'function') pdfVisorMostrar(frame, src); else frame.src = src;
     document.getElementById('itinerario-pdf-preview-download').onclick = onDescargar;
     document.getElementById('itinerario-pdf-preview-seguir-editando').classList.toggle('hidden', !seguirEditando);
     document.getElementById('itinerario-pdf-preview-modal').style.display = 'block';
@@ -283,7 +285,8 @@ function abrirVistaPreviaPDF(src, onDescargar, titulo = 'Vista previa', { seguir
 }
 function cerrarVistaPreviaPDF() {
     document.getElementById('itinerario-pdf-preview-modal').style.display = 'none';
-    document.getElementById('itinerario-pdf-preview-frame').src = '';
+    const frame = document.getElementById('itinerario-pdf-preview-frame');
+    if (typeof pdfVisorLimpiar === 'function') pdfVisorLimpiar(frame); else frame.src = '';
     if (pdfPreviewObjectUrl) {
         URL.revokeObjectURL(pdfPreviewObjectUrl);
         pdfPreviewObjectUrl = null;
@@ -1875,18 +1878,24 @@ function buildHistorialGeneradoRow(g) {
         <td class="p-2 text-slate-500 text-xs">${fecha}</td>
         <td class="p-2 text-right whitespace-nowrap">
             <button class="text-slate-500 hover:text-slate-700 mr-2 historial-preview-btn" title="Vista previa"><i class="fas fa-eye"></i></button>
-            <a href="${url}" target="_blank" rel="noopener" class="text-cyan-600 hover:text-cyan-800" title="Descargar"><i class="fas fa-download"></i></a>
+            <button type="button" class="text-cyan-600 hover:text-cyan-800 historial-descargar-btn" title="Descargar"><i class="fas fa-download"></i></button>
         </td>
     `;
     tr.querySelector('.historial-preview-btn').addEventListener('click', () => {
-        abrirVistaPreviaPDF(url, () => {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Itinerario - ${g.pasajero}.pdf`;
-            a.click();
-        }, `${g.pasajero} — ${g.titulo}`);
+        abrirVistaPreviaPDF(url, () => descargarItinerarioGenerado(url, g), `${g.pasajero} — ${g.titulo}`);
     });
+    tr.querySelector('.historial-descargar-btn').addEventListener('click', () => descargarItinerarioGenerado(url, g));
     return tr;
+}
+
+// Descarga un itinerario ya generado sin abrir otra pestaña (shared/pdf-visor.js).
+function descargarItinerarioGenerado(url, g) {
+    const nombre = `Itinerario - ${g.pasajero}.pdf`;
+    if (typeof pdfDescargarUrl === 'function') { pdfDescargarUrl(url, nombre); return; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    a.click();
 }
 
 // Filtros de "Itinerarios Generados": solo existen en Gestión de Datos.
@@ -2555,7 +2564,8 @@ async function handleGenerateItinerary() {
         // editando" no deja basura en el historial.
         let yaGuardadoEnHistorial = false;
         const descargarYGuardar = async () => {
-            saveAs(blob, nombreArchivo);
+            // Sin abrir otra pestaña (en iPhone/iPad, hoja de Compartir; ver shared/pdf-visor.js).
+            if (typeof pdfDescargarBlob === 'function') pdfDescargarBlob(blob, nombreArchivo); else saveAs(blob, nombreArchivo);
             // Si le da "Descargar" varias veces en la misma vista previa (para bajarlo de
             // nuevo, por ejemplo), no hay que duplicar el registro en el historial.
             if (yaGuardadoEnHistorial) return;

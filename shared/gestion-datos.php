@@ -599,6 +599,7 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
     </script>
     <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">
     <script src="../shared/notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
+    <script src="../shared/pdf-visor.js?v=<?= filemtime(__DIR__ . '/pdf-visor.js') ?>"></script>
     <script>window.ME_API_URL = '../shared/mi-empresa-api.php'; window.HERO_ASSET_BASE = '../shared/';</script>
     <script src="../shared/hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>
     <script src="../shared/cascade-select.js?v=<?= filemtime(__DIR__ . '/cascade-select.js') ?>"></script>

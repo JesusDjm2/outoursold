@@ -75,6 +75,7 @@ let paqueteAplicadoNombre = '';
 // cabecero X-Solo-Lectura): se ve y se descarga el PDF, pero no se guarda.
 let soloLectura = false;
 let pdfPreviewUrl = null;
+let pdfPreviewBlob = null; // el mismo PDF, para descargarlo (ver pdfDescargarBlob en pdf-visor.js)
 let pdfPreviewFilename = '';
 let pdfPreviewCotizacionId = null;
 // Si guardarCotizacion() encadena la generación del PDF de Itinerario después del de la
@@ -725,7 +726,13 @@ function createTourRow(data = {}) {
     // Día del viaje de un paquete aplicado sin F. Llegada (sin fecha todavía): lo usan
     // resincronizarFechasConLlegada para ponerle fecha y guardarComoPaquete para no perderlo.
     if (data.dia && !data.fecha) tr.dataset.dia = String(data.dia);
-    tr.querySelector('button').onclick = () => { tr.remove(); calcularResumen(); };
+    // Nunca deja la tabla vacía: sin filas, su encabezado se desarma (columnas sin ancho).
+    tr.querySelector('button').onclick = () => {
+        const body = tr.parentElement;
+        tr.remove();
+        if (body && !body.querySelector('tr')) body.appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() }));
+        calcularResumen();
+    };
     tr.querySelector('input.cant').addEventListener('input', () => {
         tr.dataset.autoCant = 'false';
         const cant = parseFloat(tr.querySelector('.cant').value) || 0;
@@ -816,7 +823,13 @@ function createHotelRow(data = {}) {
         <td class="text-right total-line col-costo">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
-    tr.querySelector('button').onclick = () => { tr.remove(); calcularResumen(); };
+    // Nunca deja la tabla vacía: sin filas, su encabezado se desarma (columnas sin ancho).
+    tr.querySelector('button').onclick = () => {
+        const body = tr.parentElement;
+        tr.remove();
+        if (body && !body.querySelector('tr')) body.appendChild(createHotelRow({ cin: sugerirSiguienteCheckinHotel() }));
+        calcularResumen();
+    };
     tr.querySelectorAll('input.nhab, input.noches').forEach(input => {
         input.addEventListener('input', () => {
             const nhab = parseFloat(tr.querySelector('.nhab').value) || 0;
@@ -1008,9 +1021,11 @@ async function guardarComoPaquete() {
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
         const eraEdicion = !!paqueteEditandoId;
+        // La vista no se limpia: lo armado queda a la vista. Editando, se sigue en el mismo
+        // paquete (con su nombre nuevo) y se sale con "Salir de la edición".
         if (eraEdicion) {
-            salirModoEdicionPaquete();
-            nuevaCotizacion(false);
+            paqueteEditandoNombre = nombre;
+            document.getElementById('paquete-edit-nombre').textContent = nombre;
         }
         await notifySuccess(eraEdicion
             ? `Paquete "${nombre}" actualizado.`
@@ -1129,9 +1144,41 @@ function hoyLocalISO() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Al guardar: borrador (a medio armar, sin PDF) o terminada (genera los PDF). Devuelve
+// 'borrador' | 'terminada' | null (canceló). Las dos se pueden seguir editando.
+async function preguntarEstadoAlGuardar() {
+    const r = await Swal.fire({
+        icon: 'question',
+        title: '¿Cómo la guardas?',
+        html: '<b>Terminada</b>: lista para el cliente, genera sus PDF.<br><b>Borrador</b>: a medio armar, sin PDF.<br><span style="font-size:0.85em;color:#64748b">Las dos se pueden seguir editando.</span>',
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: '<i class="fas fa-check mr-1"></i> Terminada',
+        denyButtonText: '<i class="fas fa-pen-ruler mr-1"></i> Borrador',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e80c13',
+        denyButtonColor: '#475569',
+        cancelButtonColor: '#94a3b8'
+    });
+    if (r.isConfirmed) return 'terminada';
+    if (r.isDenied) return 'borrador';
+    return null;
+}
+
+// Etiqueta junto al ID en Datos Pax: Borrador / Terminada (vacía en una cotización nueva).
+function mostrarEstadoCotizacion(estado) {
+    const el = document.getElementById('cot-estado-display');
+    if (!el) return;
+    el.hidden = !estado;
+    el.textContent = estado === 'borrador' ? 'Borrador' : 'Terminada';
+    el.classList.toggle('is-borrador', estado === 'borrador');
+}
+
 async function guardarCotizacion() {
     if (soloLectura) { notifyWarning('Esta cotización es de otra agencia: solo puedes verla y descargar su PDF.'); return; }
     if (!validarFechas()) return;
+    const estado = await preguntarEstadoAlGuardar();
+    if (!estado) return;
     let id = currentCotizacionId || 'COT-' + Date.now();
     // La fecha de la cotización es el día en que se crea: una nueva toma la de hoy al
     // guardarse por primera vez; una ya guardada conserva la suya.
@@ -1185,18 +1232,24 @@ async function guardarCotizacion() {
         // Paquete predefinido con el que se armó (si se aplicó uno): se guarda dentro del
         // mismo JSON de la cotización, para volver a mostrarlo al reabrirla y listarlo en
         // Gestión de Datos > Cotizaciones Guardadas.
-        paquete: paqueteAplicadoId ? { id: paqueteAplicadoId, nombre: paqueteAplicadoNombre } : null
+        paquete: paqueteAplicadoId ? { id: paqueteAplicadoId, nombre: paqueteAplicadoNombre } : null,
+        // 'borrador' (a medio armar) o 'terminada' (lista para el cliente, con sus PDF). Las
+        // dos se pueden seguir editando; las de antes, sin estado, cuentan como terminadas.
+        estado
     };
     // Antes se podía guardar el formulario vacío (un clic accidental en "Guardar" dejaba
-    // una cotización basura, ID "-", nombre "-") — se exige al menos el nombre del
-    // pasajero y una actividad u hotel antes de mandarla al servidor.
-    if (!(data.pax.nombre_pax || '').trim()) {
-        notifyWarning('Ingresa el nombre del pasajero antes de guardar.');
-        return;
-    }
-    if (!tours.some(t => t.tour.trim()) && !hotels.some(h => h.aloj.trim())) {
-        notifyWarning('Agrega al menos una actividad o un hotel antes de guardar.');
-        return;
+    // una cotización basura, ID "-", nombre "-"). Terminada: nombre del pasajero y una
+    // actividad u hotel. Borrador: alcanza con el nombre o con algo armado.
+    const conNombre = !!(data.pax.nombre_pax || '').trim();
+    const conItems = tours.some(t => t.tour.trim()) || hotels.some(h => h.aloj.trim());
+    if (estado === 'borrador') {
+        if (!conNombre && !conItems && !data.itinerarioArmado.modulos.length) {
+            notifyWarning('Para guardar un borrador, escribe al menos el nombre del pasajero o agrega algo.');
+            return;
+        }
+    } else {
+        if (!conNombre) { notifyWarning('Ingresa el nombre del pasajero antes de guardar.'); return; }
+        if (!conItems) { notifyWarning('Agrega al menos una actividad o un hotel antes de guardar.'); return; }
     }
     try {
         const response = await fetch(`${API_URL}?path=guardar-cotizacion`, {
@@ -1209,6 +1262,13 @@ async function guardarCotizacion() {
             cotizaciones[id] = data;
             currentCotizacionId = id;
             document.getElementById('current-cot-id-display').textContent = id;
+            mostrarEstadoCotizacion(estado);
+            // Borrador: se guarda y nada más (sin PDF); se sigue editando.
+            if (estado === 'borrador') {
+                if (typeof iselToast === 'function') iselToast('Guardada como borrador: puedes seguir editándola');
+                else notifySuccess('Guardada como borrador.');
+                return;
+            }
             // Guardar ya genera los PDF (antes había que pedirlo aparte con un aviso de
             // "¿Generar PDF?", y el de Itinerario tenía su propio botón "Generar Itinerario"
             // — ver handleGenerateItinerary en itinerario.js). Sin aviso previo: el propio
@@ -1257,6 +1317,9 @@ async function cargarCotizacion(id) {
         const hotelsBody = document.getElementById('hotels-body');
         hotelsBody.innerHTML = '';
         data.hotels.forEach(h => hotelsBody.appendChild(createHotelRow(h)));
+        // Sin actividades u hoteles guardados: una fila en blanco (la tabla vacía desarma su encabezado).
+        if (!toursBody.querySelector('tr')) toursBody.appendChild(createTourRow());
+        if (!hotelsBody.querySelector('tr')) hotelsBody.appendChild(createHotelRow());
         document.getElementById('precio-adicional').value = data.precios.precioAdicional || 0;
         document.getElementById('descuento-especial').value = data.precios.descuentoEspecial || 0;
         data.notas = notasLegacyToHtml(data.notas);
@@ -1275,6 +1338,7 @@ async function cargarCotizacion(id) {
         cotizaciones[id] = data;
         currentCotizacionId = id;
         document.getElementById('current-cot-id-display').textContent = id;
+        mostrarEstadoCotizacion(data.estado === 'borrador' ? 'borrador' : 'terminada');
     } catch (error) {
         notifyError("Error al cargar cotización: " + error.message);
     }
@@ -1293,6 +1357,7 @@ function nuevaCotizacion(showAlert = true) {
     currentCotizacionId = null;
     activarSoloLectura(false);
     document.getElementById('current-cot-id-display').textContent = 'Nueva';
+    mostrarEstadoCotizacion(null);
     document.querySelector('input[name="fecha_cot"]').value = hoyLocalISO();
     actualizarEstadosCamposFecha();
     document.getElementById('tours-body').appendChild(createTourRow());
@@ -1676,8 +1741,10 @@ async function mostrarVistaPreviaPdf(id) {
         const blob = new Blob([bytes], { type: 'application/pdf' });
         if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
         pdfPreviewUrl = URL.createObjectURL(blob);
+        pdfPreviewBlob = blob;
         pdfPreviewFilename = `Cotizacion_${cotizacionActual.id}_${cotizacionActual.pax.nombre_pax || 'cliente'}.pdf`;
-        document.getElementById('pdf-preview-frame').src = pdfPreviewUrl;
+        // PC: visor del navegador; celulares y tablets: páginas dibujadas (pdf-visor.js).
+        pdfVisorMostrar(document.getElementById('pdf-preview-frame'), pdfPreviewUrl);
         document.getElementById('pdf-preview-loading').classList.add('hidden');
     } catch (error) {
         console.error('Error al generar PDF:', error);
@@ -1694,7 +1761,8 @@ function abrirModalPdfCargando() {
 
 function cerrarModalPdf() {
     document.getElementById('pdf-preview-modal').classList.add('hidden');
-    document.getElementById('pdf-preview-frame').src = 'about:blank';
+    pdfVisorLimpiar(document.getElementById('pdf-preview-frame'));
+    pdfPreviewBlob = null;
     pdfPreviewCotizacionId = null;
     if (pdfPreviewUrl) {
         URL.revokeObjectURL(pdfPreviewUrl);
@@ -1708,13 +1776,8 @@ function cerrarModalPdf() {
 }
 
 function descargarPdfPreview() {
-    if (!pdfPreviewUrl) return;
-    const link = document.createElement('a');
-    link.href = pdfPreviewUrl;
-    link.download = pdfPreviewFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Baja el archivo sin abrir otra pestaña (en iPhone/iPad, con la hoja de Compartir).
+    if (pdfPreviewBlob) pdfDescargarBlob(pdfPreviewBlob, pdfPreviewFilename);
 }
 
 function abrirPdfPreviewNuevaPestana() {

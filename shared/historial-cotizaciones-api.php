@@ -63,6 +63,7 @@ function hcResumen(array $data) {
         'modulos'    => $modulos,
         'dias_itinerario' => $dias,
         'total'      => round($total, 2),
+        'estado'     => ($data['estado'] ?? '') === 'borrador' ? 'borrador' : 'terminada',
     ];
 }
 
@@ -73,6 +74,8 @@ try {
     $monedasConsulta = in_array($monedaPedida, $monedas, true) ? [$monedaPedida] : $monedas;
     $q = trim((string) ($_GET['q'] ?? ''));
     $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
+    // Estado: 'borrador' | 'terminada' (las de antes, sin estado, son terminadas) | todas.
+    $estadoPedido = $_GET['estado'] ?? 'todas';
 
     [$fd, $pd] = filtroDueno('c.creado_por');
     $ambito = is_admin() ? "($fd OR c.creado_por IS NULL)" : $fd;
@@ -88,6 +91,11 @@ try {
         }
         $condBusqueda = ' AND (' . implode(' OR ', array_map(fn($c) => "LOWER($c) LIKE LOWER(?)", $campos)) . ')';
         $paramsBusqueda = array_fill(0, count($campos), '%' . $q . '%');
+    }
+    if ($estadoPedido === 'borrador') {
+        $condBusqueda .= " AND JSON_UNQUOTE(JSON_EXTRACT(c.data, '$.estado')) = 'borrador'";
+    } elseif ($estadoPedido === 'terminada') {
+        $condBusqueda .= " AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(c.data, '$.estado')), '') <> 'borrador'";
     }
 
     // Una subconsulta por moneda, unidas: así se ordena y pagina en el servidor.

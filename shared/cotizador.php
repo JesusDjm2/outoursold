@@ -91,7 +91,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                  Datos > Paquetes; "Actualizar paquete" pide confirmar el nombre al guardar. -->
             <div id="paquete-edit-banner" class="hidden mb-4 p-3 rounded-lg flex items-center justify-between flex-wrap gap-2" style="background:rgba(187,49,53,0.08)">
                 <span class="small"><i class="fas fa-box-archive mr-2"></i>Editando el paquete predefinido: <strong id="paquete-edit-nombre"></strong></span>
-                <button type="button" id="paquete-edit-cancelar" class="btn border small">Cancelar edición</button>
+                <button type="button" id="paquete-edit-cancelar" class="btn border small">Salir de la edición</button>
             </div>
             <!-- Cotización de otra agencia abierta por el admin desde Agencias › Cotizaciones:
                  solo lectura (ver activarSoloLectura en cotizador.js). -->
@@ -129,7 +129,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <i class="fas fa-chevron-down accordion-caret"></i>
                             <h2 class="text-base font-medium">Datos Pax</h2>
                         </button>
-                        <span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span>
+                        <span class="flex items-center gap-1"><span id="cot-estado-display" class="cot-estado" hidden></span><span class="text-xs px-2 py-1 rounded" style="background:rgba(187,49,53,0.12);color:var(--accent-2)">ID: <span id="current-cot-id-display">Nueva</span></span></span>
                     </div>
                     <div class="accordion-body">
                     <form id="form-pax" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 small">
@@ -418,7 +418,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 <iframe id="pdf-preview-frame" class="w-full h-full border rounded" style="min-height:0;"></iframe>
             </div>
             <div class="flex justify-end gap-2 mt-3 pt-3 border-t">
-                <button id="pdf-preview-nueva-pestana" class="btn border"><i class="fas fa-up-right-from-square mr-2"></i>Ver en nueva pestaña</button>
+                <button id="pdf-preview-nueva-pestana" class="btn border pdf-preview-ocultar-movil"><i class="fas fa-up-right-from-square mr-2"></i>Ver en nueva pestaña</button>
                 <button id="pdf-preview-descargar" class="btn btn-primary"><i class="fas fa-download mr-2"></i>Descargar PDF</button>
             </div>
         </div>
@@ -430,6 +430,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     </script>
     <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">
     <script src="../shared/notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
+    <script src="../shared/pdf-visor.js?v=<?= filemtime(__DIR__ . '/pdf-visor.js') ?>"></script>
     <script>window.ME_API_URL = '../shared/mi-empresa-api.php'; window.HERO_ASSET_BASE = '../shared/';</script>
     <script src="../shared/hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>
     <script src="../shared/rte.js?v=<?= filemtime(__DIR__ . '/rte.js') ?>"></script>

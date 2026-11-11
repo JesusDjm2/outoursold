@@ -9,7 +9,7 @@
 const HC_API = 'historial-cotizaciones-api.php';
 const HC_MONEDAS = { usd: { codigo: 'USD', simbolo: '$' }, pen: { codigo: 'PEN', simbolo: 'S/' } };
 const HC_IDIOMAS = { es: 'Español', en: 'English', pt: 'Português' };
-const hc = { q: '', moneda: 'todas', pagina: 1, total: 0, porPagina: 25, filas: [], pedido: 0 };
+const hc = { q: '', moneda: 'todas', estado: 'todas', pagina: 1, total: 0, porPagina: 25, filas: [], pedido: 0 };
 
 // Cualquier dato escrito por un usuario pasa por acá antes de ir a innerHTML.
 function hcEsc(texto) {
@@ -42,12 +42,14 @@ function hcLeerUrl() {
     const p = new URLSearchParams(location.search);
     hc.q = p.get('q') || '';
     hc.moneda = ['usd', 'pen'].includes(p.get('moneda')) ? p.get('moneda') : 'todas';
+    hc.estado = ['borrador', 'terminada'].includes(p.get('estado')) ? p.get('estado') : 'todas';
     hc.pagina = Math.max(1, parseInt(p.get('pagina'), 10) || 1);
 }
 function hcEscribirUrl() {
     const p = new URLSearchParams();
     if (hc.q) p.set('q', hc.q);
     if (hc.moneda !== 'todas') p.set('moneda', hc.moneda);
+    if (hc.estado !== 'todas') p.set('estado', hc.estado);
     if (hc.pagina > 1) p.set('pagina', hc.pagina);
     const qs = p.toString();
     history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
@@ -60,7 +62,7 @@ async function hcCargar() {
     hcPintarSegmento();
     document.getElementById('hc-cuerpo').innerHTML = '<tr class="hc-fila-cargando"><td colspan="8"></td></tr>'.repeat(6);
     try {
-        const params = new URLSearchParams({ q: hc.q, moneda: hc.moneda, pagina: hc.pagina });
+        const params = new URLSearchParams({ q: hc.q, moneda: hc.moneda, estado: hc.estado, pagina: hc.pagina });
         const res = await fetch(`${HC_API}?${params}`);
         const datos = await res.json();
         if (!res.ok || datos.error) throw new Error(datos.error || `Error ${res.status}`);
@@ -96,6 +98,11 @@ function hcPintarResumen(r) {
 function hcPintarSegmento() {
     document.querySelectorAll('#hc-monedas .hc-segmento-btn').forEach(b => {
         const activo = b.dataset.moneda === hc.moneda;
+        b.classList.toggle('is-activo', activo);
+        b.setAttribute('aria-pressed', String(activo));
+    });
+    document.querySelectorAll('#hc-estados .hc-segmento-btn').forEach(b => {
+        const activo = b.dataset.estado === hc.estado;
         b.classList.toggle('is-activo', activo);
         b.setAttribute('aria-pressed', String(activo));
     });
@@ -136,7 +143,7 @@ function hcFilaHtml(c, i) {
             <span class="hc-sub">${creada ? hcHora(creada) : ''}${c.creado_por ? ` · ${hcEsc(c.creado_por)}` : ''}</span>
         </td>
         <td data-etiqueta="Pasajero" class="hc-col-pasajero">
-            ${nombre}
+            ${nombre}${c.estado === 'borrador' ? ' <span class="hc-estado is-borrador">Borrador</span>' : ''}
             <span class="hc-sub hc-recortar" title="${subPasajero}">${subPasajero}</span>
         </td>
         <td data-etiqueta="País">${c.pais ? hcEsc(c.pais) : '<span class="hc-tenue">—</span>'}${c.idioma && HC_IDIOMAS[c.idioma] ? `<span class="hc-sub">${HC_IDIOMAS[c.idioma]}</span>` : ''}</td>
@@ -165,7 +172,7 @@ function hcUrlCotizador(c, ver) {
 function hcPintarTabla() {
     const cuerpo = document.getElementById('hc-cuerpo');
     if (!hc.filas.length) {
-        const filtrado = hc.q || hc.moneda !== 'todas';
+        const filtrado = hc.q || hc.moneda !== 'todas' || hc.estado !== 'todas';
         cuerpo.innerHTML = `<tr><td colspan="8" class="hc-vacio">
             <i class="fas ${filtrado ? 'fa-magnifying-glass' : 'fa-file-invoice'}"></i>
             ${filtrado ? 'Ninguna cotización coincide con la búsqueda.' : 'Todavía no hay cotizaciones guardadas.'}
@@ -233,6 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
         hc.pagina = 1;
         hcCargar();
     });
+    document.getElementById('hc-estados').addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-estado]');
+        if (!b || b.dataset.estado === hc.estado) return;
+        hc.estado = b.dataset.estado;
+        hc.pagina = 1;
+        hcCargar();
+    });
     const irA = (delta) => {
         hc.pagina += delta;
         hcCargar();
@@ -246,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!btn) return;
         if (btn.dataset.accion === 'reintentar') return hcCargar();
         if (btn.dataset.accion === 'limpiar') {
-            hc.q = ''; hc.moneda = 'todas'; hc.pagina = 1;
+            hc.q = ''; hc.moneda = 'todas'; hc.estado = 'todas'; hc.pagina = 1;
             buscador.value = '';
             return hcCargar();
         }

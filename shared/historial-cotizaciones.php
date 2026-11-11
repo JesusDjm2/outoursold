@@ -62,6 +62,11 @@ $accentColorStyle = resolverAccentColorStyle($db);
                         <button type="button" class="hc-segmento-btn" data-moneda="usd">USD</button>
                         <button type="button" class="hc-segmento-btn" data-moneda="pen">PEN</button>
                     </div>
+                    <div id="hc-estados" class="hc-segmento" role="group" aria-label="Estado">
+                        <button type="button" class="hc-segmento-btn" data-estado="todas">Todas</button>
+                        <button type="button" class="hc-segmento-btn" data-estado="terminada">Terminadas</button>
+                        <button type="button" class="hc-segmento-btn" data-estado="borrador">Borradores</button>
+                    </div>
                 </section>
 
                 <div class="hc-tabla-marco">
