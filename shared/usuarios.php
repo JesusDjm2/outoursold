@@ -174,6 +174,7 @@ $heroPosY = resolverHeroPosY($db);
                     <button type="button" class="categoria-tipo-tab conexiones-subtab active" data-conexiones-subtab="conectados"><i class="fas fa-satellite-dish mr-1"></i>Conectados ahora</button>
                     <button type="button" class="categoria-tipo-tab conexiones-subtab" data-conexiones-subtab="ranking"><i class="fas fa-ranking-star mr-1"></i>Ranking de accesos</button>
                     <button type="button" class="categoria-tipo-tab conexiones-subtab" data-conexiones-subtab="bitacora"><i class="fas fa-list-check mr-1"></i>Bitácora</button>
+                    <button type="button" class="categoria-tipo-tab conexiones-subtab" data-conexiones-subtab="cambios"><i class="fas fa-clock-rotate-left mr-1"></i>Cambios</button>
                 </div>
 
                 <div id="conexiones-panel-conectados" class="conexiones-panel">
@@ -249,6 +250,40 @@ $heroPosY = resolverHeroPosY($db);
                     </div>
                 </div>
                 </div>
+
+                <!-- Bitácora de cambios (tabla auditoria): todo lo que se crea, edita o elimina. -->
+                <div id="conexiones-panel-cambios" class="conexiones-panel hidden">
+                <div class="card p-6">
+                    <h2 class="text-base font-semibold text-slate-800 mb-1">Bitácora de cambios</h2>
+                    <p class="text-xs text-slate-500 mb-4">Quién creó, modificó o eliminó qué y cuándo, en todas las agencias.</p>
+                    <div class="relative mb-3 max-w-md">
+                        <input id="cambios-search" class="input rounded px-2 py-2 border pl-8 text-sm w-full" type="text" placeholder="Buscar por usuario, agencia, pasajero, ID o acción...">
+                        <i class="fas fa-search absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full small">
+                            <thead>
+                                <tr>
+                                    <th class="text-left p-3">Fecha</th>
+                                    <th class="text-left p-3">Usuario</th>
+                                    <th class="text-left p-3">Agencia</th>
+                                    <th class="text-left p-3">Qué hizo</th>
+                                    <th class="text-left p-3">Registro</th>
+                                    <th class="text-left p-3">IP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cambios-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-between items-center mt-3 pt-3 border-t text-sm text-slate-600">
+                        <span id="cambios-page-info"></span>
+                        <div class="flex gap-2">
+                            <button id="cambios-prev" class="btn border">Anterior</button>
+                            <button id="cambios-next" class="btn border">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+                </div>
             </div>
         </div>
     </div>
@@ -273,10 +308,10 @@ $heroPosY = resolverHeroPosY($db);
                 </label>
                 <label class="text-sm block">Rol
                     <select id="usuario-rol" class="input w-full rounded px-2 py-2 border mt-1">
-                        <option value="admin">admin</option>
-                        <option value="agencia">agencia</option>
-                        <option value="conta">conta</option>
-                        <option value="reservas">reservas</option>
+                        <option value="admin">Administrador</option>
+                        <option value="agencia">Agencia (todo)</option>
+                        <option value="conta">Contabilidad (solo ver)</option>
+                        <option value="reservas">Reservas (crea y edita, no borra)</option>
                     </select>
                 </label>
                 <label class="text-sm block">Agencia
@@ -444,6 +479,7 @@ $heroPosY = resolverHeroPosY($db);
         const API_URL = 'usuarios-api.php';
         const AGENCIAS_API_URL = 'agencias-api.php';
         const ROLES = ['admin', 'agencia', 'conta', 'reservas'];
+        const ROL_TEXTO = { admin: 'Administrador', agencia: 'Agencia', conta: 'Contabilidad', reservas: 'Reservas' };
         // Todo dato escrito por un usuario (o por cualquiera en el login, ver la bitácora) pasa
         // por acá antes de ir a innerHTML: sin esto, una agencia podía inyectar código que se
         // ejecutaba en la sesión del admin.
@@ -534,6 +570,8 @@ $heroPosY = resolverHeroPosY($db);
                 cargarRankingAccesos();
             } else if (sub === 'bitacora') {
                 cargarBitacora();
+            } else if (sub === 'cambios') {
+                cargarCambios();
             }
         }
         document.querySelectorAll('.conexiones-subtab').forEach(tab => {
@@ -551,7 +589,7 @@ $heroPosY = resolverHeroPosY($db);
                 const estadoBadge = u.activo == 1
                     ? '<span class="px-2 py-1 rounded bg-emerald-100 text-emerald-700">Activo</span>'
                     : '<span class="px-2 py-1 rounded bg-red-100 text-red-700">Pausado</span>';
-                const rolOptions = ROLES.map(r => `<option value="${r}" ${r === u.rol ? 'selected' : ''}>${r}</option>`).join('');
+                const rolOptions = ROLES.map(r => `<option value="${r}" ${r === u.rol ? 'selected' : ''}>${ROL_TEXTO[r]}</option>`).join('');
                 tr.innerHTML = `
                     <td class="p-3 font-medium">${esc(u.usuario)}</td>
                     <td class="p-3">${u.email ? esc(u.email) : '<span class="text-slate-400">—</span>'}</td>
@@ -892,7 +930,7 @@ $heroPosY = resolverHeroPosY($db);
                     tr.innerHTML = `
                         <td class="p-2">${esc(u.usuario)}</td>
                         <td class="p-2">${u.email ? esc(u.email) : '<span class="text-slate-400">—</span>'}</td>
-                        <td class="p-2">${esc(u.rol)}</td>
+                        <td class="p-2">${esc(ROL_TEXTO[u.rol] || u.rol)}</td>
                         <td class="p-2">${estadoBadge}</td>
                         <td class="p-2 whitespace-nowrap">${fmtUltimoAcceso(u.ultimo_acceso)}</td>
                         <td class="p-2 text-right">
@@ -1487,6 +1525,67 @@ $heroPosY = resolverHeroPosY($db);
             bitacoraState.offset += BITACORA_PAGE_SIZE;
             cargarBitacora();
         });
+
+        // ===== Bitácora de cambios (auditoria) =====
+        const CAMBIOS_PAGE_SIZE = 25;
+        const cambiosState = { term: '', offset: 0, total: 0 };
+        let cambiosSearchDebounce = null;
+        // Ruta de la API → texto. Lo que no esté acá se muestra con la ruta legible.
+        const ACCION_TEXTO = {
+            'guardar-cotizacion': 'Guardó una cotización', 'eliminar-cotizacion': 'Mandó a la papelera una cotización',
+            'restaurar-cotizacion': 'Restauró una cotización', 'eliminar-cotizacion-definitivo': 'Eliminó para siempre una cotización',
+            'guardar-tour': 'Guardó un tour', 'eliminar-tour': 'Eliminó un tour', 'guardar-hotel': 'Guardó un hotel', 'eliminar-hotel': 'Eliminó un hotel',
+            'upload-tours': 'Importó tours (CSV)', 'upload-hoteles': 'Importó hoteles (CSV)',
+            'guardar-paquete-tour': 'Guardó un paquete', 'eliminar-paquete-tour': 'Eliminó un paquete',
+            'guardar-destino': 'Guardó un destino', 'eliminar-destino': 'Eliminó un destino',
+            'guardar-categoria': 'Guardó una categoría', 'eliminar-categoria': 'Eliminó una categoría',
+            'crear-modulo': 'Creó un itinerario', 'actualizar-modulo': 'Editó un itinerario', 'eliminar-modulo': 'Eliminó un itinerario',
+            'guardar-generado': 'Generó el PDF de un itinerario',
+            'crear': 'Creó', 'editar': 'Editó', 'eliminar': 'Eliminó', 'pausar': 'Pausó un usuario', 'activar': 'Activó un usuario',
+            'cambiar-rol': 'Cambió el rol de un usuario', 'marcar-principal': 'Marcó la agencia principal',
+            'subir-logo': 'Cambió el logo de los PDF', 'subir-logo-hero': 'Cambió el logo del encabezado',
+            'subir-hero': 'Cambió la portada', 'guardar-color': 'Cambió el color de marca', 'guardar': 'Editó los datos de la empresa',
+        };
+        const MODULO_TEXTO = { 'cotizador-usd': 'Cotizador USD', 'cotizador-pen': 'Cotizador PEN', itinerarios: 'Itinerarios', usuarios: 'Usuarios', agencias: 'Agencias', 'mi-empresa': 'Mi Empresa' };
+        const textoAccion = (x) => {
+            const base = ACCION_TEXTO[x.accion] || (x.accion.charAt(0).toUpperCase() + x.accion.slice(1).replace(/-/g, ' '));
+            const sufijo = (x.accion === 'crear' || x.accion === 'editar' || x.accion === 'eliminar')
+                ? (x.modulo === 'usuarios' ? ' un usuario' : x.modulo === 'agencias' ? ' una agencia' : '') : '';
+            return base + sufijo;
+        };
+
+        async function cargarCambios() {
+            const tbody = document.getElementById('cambios-body');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-400">Cargando...</td></tr>';
+            try {
+                const params = new URLSearchParams({ q: cambiosState.term, limit: CAMBIOS_PAGE_SIZE, offset: cambiosState.offset });
+                const res = await fetch(`${API_URL}?path=auditoria&${params}`);
+                const { results, total } = await res.json();
+                cambiosState.total = total;
+                tbody.innerHTML = results.length ? results.map(x => `
+                    <tr class="border-t">
+                        <td class="p-3 whitespace-nowrap">${esc(x.creado_en)}</td>
+                        <td class="p-3">${esc(x.usuario_nombre || '—')}<span class="block text-xs text-slate-400">${esc(ROL_TEXTO[x.usuario_rol] || '')}</span></td>
+                        <td class="p-3">${x.agencia_nombre ? esc(x.agencia_nombre) : '<span class="text-slate-400">—</span>'}</td>
+                        <td class="p-3">${esc(textoAccion(x))}<span class="block text-xs text-slate-400">${esc(MODULO_TEXTO[x.modulo] || x.modulo)}</span></td>
+                        <td class="p-3">${x.detalle ? esc(x.detalle) : ''}${x.entidad_id ? `<span class="block text-xs text-slate-400">${esc(x.entidad_id)}</span>` : ''}${!x.detalle && !x.entidad_id ? '<span class="text-slate-400">—</span>' : ''}</td>
+                        <td class="p-3 text-xs text-slate-500">${esc(x.ip || '')}</td>
+                    </tr>`).join('')
+                    : `<tr><td colspan="6" class="p-3 text-center text-slate-400">${cambiosState.term ? 'Sin resultados.' : 'Todavía no hay cambios registrados.'}</td></tr>`;
+                const shown = cambiosState.offset + results.length;
+                document.getElementById('cambios-page-info').textContent = total === 0 ? '' : `${cambiosState.offset + 1}-${shown} de ${total}`;
+                document.getElementById('cambios-prev').disabled = cambiosState.offset === 0;
+                document.getElementById('cambios-next').disabled = shown >= total;
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-red-500">No se pudo cargar la bitácora de cambios.</td></tr>';
+            }
+        }
+        document.getElementById('cambios-search').addEventListener('input', (e) => {
+            clearTimeout(cambiosSearchDebounce);
+            cambiosSearchDebounce = setTimeout(() => { cambiosState.term = e.target.value.trim(); cambiosState.offset = 0; cargarCambios(); }, 300);
+        });
+        document.getElementById('cambios-prev').addEventListener('click', () => { cambiosState.offset = Math.max(0, cambiosState.offset - CAMBIOS_PAGE_SIZE); cargarCambios(); });
+        document.getElementById('cambios-next').addEventListener('click', () => { cambiosState.offset += CAMBIOS_PAGE_SIZE; cargarCambios(); });
 
         (async function initPagina() {
             await cargarAgencias();

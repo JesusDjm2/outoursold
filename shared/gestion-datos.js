@@ -1733,14 +1733,14 @@ function buildCotRow(cot) {
     // 5. Eliminar
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
-    delBtn.className = 'cot-action-item is-danger';
+    delBtn.className = 'cot-action-item is-danger requiere-borrar';
     delBtn.innerHTML = `
         <span class="cot-action-icon is-rojo">
             <i class="fas fa-trash-can"></i>
         </span>
         <span class="cot-action-item-text">
             <span class="cot-action-title">Eliminar</span>
-            <span class="cot-action-desc">Borrar permanentemente</span>
+            <span class="cot-action-desc">Va a la papelera (30 días)</span>
         </span>
     `;
     delBtn.addEventListener('click', (e) => {
@@ -1789,7 +1789,7 @@ async function duplicarCotizacionGuardada(id) {
 }
 
 async function eliminarCotizacionGuardada(id, nombre) {
-    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
+    if (!await confirmAction(`¿Eliminar la cotización ${id}${nombre ? ' (' + nombre + ')' : ''}? Va a la papelera: podrás restaurarla durante 30 días desde Historial.`, 'Sí, a la papelera')) return;
     try {
         const res = await fetch(`${API_URL}?path=eliminar-cotizacion`, {
             method: 'POST',

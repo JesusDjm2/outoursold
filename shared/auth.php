@@ -30,7 +30,82 @@ function csrfToken() {
     return $_SESSION['csrf'];
 }
 
-function exigirCsrf() {
+// ===== Permisos por rol =====
+// admin y agencia: todo. reservas: crea y edita, pero no borra ni cambia los datos de la
+// empresa. conta: solo ve (cotizaciones, historial, precios), no modifica nada.
+const ROLES_ETIQUETA = ['admin' => 'Administrador', 'agencia' => 'Agencia', 'reservas' => 'Reservas', 'conta' => 'Contabilidad'];
+const PERMISOS_POR_ROL = [
+    'admin'    => ['editar' => true,  'borrar' => true,  'empresa' => true],
+    'agencia'  => ['editar' => true,  'borrar' => true,  'empresa' => true],
+    'reservas' => ['editar' => true,  'borrar' => false, 'empresa' => false],
+    'conta'    => ['editar' => false, 'borrar' => false, 'empresa' => false],
+];
+function puede($permiso) {
+    $rol = $_SESSION['rol'] ?? '';
+    return !empty(PERMISOS_POR_ROL[$rol][$permiso]);
+}
+function permisosDeSesion() {
+    return PERMISOS_POR_ROL[$_SESSION['rol'] ?? ''] ?? ['editar' => false, 'borrar' => false, 'empresa' => false];
+}
+
+// Para las APIs: corta con 403 si el rol no tiene el permiso.
+function exigirPermiso($permiso) {
+    if (puede($permiso)) return;
+    $rol = ROLES_ETIQUETA[$_SESSION['rol'] ?? ''] ?? 'tu rol';
+    $que = ['editar' => 'crear ni modificar', 'borrar' => 'eliminar', 'empresa' => 'cambiar los datos de la empresa'][$permiso] ?? 'hacer esto';
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => "Con el rol $rol no puedes $que.", 'permiso' => $permiso]);
+    exit;
+}
+
+// Regla común de las APIs de datos: leer (GET) siempre; borrar (rutas eliminar-*) pide
+// 'borrar'; cualquier otro cambio pide 'editar'. $permisoCambios permite pedir otro (ej.
+// 'empresa' en mi-empresa-api.php).
+function exigirPermisoSegunRuta($permisoCambios = 'editar') {
+    $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (in_array($metodo, ['GET', 'HEAD', 'OPTIONS'], true)) return;
+    $ruta = $_GET['path'] ?? '';
+    exigirPermiso(preg_match('/^(eliminar|vaciar)/', $ruta) ? 'borrar' : $permisoCambios);
+}
+
+// ===== Bitácora de cambios (tabla auditoria, migración 041) =====
+// Todo pedido que modifica algo y sale bien queda registrado solo: exigirCsrf() activa esto
+// en cada API. Se guarda la ruta (accion), el id tocado (del pedido o de la respuesta) y un
+// nombre legible si viene (pasajero, tour, usuario...). Nunca rompe la respuesta.
+function iniciarAuditoria($modulo) {
+    ob_start();
+    register_shutdown_function(function () use ($modulo) {
+        $salida = ob_get_contents();
+        if (ob_get_level() > 0) ob_end_flush();
+        $codigo = http_response_code();
+        if ($codigo >= 400 || empty($_SESSION['user_id'])) return;
+        try {
+            $entrada = json_decode(file_get_contents('php://input'), true);
+            if (!is_array($entrada)) $entrada = $_POST;
+            $respuesta = json_decode((string) $salida, true);
+            if (is_array($respuesta) && isset($respuesta['success']) && !$respuesta['success']) return;
+            $id = $respuesta['id'] ?? $entrada['id'] ?? null;
+            $detalle = $entrada['pax']['nombre_pax'] ?? $entrada['nombre'] ?? $entrada['tour'] ?? $entrada['aloj']
+                ?? $entrada['usuario'] ?? $entrada['titulo'] ?? $entrada['pasajero'] ?? null;
+            if (is_array($detalle)) $detalle = null;
+            $stmt = getDB()->prepare("INSERT INTO auditoria (usuario_id, agencia_id, accion, modulo, entidad_id, detalle, ip) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                (int) $_SESSION['user_id'],
+                agenciaDeSesion(),
+                mb_substr((string) ($_GET['path'] ?? 'cambio'), 0, 60),
+                mb_substr($modulo, 0, 30),
+                $id !== null && !is_array($id) ? mb_substr((string) $id, 0, 60) : null,
+                $detalle !== null ? mb_substr(trim((string) $detalle), 0, 300) : null,
+                $_SERVER['REMOTE_ADDR'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            error_log('auditoria: ' . $e->getMessage()); // sin la migración 041, o lo que sea: no se corta nada
+        }
+    });
+}
+
+function exigirCsrf($moduloAuditoria = null) {
     $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     if (in_array($metodo, ['GET', 'HEAD', 'OPTIONS'], true)) return;
     // Origen distinto al del sitio: se rechaza aunque traiga token.
@@ -42,6 +117,7 @@ function exigirCsrf() {
     if (!is_string($enviado) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $enviado)) {
         responderCsrfInvalido();
     }
+    if ($moduloAuditoria) iniciarAuditoria($moduloAuditoria);
 }
 
 function responderCsrfInvalido() {
@@ -249,9 +325,12 @@ function is_admin() {
     return is_logged_in() && ($_SESSION['rol'] ?? '') === 'admin';
 }
 
+// Sin sesión: al login, desde cualquier carpeta (shared/, usd/, pen/, itinerario/). Antes
+// iba a "login.php" de la carpeta actual, que fuera de shared/ no existe (404).
 function require_login() {
     if (!is_logged_in()) {
-        header('Location: login.php');
+        $carpeta = basename(dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+        header('Location: ' . ($carpeta === 'shared' ? 'login.php' : '../shared/login.php'));
         exit;
     }
 }

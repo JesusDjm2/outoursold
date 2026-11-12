@@ -19,7 +19,9 @@ if (!is_logged_in()) {
     exit;
 }
 // Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
-exigirCsrf();
+exigirCsrf('itinerarios');
+// Permisos por rol: leer siempre; eliminar-* pide "borrar"; cualquier otro cambio, "editar".
+exigirPermisoSegunRuta();
 
 header('Content-Type: application/json');
 $db = getDB();

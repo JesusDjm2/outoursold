@@ -13,7 +13,9 @@ if (!is_logged_in()) {
     exit;
 }
 // Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
-exigirCsrf();
+exigirCsrf('cotizador-' . $currency);
+// Permisos por rol: leer siempre; eliminar-* pide "borrar"; cualquier otro cambio, "editar".
+exigirPermisoSegunRuta();
 
 header('Content-Type: application/json');
 $db = getDB();
@@ -65,6 +67,15 @@ function filtroCotizaciones() {
     [$fd, $pd] = filtroDueno();
     return [is_admin() ? "($fd OR creado_por IS NULL)" : $fd, $pd];
 }
+// Papelera de cotizaciones (migración 041): lo eliminado se guarda PAPELERA_DIAS días y
+// después se borra solo (al eliminar otra o al mirar la papelera).
+const PAPELERA_DIAS = 30;
+function purgarPapeleraCotizaciones($db) {
+    foreach (['usd', 'pen'] as $m) {
+        $db->exec("DELETE FROM cotizaciones_$m WHERE eliminado_en IS NOT NULL AND eliminado_en < NOW() - INTERVAL " . PAPELERA_DIAS . " DAY");
+    }
+}
+
 function cotizacionEsDelAmbito($db, $tabla, $id) {
     [$fc, $pc] = filtroCotizaciones();
     $stmt = $db->prepare("SELECT 1 FROM $tabla WHERE id = ? AND $fc");
@@ -830,6 +841,7 @@ try {
             // Solo las de mi agencia, admin incluido (las de las demás las ve desde Agencias).
             [$fc, $pc] = filtroCotizaciones();
             $condiciones[] = $fc;
+            $condiciones[] = 'eliminado_en IS NULL'; // las de la papelera no se listan
             array_push($params, ...$pc);
             $where = $condiciones ? ' WHERE ' . implode(' AND ', $condiciones) : '';
 
@@ -856,7 +868,7 @@ try {
             $soloLectura = !cotizacionEsDelAmbito($db, $tablaCotizaciones, $id);
             $row = null;
             if (!$soloLectura || is_admin()) {
-                $stmt = $db->prepare("SELECT data FROM $tablaCotizaciones WHERE id = ?");
+                $stmt = $db->prepare("SELECT data FROM $tablaCotizaciones WHERE id = ? AND eliminado_en IS NULL");
                 $stmt->execute([$id]);
                 $row = $stmt->fetch();
             }
@@ -995,9 +1007,39 @@ try {
                 echo json_encode(['error' => 'No tienes permiso para eliminar esta cotización.']);
                 break;
             }
-            $stmt = $db->prepare("DELETE FROM $tablaCotizaciones WHERE id = ?");
-            $stmt->execute([$data['id']]);
-            echo json_encode(['success' => true]);
+            // A la papelera (migración 041): se puede restaurar durante PAPELERA_DIAS días.
+            $stmt = $db->prepare("UPDATE $tablaCotizaciones SET eliminado_en = NOW(), eliminado_por = ? WHERE id = ? AND eliminado_en IS NULL");
+            $stmt->execute([$_SESSION['user_id'], $data['id']]);
+            purgarPapeleraCotizaciones($db);
+            echo json_encode(['success' => true, 'papelera' => true, 'dias' => PAPELERA_DIAS]);
+            break;
+
+        // Sacar una cotización de la papelera (vuelve a listarse con su mismo ID y fecha).
+        case 'restaurar-cotizacion':
+        // Borrarla para siempre desde la papelera (pide el permiso "borrar": empieza con eliminar-).
+        case 'eliminar-cotizacion-definitivo':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            $data = json_decode(file_get_contents('php://input'), true);
+            $idPapelera = is_string($data['id'] ?? null) ? $data['id'] : '';
+            if ($idPapelera === '' || !cotizacionEsDelAmbito($db, $tablaCotizaciones, $idPapelera)) {
+                http_response_code(404);
+                echo json_encode(['error' => 'No se encontró la cotización en tu papelera.']);
+                break;
+            }
+            $stmt = $path === 'restaurar-cotizacion'
+                ? $db->prepare("UPDATE $tablaCotizaciones SET eliminado_en = NULL, eliminado_por = NULL WHERE id = ? AND eliminado_en IS NOT NULL")
+                : $db->prepare("DELETE FROM $tablaCotizaciones WHERE id = ? AND eliminado_en IS NOT NULL");
+            $stmt->execute([$idPapelera]);
+            if (!$stmt->rowCount()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Esa cotización no está en la papelera.']);
+                break;
+            }
+            echo json_encode(['success' => true, 'id' => $idPapelera]);
             break;
 
         case 'upload-tours':

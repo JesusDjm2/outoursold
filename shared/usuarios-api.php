@@ -10,7 +10,7 @@ if (!is_admin()) {
     exit;
 }
 // Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
-exigirCsrf();
+exigirCsrf('usuarios');
 
 header('Content-Type: application/json');
 $db = getDB();
@@ -205,6 +205,35 @@ try {
             break;
 
         // Bitácora de inicios de sesión (exitosos y fallidos), buscable y paginada.
+        // Bitácora de cambios (tabla auditoria, migración 041): quién cambió qué y cuándo.
+        case 'auditoria':
+            $term = trim($_GET['q'] ?? '');
+            $limit = max(1, min(100, (int) ($_GET['limit'] ?? 25)));
+            $offset = max(0, (int) ($_GET['offset'] ?? 0));
+            $condiciones = [];
+            $params = [];
+            if ($term !== '') {
+                $condiciones[] = "(LOWER(u.usuario) LIKE LOWER(?) OR LOWER(a.nombre) LIKE LOWER(?) OR LOWER(x.detalle) LIKE LOWER(?) OR LOWER(x.entidad_id) LIKE LOWER(?) OR LOWER(x.accion) LIKE LOWER(?))";
+                $like = "%$term%";
+                array_push($params, $like, $like, $like, $like, $like);
+            }
+            $where = $condiciones ? ' WHERE ' . implode(' AND ', $condiciones) : '';
+            $baseSql = "FROM auditoria x
+                        LEFT JOIN usuarios u ON u.id = x.usuario_id
+                        LEFT JOIN agencias a ON a.id = x.agencia_id" . $where;
+            $countStmt = $db->prepare("SELECT COUNT(*) $baseSql");
+            $countStmt->execute($params);
+            $total = (int) $countStmt->fetchColumn();
+            $stmt = $db->prepare(
+                "SELECT x.id, x.accion, x.modulo, x.entidad_id, x.detalle, x.ip, x.creado_en,
+                        u.usuario AS usuario_nombre, u.rol AS usuario_rol, a.nombre AS agencia_nombre
+                 $baseSql
+                 ORDER BY x.creado_en DESC, x.id DESC LIMIT $limit OFFSET $offset"
+            );
+            $stmt->execute($params);
+            echo json_encode(['results' => $stmt->fetchAll(), 'total' => $total]);
+            break;
+
         case 'bitacora':
             $term = trim($_GET['q'] ?? '');
             $soloFallidos = ($_GET['solo_fallidos'] ?? '') === '1';

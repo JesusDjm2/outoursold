@@ -118,3 +118,16 @@
 @media (prefers-reduced-motion: reduce) {
     .hc-fila-cargando td::after { animation: none; }
 }
+
+/* ===== Papelera ===== */
+.hc-segmento-papelera { display: inline-flex; align-items: center; gap: 6px; }
+.hc-segmento-papelera i { font-size: 0.72rem; }
+.hc-cuenta { font-size: 0.7rem; font-weight: 700; color: #b45309; }
+.hc-papelera-info { display: block; margin-bottom: 4px; font-size: 0.7rem; color: var(--hc-tenue); white-space: normal; text-align: right; }
+.hc-btn-texto { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--hc-linea); border-radius: 8px; background: white; font-size: 0.78rem; font-weight: 600; color: var(--hc-texto); }
+.hc-btn-texto:hover { background: #f1f5f9; }
+@media (max-width: 639px) {
+    .hc-acciones { flex-wrap: wrap; }
+    .hc-papelera-info { text-align: left; flex-basis: 100%; }
+    .hc-acciones .hc-btn-texto { flex: 1; justify-content: center; height: 38px; }
+}

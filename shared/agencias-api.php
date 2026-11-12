@@ -10,7 +10,7 @@ if (!is_admin()) {
     exit;
 }
 // Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
-exigirCsrf();
+exigirCsrf('agencias');
 
 header('Content-Type: application/json');
 $db = getDB();
@@ -223,7 +223,7 @@ try {
             }
 
             foreach (['pen', 'usd'] as $moneda) {
-                $stmt = $db->query("SELECT creado_por, data, fecha_guardado FROM cotizaciones_$moneda WHERE creado_por IS NOT NULL");
+                $stmt = $db->query("SELECT creado_por, data, fecha_guardado FROM cotizaciones_$moneda WHERE creado_por IS NOT NULL AND eliminado_en IS NULL");
                 while ($row = $stmt->fetch()) {
                     $agenciaId = $usuarioAgencia[$row['creado_por']] ?? null;
                     if (!$agenciaId || !isset($stats[$agenciaId])) continue;
@@ -332,7 +332,7 @@ try {
                 $stmt = $db->prepare(
                     "SELECT DATE_FORMAT(fecha_guardado, ?) AS periodo, COUNT(*) AS n
                      FROM cotizaciones_$moneda
-                     WHERE fecha_guardado >= ?
+                     WHERE fecha_guardado >= ? AND eliminado_en IS NULL
                      GROUP BY periodo ORDER BY periodo"
                 );
                 $stmt->execute([$formato, $desde]);
@@ -377,7 +377,7 @@ try {
             if ($usuarioIds) {
                 $placeholders = implode(',', array_fill(0, count($usuarioIds), '?'));
                 foreach (['pen', 'usd'] as $moneda) {
-                    $stmt = $db->prepare("SELECT COUNT(*), MAX(fecha_guardado) FROM cotizaciones_$moneda WHERE creado_por IN ($placeholders)");
+                    $stmt = $db->prepare("SELECT COUNT(*), MAX(fecha_guardado) FROM cotizaciones_$moneda WHERE creado_por IN ($placeholders) AND eliminado_en IS NULL");
                     $stmt->execute($usuarioIds);
                     [$count, $max] = $stmt->fetch(PDO::FETCH_NUM);
                     $totalCotizaciones += (int)$count;
@@ -428,7 +428,7 @@ try {
             $subqueries = [];
             $params = [];
             foreach (['pen', 'usd'] as $moneda) {
-                $sub = "SELECT id, '$moneda' AS moneda, data, fecha_guardado, creado_por FROM cotizaciones_$moneda WHERE creado_por IN ($placeholders)";
+                $sub = "SELECT id, '$moneda' AS moneda, data, fecha_guardado, creado_por FROM cotizaciones_$moneda WHERE creado_por IN ($placeholders) AND eliminado_en IS NULL";
                 $subParams = $usuarioIds;
                 if ($term !== '') {
                     $sub .= " AND (LOWER(id) LIKE LOWER(?) OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(data, '$.pax.nombre_pax'))) LIKE LOWER(?))";

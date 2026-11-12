@@ -13,6 +13,23 @@
     // el token de la sesión en la cabecera X-CSRF-Token. Va acá porque todas las vistas con
     // sesión cargan el menú antes que sus scripts.
     window.CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
+    // Permisos del rol (ver PERMISOS_POR_ROL en auth.php). El servidor los exige igual; acá
+    // solo sirven para no mostrar botones que el rol no puede usar (clases sin-editar,
+    // sin-borrar y sin-empresa en <body>, ver sidebar.css).
+    window.PERMISOS = <?= json_encode(permisosDeSesion()) ?>;
+    window.ROL = <?= json_encode($_SESSION['rol'] ?? '') ?>;
+    window.ROL_ETIQUETA = <?= json_encode(ROLES_ETIQUETA[$_SESSION['rol'] ?? ''] ?? '') ?>;
+    ['editar', 'borrar', 'empresa'].forEach(p => { if (!window.PERMISOS[p]) document.body.classList.add('sin-' + p); });
+    // Rol de solo lectura (Contabilidad): un aviso arriba de cada vista.
+    if (!window.PERMISOS.editar) {
+        document.addEventListener('DOMContentLoaded', () => {
+            const aviso = document.createElement('div');
+            aviso.className = 'rol-aviso';
+            aviso.innerHTML = '<i class="fas fa-eye"></i><span></span>';
+            aviso.querySelector('span').textContent = `Tu rol (${window.ROL_ETIQUETA}) es de solo lectura: puedes ver cotizaciones, historial y precios, pero no crear, modificar ni eliminar.`;
+            document.querySelector('.app-content')?.prepend(aviso);
+        });
+    }
     (function () {
         const fetchOriginal = window.fetch.bind(window);
         window.fetch = function (recurso, opciones = {}) {

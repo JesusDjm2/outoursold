@@ -9,7 +9,7 @@
 const HC_API = 'historial-cotizaciones-api.php';
 const HC_MONEDAS = { usd: { codigo: 'USD', simbolo: '$' }, pen: { codigo: 'PEN', simbolo: 'S/' } };
 const HC_IDIOMAS = { es: 'Español', en: 'English', pt: 'Português' };
-const hc = { q: '', moneda: 'todas', estado: 'todas', pagina: 1, total: 0, porPagina: 25, filas: [], pedido: 0 };
+const hc = { q: '', moneda: 'todas', estado: 'todas', papeleraDias: 30, pagina: 1, total: 0, porPagina: 25, filas: [], pedido: 0 };
 
 // Cualquier dato escrito por un usuario pasa por acá antes de ir a innerHTML.
 function hcEsc(texto) {
@@ -42,7 +42,7 @@ function hcLeerUrl() {
     const p = new URLSearchParams(location.search);
     hc.q = p.get('q') || '';
     hc.moneda = ['usd', 'pen'].includes(p.get('moneda')) ? p.get('moneda') : 'todas';
-    hc.estado = ['borrador', 'terminada'].includes(p.get('estado')) ? p.get('estado') : 'todas';
+    hc.estado = ['borrador', 'terminada', 'papelera'].includes(p.get('estado')) ? p.get('estado') : 'todas';
     hc.pagina = Math.max(1, parseInt(p.get('pagina'), 10) || 1);
 }
 function hcEscribirUrl() {
@@ -67,7 +67,7 @@ async function hcCargar() {
         const datos = await res.json();
         if (!res.ok || datos.error) throw new Error(datos.error || `Error ${res.status}`);
         if (pedido !== hc.pedido) return; // llegó tarde: ya se pidió otra búsqueda
-        Object.assign(hc, { filas: datos.filas, total: datos.total, pagina: datos.pagina, porPagina: datos.por_pagina });
+        Object.assign(hc, { filas: datos.filas, total: datos.total, pagina: datos.pagina, porPagina: datos.por_pagina, papeleraDias: datos.papelera_dias || 30 });
         hcEscribirUrl();
         hcPintarResumen(datos.resumen);
         hcPintarTabla();
@@ -93,6 +93,7 @@ function hcPintarResumen(r) {
         kpi('Este mes', r.este_mes, mes.charAt(0).toUpperCase() + mes.slice(1)) +
         kpi('En USD', r.usd, 'dólares') +
         kpi('En PEN', r.pen, 'soles');
+    document.getElementById('hc-papelera-n').textContent = r.papelera ? r.papelera : '';
 }
 
 function hcPintarSegmento() {
@@ -154,15 +155,25 @@ function hcFilaHtml(c, i) {
             <span class="hc-total">${c.total ? hcDinero(c.total, c.moneda) : '<span class="hc-tenue">—</span>'}</span>
             <span class="hc-moneda">${moneda.codigo}</span>
         </td>
-        <td class="hc-acciones">
+        <td class="hc-acciones">${c.eliminada ? hcAccionesPapelera(c) : `
             <a class="hc-btn-icono" href="${hcUrlCotizador(c)}" title="Abrir en el Cotizador" aria-label="Abrir ${hcEsc(c.id)} en el Cotizador"><i class="fas fa-folder-open"></i></a>
             <a class="hc-btn-icono" href="${hcUrlCotizador(c, 'pdf')}" title="PDF de la cotización" aria-label="PDF de la cotización ${hcEsc(c.id)}"><i class="fas fa-file-pdf"></i></a>
             ${c.modulos
                 ? `<a class="hc-btn-icono" href="${hcUrlCotizador(c, 'itinerario')}" title="PDF del itinerario" aria-label="PDF del itinerario ${hcEsc(c.id)}"><i class="fas fa-route"></i></a>`
                 : '<span class="hc-btn-icono is-apagado" title="Sin itinerario armado" aria-hidden="true"><i class="fas fa-route"></i></span>'}
-            <button type="button" class="hc-btn-icono is-peligro" data-accion="eliminar" title="Eliminar" aria-label="Eliminar ${hcEsc(c.id)}"><i class="fas fa-trash"></i></button>
+            <button type="button" class="hc-btn-icono is-peligro" data-accion="eliminar" title="Mover a la papelera" aria-label="Eliminar ${hcEsc(c.id)}"><i class="fas fa-trash"></i></button>`}
         </td>
     </tr>`;
+}
+
+// Papelera: cuándo se eliminó, cuántos días quedan y Restaurar / Eliminar para siempre.
+function hcAccionesPapelera(c) {
+    const eliminada = hcFecha(c.eliminada);
+    const quedan = eliminada ? Math.max(0, hc.papeleraDias - Math.floor((Date.now() - eliminada) / 86400000)) : hc.papeleraDias;
+    return `
+            <span class="hc-papelera-info">Eliminada ${eliminada ? hcDia(eliminada) : ''} · se borra en ${hcPlural(quedan, 'día', 'días')}</span>
+            <button type="button" class="hc-btn-texto requiere-editar" data-accion="restaurar" title="Volver a listarla"><i class="fas fa-rotate-left"></i>Restaurar</button>
+            <button type="button" class="hc-btn-icono is-peligro requiere-borrar" data-accion="definitivo" title="Eliminar para siempre" aria-label="Eliminar para siempre ${hcEsc(c.id)}"><i class="fas fa-trash"></i></button>`;
 }
 
 function hcUrlCotizador(c, ver) {
@@ -197,23 +208,48 @@ function hcPintarPaginas() {
 }
 
 // ===== Acciones =====
+// Pedido a la API de la moneda de la cotización (eliminar, restaurar, definitivo).
+async function hcAccionCotizacion(c, ruta) {
+    const res = await fetch(`../${c.moneda}/api.php?path=${ruta}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id })
+    });
+    const r = await res.json();
+    if (!r.success) throw new Error(r.error || 'No se pudo completar la acción');
+    // Si era la última de la página, volver a la anterior.
+    if (hc.filas.length === 1 && hc.pagina > 1) hc.pagina--;
+    hcCargar();
+    return r;
+}
+
 async function hcEliminar(c) {
     const nombre = c.nombre_pax || 'Sin nombre';
-    if (!await confirmAction(`¿Eliminar la cotización ${c.id} (${nombre}, ${HC_MONEDAS[c.moneda].codigo})? Esta acción no se puede deshacer.`, 'Sí, eliminar')) return;
+    if (!await confirmAction(`¿Mover a la papelera la cotización ${c.id} (${nombre}, ${HC_MONEDAS[c.moneda].codigo})? Podrás restaurarla durante ${hc.papeleraDias} días.`, 'Sí, a la papelera')) return;
     try {
-        const res = await fetch(`../${c.moneda}/api.php?path=eliminar-cotizacion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: c.id })
-        });
-        const r = await res.json();
-        if (!r.success) throw new Error(r.error || 'No se pudo eliminar');
-        notifySuccess('Cotización eliminada');
-        // Si era la última de la página, volver a la anterior.
-        if (hc.filas.length === 1 && hc.pagina > 1) hc.pagina--;
-        hcCargar();
+        await hcAccionCotizacion(c, 'eliminar-cotizacion');
+        notifySuccess(`Cotización movida a la papelera. Puedes restaurarla durante ${hc.papeleraDias} días.`);
     } catch (e) {
         notifyError('Error al eliminar la cotización: ' + e.message);
+    }
+}
+
+async function hcRestaurar(c) {
+    try {
+        await hcAccionCotizacion(c, 'restaurar-cotizacion');
+        notifySuccess(`Cotización ${c.id} restaurada.`);
+    } catch (e) {
+        notifyError('Error al restaurar: ' + e.message);
+    }
+}
+
+async function hcEliminarDefinitivo(c) {
+    if (!await confirmAction(`¿Eliminar para siempre la cotización ${c.id} (${c.nombre_pax || 'Sin nombre'})? Ya no se podrá recuperar.`, 'Sí, eliminar para siempre')) return;
+    try {
+        await hcAccionCotizacion(c, 'eliminar-cotizacion-definitivo');
+        notifySuccess('Cotización eliminada para siempre.');
+    } catch (e) {
+        notifyError('Error al eliminar: ' + e.message);
     }
 }
 
@@ -266,6 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const c = hc.filas[Number(btn.closest('tr')?.dataset.i)];
         if (c && btn.dataset.accion === 'eliminar') hcEliminar(c);
+        if (c && btn.dataset.accion === 'restaurar') hcRestaurar(c);
+        if (c && btn.dataset.accion === 'definitivo') hcEliminarDefinitivo(c);
     });
 
     hcCargar();

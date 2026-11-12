@@ -66,6 +66,7 @@ $accentColorStyle = resolverAccentColorStyle($db);
                         <button type="button" class="hc-segmento-btn" data-estado="todas">Todas</button>
                         <button type="button" class="hc-segmento-btn" data-estado="terminada">Terminadas</button>
                         <button type="button" class="hc-segmento-btn" data-estado="borrador">Borradores</button>
+                        <button type="button" class="hc-segmento-btn hc-segmento-papelera" data-estado="papelera" title="Eliminadas: se pueden restaurar durante 30 días"><i class="fas fa-trash-can" aria-hidden="true"></i>Papelera <span id="hc-papelera-n" class="hc-cuenta"></span></button>
                     </div>
                 </section>
 

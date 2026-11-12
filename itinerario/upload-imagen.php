@@ -13,7 +13,8 @@ if (!is_logged_in()) {
     exit;
 }
 // Todo pedido que modifica algo debe traer el token CSRF de la sesión (ver auth.php).
-exigirCsrf();
+exigirCsrf('itinerarios');
+exigirPermiso('editar'); // subir archivos es un cambio
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Método no permitido']);

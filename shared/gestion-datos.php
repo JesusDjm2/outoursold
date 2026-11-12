@@ -7,6 +7,8 @@
 // $pageTitle, $currencySymbol, $navActive.
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/agencia-helpers.php';
+// Solo con sesión (antes la página se abría sin iniciar sesión, vacía).
+require_login();
 $navRoot = '../';
 $navShared = '../shared/';
 $db = getDB();

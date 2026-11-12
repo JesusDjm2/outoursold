@@ -23,10 +23,6 @@ header('Content-Type: application/json');
 
 const HC_POR_PAGINA = 25;
 
-// Fecha de creación: el ID es "COT-" + milisegundos de cuando se creó (fecha_guardado cambia
-// con cada guardado). Si el ID no tiene esa forma, se usa fecha_guardado.
-const HC_CREADA = "CASE WHEN c.id REGEXP '^COT-[0-9]{13}$' THEN FROM_UNIXTIME(CAST(SUBSTRING(c.id, 5) AS UNSIGNED) DIV 1000) ELSE c.fecha_guardado END";
-
 function hcNumero($valor) {
     return is_numeric($valor) ? (float) $valor : 0.0;
 }
@@ -76,35 +72,40 @@ try {
     $monedasConsulta = in_array($monedaPedida, $monedas, true) ? [$monedaPedida] : $monedas;
     $q = trim((string) ($_GET['q'] ?? ''));
     $pagina = max(1, (int) ($_GET['pagina'] ?? 1));
-    // Estado: 'borrador' | 'terminada' (las de antes, sin estado, son terminadas) | todas.
+    // Estado: 'borrador' | 'terminada' | 'papelera' (eliminadas, se borran solas a los 30 días) | todas.
     $estadoPedido = $_GET['estado'] ?? 'todas';
+    $enPapelera = $estadoPedido === 'papelera';
+    // Al mirar la papelera se borra para siempre lo que ya pasó los 30 días (igual que en api.php).
+    if ($enPapelera) {
+        foreach ($monedas as $m) $db->exec("DELETE FROM cotizaciones_$m WHERE eliminado_en IS NOT NULL AND eliminado_en < NOW() - INTERVAL 30 DAY");
+    }
 
     [$fd, $pd] = filtroDueno('c.creado_por');
     $ambito = is_admin() ? "($fd OR c.creado_por IS NULL)" : $fd;
 
     // Búsqueda: ID, pasajero, contacto, país o paquete. La columna `data` es utf8mb4_bin
     // (distingue mayúsculas), así que se compara todo en minúsculas.
-    $condBusqueda = '';
+    $condBusqueda = $enPapelera ? ' AND c.eliminado_en IS NOT NULL' : ' AND c.eliminado_en IS NULL';
     $paramsBusqueda = [];
     if ($q !== '') {
         $campos = ['c.id'];
         foreach (['$.pax.nombre_pax', '$.pax.contacto', '$.pax.pais', '$.paquete.nombre'] as $ruta) {
             $campos[] = "JSON_UNQUOTE(JSON_EXTRACT(c.data, '$ruta'))";
         }
-        $condBusqueda = ' AND (' . implode(' OR ', array_map(fn($c) => "LOWER($c) LIKE LOWER(?)", $campos)) . ')';
+        $condBusqueda .= ' AND (' . implode(' OR ', array_map(fn($c) => "LOWER($c) LIKE LOWER(?)", $campos)) . ')';
         $paramsBusqueda = array_fill(0, count($campos), '%' . $q . '%');
     }
-    if ($estadoPedido === 'borrador') {
-        $condBusqueda .= " AND JSON_UNQUOTE(JSON_EXTRACT(c.data, '$.estado')) = 'borrador'";
-    } elseif ($estadoPedido === 'terminada') {
-        $condBusqueda .= " AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(c.data, '$.estado')), '') <> 'borrador'";
+    // Columna `estado` calculada (migración 041), con índice.
+    if ($estadoPedido === 'borrador' || $estadoPedido === 'terminada') {
+        $condBusqueda .= " AND c.estado = '$estadoPedido'";
     }
 
-    // Una subconsulta por moneda, unidas: así se ordena y pagina en el servidor.
+    // Una subconsulta liviana por moneda (sin el JSON), unidas: así se ordena y pagina en el
+    // servidor sin cargar el contenido de todas. creada_ms = milisegundos del ID (índice).
     $partes = [];
     $params = [];
     foreach ($monedasConsulta as $m) {
-        $partes[] = "SELECT '$m' AS moneda, c.id, c.data, c.fecha_guardado, " . HC_CREADA . " AS creada, u.usuario AS creado_por_nombre
+        $partes[] = "SELECT '$m' AS moneda, c.id, c.creada_ms, FROM_UNIXTIME(c.creada_ms DIV 1000) AS creada, c.fecha_guardado, c.eliminado_en, u.usuario AS creado_por_nombre
                      FROM cotizaciones_$m c LEFT JOIN usuarios u ON u.id = c.creado_por
                      WHERE $ambito$condBusqueda";
         array_push($params, ...$pd, ...$paramsBusqueda);
@@ -119,31 +120,48 @@ try {
     $paginas = max(1, (int) ceil($total / $porPagina));
     $pagina = min($pagina, $paginas);
     $offset = ($pagina - 1) * $porPagina;
-    $stmt = $db->prepare("SELECT * FROM ($union) x ORDER BY creada DESC, id DESC LIMIT $porPagina OFFSET $offset");
+    $orden = $enPapelera ? 'eliminado_en DESC' : 'COALESCE(creada_ms, UNIX_TIMESTAMP(fecha_guardado) * 1000) DESC';
+    $stmt = $db->prepare("SELECT * FROM ($union) x ORDER BY $orden, id DESC LIMIT $porPagina OFFSET $offset");
     $stmt->execute($params);
+    $pagina_filas = $stmt->fetchAll();
+
+    // Solo ahora se trae el JSON, y solo de las filas de esta página.
+    $datos = [];
+    foreach ($monedas as $m) {
+        $ids = array_column(array_filter($pagina_filas, fn($r) => $r['moneda'] === $m), 'id');
+        if (!$ids) continue;
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $st = $db->prepare("SELECT id, data FROM cotizaciones_$m WHERE id IN ($marcas)");
+        $st->execute($ids);
+        foreach ($st->fetchAll() as $d) $datos["$m|{$d['id']}"] = json_decode($d['data'], true);
+    }
+
     $filas = [];
-    while ($r = $stmt->fetch()) {
-        $data = json_decode($r['data'], true);
+    foreach ($pagina_filas as $r) {
+        $data = $datos["{$r['moneda']}|{$r['id']}"] ?? [];
         $filas[] = array_merge([
             'id' => $r['id'],
             'moneda' => $r['moneda'],
-            'creada' => $r['creada'],
+            'creada' => $r['creada'] ?: $r['fecha_guardado'], // fecha de MySQL (misma zona horaria que antes)
             'modificada' => $r['fecha_guardado'],
             'creado_por' => $r['creado_por_nombre'],
+            'eliminada' => $r['eliminado_en'],
         ], hcResumen(is_array($data) ? $data : []));
     }
 
-    // Resumen de arriba: sin la búsqueda ni el filtro de moneda (siempre lo de la agencia).
-    $resumen = ['total' => 0, 'usd' => 0, 'pen' => 0, 'este_mes' => 0];
+    // Resumen de arriba: sin la búsqueda ni los filtros (siempre lo de la agencia).
+    $resumen = ['total' => 0, 'usd' => 0, 'pen' => 0, 'este_mes' => 0, 'papelera' => 0];
     foreach ($monedas as $m) {
-        $stmt = $db->prepare("SELECT COUNT(*) AS n,
-                                     SUM(" . HC_CREADA . " >= DATE_FORMAT(CURDATE(), '%Y-%m-01')) AS mes
+        $stmt = $db->prepare("SELECT SUM(c.eliminado_en IS NULL) AS n,
+                                     SUM(c.eliminado_en IS NULL AND c.creada_ms >= UNIX_TIMESTAMP(DATE_FORMAT(CURDATE(), '%Y-%m-01')) * 1000) AS mes,
+                                     SUM(c.eliminado_en IS NOT NULL) AS papelera
                               FROM cotizaciones_$m c WHERE $ambito");
         $stmt->execute($pd);
         $fila = $stmt->fetch();
         $resumen[$m] = (int) $fila['n'];
         $resumen['total'] += (int) $fila['n'];
         $resumen['este_mes'] += (int) $fila['mes'];
+        $resumen['papelera'] += (int) $fila['papelera'];
     }
 
     echo json_encode([
@@ -152,6 +170,7 @@ try {
         'pagina' => $pagina,
         'por_pagina' => $porPagina,
         'resumen' => $resumen,
+        'papelera_dias' => 30,
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     http_response_code(500);
