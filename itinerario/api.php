@@ -97,6 +97,42 @@ function guardarConfigPaginas($db, $tablaConfig, $idioma, array $startFiles, arr
     return true;
 }
 
+// ===== Modo de cada sección del PDF del itinerario (migración 043) =====
+// PDF subidos o páginas generadas por el sistema con la marca de la agencia. Sin config
+// (o antes de la migración), todo como siempre: PDF subidos y sin términos.
+const PAGINAS_MODO_DEFECTO = ['presentacion' => 'pdf', 'dias' => 'pdf', 'cierre' => 'pdf', 'terminos' => false];
+function normalizarModosPaginas($modos) {
+    $modos = is_array($modos) ? $modos : [];
+    $validos = [
+        'presentacion' => ['pdf', 'generada', 'generada_pdf'],
+        'dias' => ['pdf', 'generada'],
+        'cierre' => ['pdf', 'generada', 'pdf_generada'],
+    ];
+    $limpio = PAGINAS_MODO_DEFECTO;
+    foreach ($validos as $clave => $opciones) {
+        if (in_array($modos[$clave] ?? null, $opciones, true)) $limpio[$clave] = $modos[$clave];
+    }
+    $limpio['terminos'] = !empty($modos['terminos']);
+    return $limpio;
+}
+function columnaPaginasDisponible($db) {
+    static $disponible = null;
+    if ($disponible === null) {
+        $disponible = configPorAgenciaDisponible($db)
+            && (bool) $db->query("SHOW COLUMNS FROM itinerario_config_agencia LIKE 'paginas'")->fetchColumn();
+    }
+    return $disponible;
+}
+function leerModosPaginas($db, $idioma) {
+    if (!columnaPaginasDisponible($db)) return PAGINAS_MODO_DEFECTO;
+    $agenciaId = resolverAgenciaPropiaId($db);
+    if (!$agenciaId) return PAGINAS_MODO_DEFECTO;
+    $stmt = $db->prepare("SELECT paginas FROM itinerario_config_agencia WHERE agencia_id = ? AND idioma = ?");
+    $stmt->execute([$agenciaId, $idioma]);
+    $json = $stmt->fetchColumn();
+    return normalizarModosPaginas($json ? json_decode($json, true) : []);
+}
+
 function idOInt($val) {
     return ($val !== null && $val !== '') ? (int) $val : null;
 }
@@ -163,7 +199,7 @@ try {
             // Acotado al catálogo de TU agencia (admin incluido) — igual que shared/api.php.
             [$fd, $pd] = filtroDueno('m.creado_por');
             $stmt = $db->prepare(
-                "SELECT m.id, m.titulo, m.filename, m.imagen, m.lugares_visitar, m.incluye, m.no_incluye,
+                "SELECT m.id, m.titulo, m.filename, m.imagen, m.lugares_visitar, m.descripcion, m.incluye, m.no_incluye,
                         m.destino_id, m.categoria_id, COALESCE(ag.nombre, u.usuario) AS creado_por_nombre
                  FROM $tablaModulos m
                  LEFT JOIN usuarios u ON u.id = m.creado_por
@@ -343,7 +379,33 @@ try {
 
         case 'config':
             $config = leerConfigPaginas($db, $tablaConfig, $idioma);
-            echo json_encode(['startFiles' => $config['start'], 'endFiles' => $config['end']]);
+            echo json_encode(['startFiles' => $config['start'], 'endFiles' => $config['end'], 'paginas' => leerModosPaginas($db, $idioma)]);
+            break;
+
+        // Modo de cada sección del PDF (PDF subidos o páginas generadas), de mi agencia y
+        // este idioma. Se guarda en la misma fila que las Páginas fijas.
+        case 'guardar-modos-paginas':
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            if (!columnaPaginasDisponible($db)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Falta correr la migración 043 en la base de datos.']);
+                break;
+            }
+            $agenciaId = resolverAgenciaPropiaId($db);
+            if (!$agenciaId) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Tu usuario no tiene una agencia asignada; no se puede guardar el diseño del PDF.']);
+                break;
+            }
+            $modos = normalizarModosPaginas(json_decode(file_get_contents('php://input'), true));
+            $db->prepare("INSERT INTO itinerario_config_agencia (agencia_id, idioma, start_files, end_files, paginas) VALUES (?, ?, '[]', '[]', ?)
+                          ON DUPLICATE KEY UPDATE paginas = VALUES(paginas)")
+                ->execute([$agenciaId, $idioma, json_encode($modos)]);
+            echo json_encode(['success' => true, 'paginas' => $modos]);
             break;
 
         case 'paquetes':
@@ -500,7 +562,7 @@ try {
                 $valores[] = $categoriaIdModulo;
             }
             // Textos largos (migración 036): vacío = NULL.
-            foreach (['lugares_visitar', 'incluye', 'no_incluye'] as $campoTexto) {
+            foreach (['lugares_visitar', 'descripcion', 'incluye', 'no_incluye'] as $campoTexto) {
                 if (array_key_exists($campoTexto, $data)) {
                     $texto = trim((string) ($data[$campoTexto] ?? ''));
                     $campos[] = "$campoTexto = ?";

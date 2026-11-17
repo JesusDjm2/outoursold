@@ -208,6 +208,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                     <i class="fas fa-chevron-down itin-campo-caret" aria-hidden="true"></i>
                                 </div>
                             </div>
+                            <!-- Diseño del PDF solo para esta cotización (por defecto, el de la agencia). -->
+                            <button type="button" id="itin-pdf-diseno" class="itin-pdf-diseno solo-cotizacion" title="Diseño del PDF del itinerario: PDF subidos o páginas generadas con tu marca">
+                                <i class="fas fa-wand-magic-sparkles"></i><span>Diseño PDF</span><b id="itin-pdf-diseno-marca" hidden>Personalizado</b>
+                            </button>
                             <div class="field itin-campo">
                                 <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Por defecto son los días y noches de la cotización; puedes cambiarlo.">
                             </div>
@@ -445,6 +449,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script src="../shared/cascade-select.js?v=<?= filemtime(__DIR__ . '/cascade-select.js') ?>"></script>
     <script>window.ITINERARIO_API_BASE = '../itinerario/';</script>
     <script src="../itinerario/itinerario.js?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.js') ?>"></script>
+    <script src="../itinerario/itinerario-paginas.js?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario-paginas.js') ?>"></script>
     <script src="../shared/catalogo-shared.js?v=<?= filemtime(__DIR__ . '/catalogo-shared.js') ?>"></script>
     <script src="../shared/itinerario-selector.js?v=<?= filemtime(__DIR__ . '/itinerario-selector.js') ?>"></script>
     <script src="../shared/itinerario-vinculos.js?v=<?= filemtime(__DIR__ . '/itinerario-vinculos.js') ?>"></script>

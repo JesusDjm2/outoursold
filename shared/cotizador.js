@@ -1293,7 +1293,9 @@ async function guardarCotizacion() {
                 dias: armado.map(x => x.dia),
                 // Los vínculos con Actividades van en tours[i].vinculo; esto dice que se
                 // guardaron (las de antes se vinculan por coincidencia al abrirlas).
-                vinculos: 1
+                vinculos: 1,
+                // Diseño del PDF elegido solo para esta cotización (null = el de la agencia).
+                paginas: modosPaginasCotizacion
             };
         })(),
         // Paquete predefinido con el que se armó (si se aplicó uno): se guarda dentro del
@@ -1466,6 +1468,8 @@ function nuevaCotizacion(showAlert = true) {
 // cotización (nombres de archivo de módulo, en orden), y se reconstruye con la misma
 // addItineraryBuilderRow() que ya usa el armador standalone — no hay lógica propia acá.
 function limpiarItinerarioArmado() {
+    modosPaginasCotizacion = null;
+    pintarBotonDisenoPdf();
     document.getElementById('itinerary-passenger').value = '';
     const titulo = document.getElementById('itinerary-title');
     titulo.value = '';
@@ -1516,7 +1520,47 @@ function tituloItinerarioPara(nombrePax) {
     return nombrePax ? `Itinerario de ${nombrePax}` : '';
 }
 
+// ===== Diseño del PDF del itinerario solo para esta cotización =====
+// Por defecto el de la agencia (Gestión de Datos › Páginas fijas); acá se puede cambiar para
+// esta cotización: se guarda con ella (itinerarioArmado.paginas) y no toca el de la agencia.
+function pintarBotonDisenoPdf() {
+    const marca = document.getElementById('itin-pdf-diseno-marca');
+    if (marca) marca.hidden = !modosPaginasCotizacion;
+}
+async function abrirDisenoPdfCotizacion() {
+    let elegidos = modosPaginasPdf();
+    const r = await Swal.fire({
+        title: 'Diseño del PDF del itinerario',
+        html: '<p class="modos-pdf-intro">Solo para esta cotización. El de siempre se elige en Gestión de Datos › Itinerarios › Páginas fijas.</p><div id="modos-pdf-swal"></div>',
+        width: 680,
+        showCancelButton: true,
+        showDenyButton: !!modosPaginasCotizacion,
+        confirmButtonText: 'Usar en esta cotización',
+        denyButtonText: 'Volver al de la agencia',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e80c13',
+        denyButtonColor: '#475569',
+        cancelButtonColor: '#94a3b8',
+        didOpen: () => {
+            document.getElementById('modos-pdf-swal').appendChild(construirControlesModosPaginas(elegidos, m => { elegidos = m; }));
+        }
+    });
+    if (r.isConfirmed) {
+        const agencia = modosPaginasAgencia();
+        const igual = Object.keys(MODOS_PAGINAS_DEFECTO).every(k => !!agencia[k] === !!elegidos[k] && (typeof agencia[k] === 'boolean' || agencia[k] === elegidos[k]));
+        modosPaginasCotizacion = igual ? null : elegidos;
+    } else if (r.isDenied) {
+        modosPaginasCotizacion = null;
+    } else {
+        return;
+    }
+    pintarBotonDisenoPdf();
+    if (typeof iselToast === 'function') iselToast(modosPaginasCotizacion ? 'Diseño del PDF personalizado para esta cotización' : 'Se usa el diseño del PDF de la agencia');
+}
+
 function restaurarItinerarioArmado(armado) {
+    modosPaginasCotizacion = armado?.paginas || null;
+    pintarBotonDisenoPdf();
     const nombrePax = document.querySelector('input[name="nombre_pax"]').value || '';
     document.getElementById('itinerary-passenger').value = armado?.pasajero || nombrePax;
     let titulo = armado?.titulo || '';
@@ -1903,6 +1947,7 @@ async function init() {
     inicializarAcordeones();
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.getElementById('guardar-como-paquete').addEventListener('click', guardarComoPaquete);
+    document.getElementById('itin-pdf-diseno')?.addEventListener('click', abrirDisenoPdfCotizacion);
     document.getElementById('solo-lectura-pdf').addEventListener('click', () => mostrarVistaPreviaPdf(currentCotizacionId));
     document.getElementById('solo-lectura-salir').addEventListener('click', () => nuevaCotizacion(false));
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);

@@ -906,7 +906,7 @@ try {
             }
             $agenciaId = $filaCot['agencia_id'] ?: null;
             $sqlAgencia = "SELECT id, nombre, ruc, direccion, telefono, telefono2, whatsapp,
-                                   color_principal, color_secundario, logo,
+                                   color_principal, color_secundario, logo, hero_imagen,
                                    terminos_es, terminos_en, terminos_pt
                             FROM agencias WHERE " . ($agenciaId ? "id = ?" : "es_principal = 1 LIMIT 1");
             $agStmt = $db->prepare($sqlAgencia);

@@ -342,6 +342,96 @@ function loadFontWithXHR(url, fontName) {
 }
 
 // ===== Carga / cambio de idioma =====
+// ===== Diseño del PDF: PDF subidos o páginas generadas (migración 043) =====
+// El de la agencia (por idioma) se elige en Gestión de Datos › Itinerarios › Páginas fijas;
+// en el Cotizador se puede cambiar para una cotización (modosPaginasCotizacion, se guarda
+// con ella). Las páginas las arma itinerario-paginas.js.
+const MODOS_PAGINAS_DEFECTO = { presentacion: 'pdf', dias: 'pdf', cierre: 'pdf', terminos: false };
+let modosPaginasCotizacion = null; // null = el de la agencia
+function modosPaginasAgencia(idioma = idiomaActivo) {
+    return { ...MODOS_PAGINAS_DEFECTO, ...(idiomaCache[idioma]?.paginas || {}) };
+}
+function modosPaginasPdf(idioma = idiomaActivo) {
+    return modosPaginasCotizacion ? { ...MODOS_PAGINAS_DEFECTO, ...modosPaginasCotizacion } : modosPaginasAgencia(idioma);
+}
+const OPCIONES_MODOS_PAGINAS = [
+    { clave: 'presentacion', titulo: 'Presentación', icono: 'fa-flag', opciones: [
+        ['pdf', 'PDF subidos', 'Las páginas de Presentación que subiste; el pasajero va en la primera.'],
+        ['generada', 'Portada generada', 'Foto del primer día, pasajero, fechas, duración y destinos, con tu marca.'],
+        ['generada_pdf', 'Generada + PDF', 'La portada generada y, después, tus páginas de Presentación.']
+    ] },
+    { clave: 'dias', titulo: 'Días del itinerario', icono: 'fa-route', opciones: [
+        ['pdf', 'PDF de cada itinerario', 'El PDF subido de cada itinerario (si falta, se genera).'],
+        ['generada', 'Páginas generadas', 'Foto, día, fecha, descripción, lugares e incluye de cada itinerario.']
+    ] },
+    { clave: 'cierre', titulo: 'Cierre', icono: 'fa-flag-checkered', opciones: [
+        ['pdf', 'PDF subidos', 'Las páginas de Cierre que subiste.'],
+        ['generada', 'Contacto generado', 'Agradecimiento y tus datos de contacto, con tu marca.'],
+        ['pdf_generada', 'PDF + contacto', 'Tus páginas de Cierre y, al final, el contacto generado.']
+    ] }
+];
+// Controles (segmentados) para elegir los modos. onChange(modos) en cada cambio.
+function construirControlesModosPaginas(modosIniciales, onChange) {
+    let modos = { ...MODOS_PAGINAS_DEFECTO, ...modosIniciales };
+    const wrap = document.createElement('div');
+    wrap.className = 'modos-pdf';
+    wrap.innerHTML = OPCIONES_MODOS_PAGINAS.map(g => `
+        <div class="modos-pdf-fila">
+            <span class="modos-pdf-titulo"><i class="fas ${g.icono}"></i>${g.titulo}</span>
+            <div class="modos-pdf-seg" role="radiogroup" aria-label="${g.titulo}">
+                ${g.opciones.map(([valor, texto, ayuda]) => `<button type="button" role="radio" data-clave="${g.clave}" data-valor="${valor}" title="${escapeHtml(ayuda)}">${texto}</button>`).join('')}
+            </div>
+        </div>`).join('') + `
+        <label class="modos-pdf-fila modos-pdf-check">
+            <input type="checkbox" data-clave="terminos">
+            <span><b>Términos y condiciones</b> antes del cierre: los de Mi Empresa en el idioma del PDF.</span>
+        </label>`;
+    const pintar = () => {
+        wrap.querySelectorAll('button[data-clave]').forEach(b => {
+            const activo = modos[b.dataset.clave] === b.dataset.valor;
+            b.classList.toggle('is-activo', activo);
+            b.setAttribute('aria-checked', activo ? 'true' : 'false');
+        });
+        wrap.querySelector('input[data-clave="terminos"]').checked = !!modos.terminos;
+    };
+    wrap.addEventListener('click', (ev) => {
+        const b = ev.target.closest('button[data-clave]');
+        if (!b || modos[b.dataset.clave] === b.dataset.valor) return;
+        modos = { ...modos, [b.dataset.clave]: b.dataset.valor };
+        pintar();
+        onChange({ ...modos });
+    });
+    wrap.querySelector('input[data-clave="terminos"]').addEventListener('change', (ev) => {
+        modos = { ...modos, terminos: ev.target.checked };
+        onChange({ ...modos });
+    });
+    pintar();
+    return wrap;
+}
+async function guardarModosPaginasAgencia(modos, idioma = idiomaActivo) {
+    const data = await fetch(`${ITINERARIO_API_BASE}api.php?path=guardar-modos-paginas&idioma=${idioma}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(modos)
+    }).then(r => r.json());
+    if (!data.success) throw new Error(data.error || 'Error desconocido');
+    if (idiomaCache[idioma]) idiomaCache[idioma].paginas = { ...MODOS_PAGINAS_DEFECTO, ...data.paginas };
+    return data.paginas;
+}
+// Gestión de Datos › Páginas fijas: el diseño del PDF de la agencia en el idioma activo.
+function renderModosPaginasGestion() {
+    const cont = document.getElementById('modos-pdf-gestion');
+    if (!cont) return;
+    cont.innerHTML = '';
+    let guardando = Promise.resolve();
+    cont.appendChild(construirControlesModosPaginas(modosPaginasAgencia(), (modos) => {
+        const idioma = idiomaActivo;
+        guardando = guardando.then(() => guardarModosPaginasAgencia(modos, idioma))
+            .then(() => Swal.fire({ toast: true, position: 'bottom', icon: 'success', titleText: 'Diseño del PDF guardado', showConfirmButton: false, timer: 1800 }))
+            .catch(e => { notifyError('No se pudo guardar el diseño del PDF: ' + e.message); renderModosPaginasGestion(); });
+    }));
+}
+
 async function cargarIdioma(idioma) {
     const [modules, config, paquetes, paginasFijas, generados] = await Promise.all([
         fetch(`${ITINERARIO_API_BASE}api.php?path=modulos&idioma=${idioma}`).then(r => r.json()),
@@ -354,6 +444,7 @@ async function cargarIdioma(idioma) {
         modules,
         fixedStartFiles: config.startFiles || [],
         fixedEndFiles: config.endFiles || [],
+        paginas: { ...MODOS_PAGINAS_DEFECTO, ...(config.paginas || {}) },
         paquetes,
         paginasFijas,
         generados
@@ -380,6 +471,7 @@ async function activarIdioma(idioma) {
 function renderTodoIdioma() {
     renderModulosTable();
     renderPaginasFijasTable();
+    renderModosPaginasGestion();
     renderHistorialGeneradosTable();
     loadFixedSections();
     renderPaquetesListItinerario();
@@ -569,6 +661,7 @@ async function guardarItinerarioCatalogo(it, cambios) {
         titulo: cambios.titulo,
         lugares_visitar: cambios.lugares_visitar,
         incluye: cambios.incluye,
+        ...('descripcion' in cambios ? { descripcion: cambios.descripcion } : {}),
         no_incluye: cambios.no_incluye
     };
     if ('destino_id' in cambios) payload.destino_id = cambios.destino_id;
@@ -669,6 +762,10 @@ function abrirEditorItinerario(it) {
                         </div>
                     </div>
                     <div class="cat-field">
+                        <label for="ie-descripcion">Descripción del día</label>
+                        <textarea id="ie-descripcion" rows="6" placeholder="El texto del día para el PDF generado. Un párrafo por línea; el primero se destaca."></textarea>
+                    </div>
+                    <div class="cat-field">
                         <label for="ie-lugares">Lugares a visitar</label>
                         <textarea id="ie-lugares" rows="4" placeholder="Ej.: Plaza de Armas, Qorikancha, Sacsayhuamán..."></textarea>
                     </div>
@@ -693,6 +790,7 @@ function abrirEditorItinerario(it) {
 
     $('#ie-titulo').value = it.titulo || '';
     $('#ie-lugares').value = it.lugares_visitar || '';
+    $('#ie-descripcion').value = it.descripcion || '';
     $('#ie-incluye').value = it.incluye || '';
     $('#ie-no-incluye').value = it.no_incluye || '';
     $('.ie-pdf').href = urlPdfModulo(it);
@@ -768,6 +866,7 @@ function abrirEditorItinerario(it) {
                 destino_id: destinoSel.value || null,
                 categoria_id: categoriaSel.value || null,
                 lugares_visitar: $('#ie-lugares').value,
+                descripcion: $('#ie-descripcion').value,
                 incluye: $('#ie-incluye').value,
                 no_incluye: $('#ie-no-incluye').value,
                 imagen: imagenElegida,
@@ -2247,7 +2346,7 @@ async function agregarPaginasResumenPdf(pdfDoc, { idioma, armado, titulo, fLlega
     const nuevaPagina = (sup, tituloPagina, continua) => {
         const page = pdfDoc.addPage([W, H]);
         page.drawRectangle({ x: 0, y: H - BANDA, width: W, height: BANDA, color: c(prim) });
-        page.drawCircle({ x: W - 30 * s, y: H + 6 * s, size: 128 * s, color: c(sec), opacity: 0.4 });
+        page.drawCircle({ x: W - 30 * s, y: H + 6 * s, size: 128 * s, color: c(mezclarColorPdf(prim, BLANCO, 0.1)) });
         page.drawCircle({ x: W - 210 * s, y: H - BANDA + 4 * s, size: 54 * s, color: c(BLANCO), opacity: 0.07 });
         page.drawRectangle({ x: 0, y: H - BANDA - 4 * s, width: W, height: 4 * s, color: c(sec) });
 
@@ -2470,6 +2569,9 @@ async function handleGenerateItinerary() {
         const pdfDoc = await PDFDocument.create();
         pdfDoc.registerFontkit(fontkit);
 
+        // Modo de cada sección: PDF subidos o páginas generadas (itinerario-paginas.js).
+        const generaPaginas = typeof generarPortadaPdf === 'function';
+        const modos = generaPaginas ? modosPaginasPdf(idiomaPdf) : { ...MODOS_PAGINAS_DEFECTO };
         const getFiles = selector => Array.from(document.querySelectorAll(selector)).map(s => s.value).filter(Boolean);
         // Presentación / Cierre: del armador de esas secciones si está en la página
         // (standalone); si no (Cotizador), de la config guardada para este idioma
@@ -2488,20 +2590,33 @@ async function handleGenerateItinerary() {
         // seguidos. Un bloque de 1 día va como etiqueta en la primera página del día
         // siguiente; desde 2 días, una página propia hecha con el módulo "día libre" del
         // catálogo como plantilla (si no hay, también va como etiqueta).
+        // Con los días generados, un bloque de 2+ días libres es una página generada.
+        const diasGenerados = modos.dias === 'generada';
         const plantillaLibre = modulosActivos().find(m => esModuloDiaLibre(m) && m.archivo_existe !== false) || null;
-        const allFilesToProcess = startFiles.map(filename => ({ filename, type: 'start' }));
+        const moduloDe = filename => modulosActivos().find(m => m.filename === filename) || null;
+        const allFilesToProcess = [];
+        // Presentación: portada generada (con el pasajero) y/o las páginas subidas.
+        if (modos.presentacion !== 'pdf') allFilesToProcess.push({ type: 'portada' });
+        if (modos.presentacion !== 'generada') startFiles.forEach(filename => allFilesToProcess.push({ filename, type: 'start', sinSello: modos.presentacion === 'generada_pdf' }));
         let diaAnterior = null;
         armado.forEach(x => {
             let libreAntes = null;
             if (diaAnterior !== null && x.dia - diaAnterior > 1) {
                 const bloque = { desde: diaAnterior + 1, hasta: x.dia - 1 };
-                if (bloque.hasta > bloque.desde && plantillaLibre) allFilesToProcess.push({ filename: plantillaLibre.filename, type: 'libre', ...bloque });
+                if (bloque.hasta > bloque.desde && diasGenerados) allFilesToProcess.push({ type: 'libre-gen', ...bloque });
+                else if (bloque.hasta > bloque.desde && plantillaLibre) allFilesToProcess.push({ filename: plantillaLibre.filename, type: 'libre', ...bloque });
                 else libreAntes = bloque;
             }
-            allFilesToProcess.push({ filename: x.filename, type: 'body', dia: x.dia, primeraDelDia: x.dia !== diaAnterior, libreAntes });
+            // Generada si así está elegido, o si el itinerario no tiene su PDF en el servidor.
+            const modulo = moduloDe(x.filename);
+            const generar = generaPaginas && (diasGenerados || modulo?.archivo_existe === false);
+            allFilesToProcess.push({ filename: x.filename, type: generar ? 'dia-gen' : 'body', modulo, dia: x.dia, primeraDelDia: x.dia !== diaAnterior, libreAntes });
             diaAnterior = x.dia;
         });
-        endFiles.forEach(filename => allFilesToProcess.push({ filename, type: 'end' }));
+        // Cierre: términos (si se piden y la agencia los tiene), las subidas y/o el contacto generado.
+        if (modos.terminos) allFilesToProcess.push({ type: 'terminos' });
+        if (modos.cierre !== 'generada') endFiles.forEach(filename => allFilesToProcess.push({ filename, type: 'end' }));
+        if (modos.cierre !== 'pdf') allFilesToProcess.push({ type: 'cierre' });
 
         if (allFilesToProcess.length === 0) {
             hideLoadingModal();
@@ -2534,28 +2649,114 @@ async function handleGenerateItinerary() {
             });
         };
 
-        // Bucle único que procesa un archivo a la vez de forma garantizada
-        for (let i = 0; i < totalFiles; i++) {
-            const fileInfo = allFilesToProcess[i];
-            const { filename, type } = fileInfo;
-            if (type === 'end' && !resumenAgregado) await agregarResumen();
-            // La plantilla de días libres aporta solo su primera página.
-            const soloPrimera = type === 'libre';
-            const progress = 30 + (i / totalFiles * 65);
-            updateProgress(progress, `Procesando ${i + 1} de ${totalFiles}: ${filename}`);
-
+        // PDF subidos: se cargan una sola vez (el primero también da el tamaño de las páginas
+        // generadas, para que todo el documento tenga el mismo formato).
+        const pdfsCargados = new Map();
+        const cargarPdfSubido = async (filename) => {
+            if (pdfsCargados.has(filename)) return pdfsCargados.get(filename);
             const pdfUrl = `${ITINERARIO_API_BASE}./uploads/${idiomaPdf}/${encodeURIComponent(filename)}`;
             // no-cache: revalida con el servidor, por si el PDF se reemplazó (mismo nombre).
             const res = await fetch(pdfUrl, { cache: 'no-cache' });
             if (!res.ok) {
                 throw new Error(`Módulo no encontrado: "${filename}" (${res.status}). El archivo PDF no está subido en el servidor para el idioma "${idiomaPdf}".`);
             }
-            const bytes = await res.arrayBuffer();
-            const tempDoc = await PDFDocument.load(bytes);
+            const doc = await PDFDocument.load(await res.arrayBuffer());
+            pdfsCargados.set(filename, doc);
+            return doc;
+        };
+        const tipoGenerado = tipo => ['portada', 'dia-gen', 'libre-gen', 'terminos', 'cierre'].includes(tipo);
+        let marca = null;
+        const kitMarca = async () => {
+            if (marca) return marca;
+            const primerSubido = allFilesToProcess.find(f => !tipoGenerado(f.type));
+            let tamano = TAMANO_PAGINA_GENERADA;
+            if (pdfDoc.getPageCount()) tamano = Object.values(pdfDoc.getPage(0).getSize());
+            else if (primerSubido) {
+                try { tamano = Object.values((await cargarPdfSubido(primerSubido.filename)).getPage(0).getSize()); } catch (e) { /* se avisa al procesarlo */ }
+            }
+            marca = await crearMarcaPdf(pdfDoc, { agencia: agenciaPdf, logoPng: logoPdf, fuenteTitulo: janoFont, fuenteScript: charlotteFont, idioma: idiomaPdf, tamano });
+            return marca;
+        };
+        const urlImagenModulo = m => (m?.imagen && m.imagen_existe !== false) ? `${ITINERARIO_API_BASE}uploads/${idiomaPdf}/imagenes/${encodeURIComponent(m.imagen)}` : null;
+        // Destino sin el grupo ("Cusco", no "Cusco · Con hotel") y categoría, para la ruta del día.
+        const destinoBase = id => id == null ? null : (itinDestinosData.find(d => Number(d.id) === Number(id))?.nombreBase || null);
+        const categoriaDe = id => id == null ? null : (itinCategoriasData.find(cat => Number(cat.id) === Number(id))?.nombre || null);
+        const rutaModulo = m => [destinoBase(m?.destino_id), categoriaDe(m?.categoria_id)].filter(Boolean).join(' · ');
+        const tituloModulo = filename => moduloDe(filename)?.titulo || filename.replace(/\.pdf$/i, '');
+        const tPag = (typeof TEXTOS_PAGINAS_PDF !== 'undefined' && (TEXTOS_PAGINAS_PDF[idiomaPdf] || TEXTOS_PAGINAS_PDF.es)) || {};
+        const textoLibre = (desde, hasta) => `${tPag.dia} ${desde}${hasta > desde ? `-${hasta}` : ''} · ${hasta > desde ? tPag.libres : tPag.libre}`;
+        // Portada: cada día con sus itinerarios y los días libres entre ellos.
+        const agendaPortada = () => {
+            const filas = [];
+            armado.forEach((x, i) => {
+                const previo = armado[i - 1];
+                if (previo && x.dia - previo.dia > 1) filas.push({ libre: true, titulo: textoLibre(previo.dia + 1, x.dia - 1) });
+                const ultima = filas[filas.length - 1];
+                if (ultima && !ultima.libre && ultima.dia === x.dia) ultima.titulo += ` + ${tituloModulo(x.filename)}`;
+                else filas.push({ dia: x.dia, titulo: tituloModulo(x.filename) });
+            });
+            return filas;
+        };
+        // Página de un día: lo que viene después (otro itinerario o días libres).
+        const siguienteDe = (info) => {
+            const i = armado.findIndex(x => x.filename === info.filename && x.dia === info.dia);
+            const sig = i >= 0 ? armado[i + 1] : null;
+            if (!sig) return null;
+            if (sig.dia - info.dia > 1) return { libre: true, titulo: textoLibre(info.dia + 1, sig.dia - 1) };
+            return { dia: sig.dia, titulo: tituloModulo(sig.filename) };
+        };
+
+        // Bucle único que procesa un archivo a la vez de forma garantizada
+        for (let i = 0; i < totalFiles; i++) {
+            const fileInfo = allFilesToProcess[i];
+            const { filename, type } = fileInfo;
+            if ((type === 'end' || type === 'terminos' || type === 'cierre') && !resumenAgregado) await agregarResumen();
+            const progress = 30 + (i / totalFiles * 65);
+            updateProgress(progress, `Procesando ${i + 1} de ${totalFiles}${filename ? `: ${filename}` : ''}`);
+
+            if (tipoGenerado(type)) {
+                const k = await kitMarca();
+                if (type === 'portada') {
+                    const fFin = document.querySelector('input[name="f_salida"]')?.value || (fLlegada && armado.length ? sumarDiasFechaISO(fLlegada, armado[armado.length - 1].dia - 1) : '');
+                    const primerConImagen = armado.map(x => moduloDe(x.filename)).find(m => urlImagenModulo(m));
+                    const heroAgencia = agenciaPdf?.hero_imagen ? `${ITINERARIO_API_BASE}../shared/uploads/agencias/${encodeURIComponent(agenciaPdf.hero_imagen)}` : null;
+                    const destinos = [...new Set(armado.map(x => destinoBase(moduloDe(x.filename)?.destino_id)).filter(Boolean))];
+                    // Si el nombre es el automático ("5 días / 4 noches"), la duración ya va en los
+                    // datos: de título, los destinos del viaje.
+                    const tituloAuto = /^\d+ \S+ \/ \d+ \S+$/.test(packageTitle.trim());
+                    const tituloPortada = tituloAuto && destinos.length ? destinos.join(' · ') : packageTitle;
+                    await generarPortadaPdf(k, {
+                        pasajero: passengerName, titulo: tituloPortada, fInicio: fLlegada, fFin, agenda: agendaPortada(),
+                        nDias: armado.length ? armado[armado.length - 1].dia : 0,
+                        nPax: Number(document.querySelector('input[name="n_pax"]')?.value) || 0,
+                        destinos, imagenUrl: urlImagenModulo(primerConImagen) || heroAgencia
+                    });
+                } else if (type === 'dia-gen') {
+                    await generarPaginaDiaPdf(k, {
+                        modulo: fileInfo.modulo || { titulo: filename.replace(/\.pdf$/i, '') }, dia: fileInfo.dia, siguiente: siguienteDe(fileInfo),
+                        fecha: fechaCortaDia(fLlegada, fileInfo.dia, idiomaPdf), ruta: rutaModulo(fileInfo.modulo),
+                        imagenUrl: urlImagenModulo(fileInfo.modulo),
+                        libreAntes: fileInfo.primeraDelDia ? fileInfo.libreAntes : null
+                    });
+                } else if (type === 'libre-gen') {
+                    const fechas = [fechaCortaDia(fLlegada, fileInfo.desde, idiomaPdf), fechaCortaDia(fLlegada, fileInfo.hasta, idiomaPdf)].filter(Boolean).join(' - ');
+                    await generarPaginaLibrePdf(k, { desde: fileInfo.desde, hasta: fileInfo.hasta, fechas });
+                } else if (type === 'terminos') {
+                    generarTerminosPdf(k, agenciaPdf?.[`terminos_${idiomaPdf}`] || '');
+                } else if (type === 'cierre') {
+                    generarCierrePdf(k, { pasajero: passengerName });
+                }
+                isFirstPageOfAll = false;
+                continue;
+            }
+
+            // La plantilla de días libres aporta solo su primera página.
+            const soloPrimera = type === 'libre';
+            const tempDoc = await cargarPdfSubido(filename);
             const copiedPages = await pdfDoc.copyPages(tempDoc, soloPrimera ? [0] : tempDoc.getPageIndices());
 
             for (const [indicePagina, page] of copiedPages.entries()) {
-                if (type === 'start' && isFirstPageOfAll) {
+                if (type === 'start' && isFirstPageOfAll && !fileInfo.sinSello) {
                     const { width, height } = page.getSize();
                     const centerX = width / 2;
                     const centerY = height / 2;

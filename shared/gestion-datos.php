@@ -439,6 +439,16 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
                                 <button type="button" id="paginas-subir-btn" class="btn btn-primary small" disabled><i class="fas fa-upload mr-1"></i>Subir</button>
                             </div>
                         </div>
+                        <!-- Diseño del PDF (migración 043): cada sección con los PDF subidos o con páginas
+                             que arma el sistema con la marca de la agencia. Se guarda al elegir, por
+                             idioma (ver renderModosPaginasGestion en itinerario.js). -->
+                        <div class="modos-pdf-card">
+                            <div class="modos-pdf-cab">
+                                <h3><i class="fas fa-wand-magic-sparkles"></i>Diseño del PDF del itinerario</h3>
+                                <p>Elige si cada sección usa los PDF que subiste o páginas que el sistema arma con tu logo, colores y datos de Mi Empresa. En el Cotizador se puede cambiar para un itinerario.</p>
+                            </div>
+                            <div id="modos-pdf-gestion"></div>
+                        </div>
                         <div class="pf-board">
                             <div class="pf-zona" data-zona="sin">
                                 <div class="pf-zona-head"><i class="fas fa-inbox"></i>Sin asignar <span class="conteo-badge" data-conteo="sin">0</span></div>

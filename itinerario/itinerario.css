@@ -161,3 +161,34 @@ tr.draggable:active {
 .clasif-grupo.is-activo { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
 .clasif-grupo.is-activo i { color: var(--accent-1, #e80c13); }
 .clasif-grupo:focus-visible { outline: 2px solid var(--accent-1, #e80c13); outline-offset: 1px; }
+
+/* ===== Diseño del PDF del itinerario (construirControlesModosPaginas, itinerario.js) =====
+   Una fila por sección con un control segmentado; en Gestión (Páginas fijas) y en el popup
+   "Diseño PDF" del Cotizador. */
+.modos-pdf { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.modos-pdf-fila { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 12px; }
+.modos-pdf-titulo { display: inline-flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 600; color: #334155; }
+.modos-pdf-titulo i { width: 16px; text-align: center; color: var(--accent-1, #e80c13); }
+.modos-pdf-seg { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; border-radius: 10px; background: #f1f5f9; justify-self: start; }
+.modos-pdf-seg button {
+    padding: 6px 12px; border-radius: 8px;
+    font-size: 0.76rem; font-weight: 600; color: #64748b; white-space: nowrap;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.modos-pdf-seg button:hover { color: #1e293b; }
+.modos-pdf-seg button.is-activo { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14); }
+.modos-pdf-seg button:focus-visible { outline: 2px solid var(--accent-1, #e80c13); outline-offset: 1px; }
+.modos-pdf-check { grid-template-columns: auto 1fr; justify-content: start; font-size: 0.78rem; color: #475569; cursor: pointer; padding-top: 4px; border-top: 1px dashed #e2e8f0; }
+.modos-pdf-check input { width: 16px; height: 16px; accent-color: var(--accent-1, #e80c13); }
+.modos-pdf-check b { color: #1e293b; font-weight: 600; }
+.modos-pdf-intro { font-size: 0.82rem; color: #64748b; margin-bottom: 14px; text-align: left; }
+.modos-pdf-card { margin: 0 16px 16px; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: linear-gradient(180deg, #fff, #f8fafc); }
+.modos-pdf-cab { margin-bottom: 12px; }
+.modos-pdf-cab h3 { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: #1e293b; }
+.modos-pdf-cab h3 i { color: var(--accent-1, #e80c13); }
+.modos-pdf-cab p { margin-top: 3px; font-size: 0.75rem; color: #94a3b8; max-width: 760px; }
+@media (max-width: 640px) {
+    .modos-pdf-fila { grid-template-columns: 1fr; gap: 6px; }
+    .modos-pdf-seg { justify-self: stretch; }
+    .modos-pdf-seg button { flex: 1; padding: 6px 8px; }
+}

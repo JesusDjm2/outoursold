@@ -655,3 +655,15 @@ input[readonly] {
 .leyenda-vinculos span { display: inline-flex; align-items: center; gap: 5px; }
 .leyenda-vinculos .fa-link { color: #0f766e; }
 .leyenda-vinculos .fa-hand-pointer { color: #94a3b8; }
+
+/* Botón "Diseño PDF" junto al nombre del itinerario; "Personalizado" si esta cotización usa otro. */
+.itin-pdf-diseno {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    height: 34px; padding: 0 12px;
+    border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;
+    font-size: 0.76rem; font-weight: 600; color: #334155; white-space: nowrap;
+}
+.itin-pdf-diseno i { color: var(--accent-1, #e80c13); }
+.itin-pdf-diseno:hover { border-color: #cbd5e1; background: #f8fafc; }
+.itin-pdf-diseno b { padding: 1px 7px; border-radius: 999px; background: rgba(187, 49, 53, 0.12); color: var(--accent-2, #bb3135); font-size: 0.66rem; font-weight: 700; }
+.itin-pdf-diseno b[hidden] { display: none; }

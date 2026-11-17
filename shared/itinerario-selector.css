@@ -669,3 +669,6 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 .idet-vinculo-nota { margin-top: 6px; font-size: 0.74rem; line-height: 1.4; color: #64748b; }
 .idet-vinculo-nota b { color: #334155; font-weight: 600; }
 .if-ayuda { font-size: 0.72rem; color: #94a3b8; }
+.idet-desc { font-size: 0.84rem; line-height: 1.55; color: #334155; }
+.idet-desc + .idet-desc { margin-top: 6px; }
+.idet-desc:first-of-type { font-weight: 600; color: #0f172a; }

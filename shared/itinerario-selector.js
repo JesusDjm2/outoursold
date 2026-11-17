@@ -1171,6 +1171,7 @@ function renderDetalle() {
     const tr = detalleActual.uid ? filaPorUid(detalleActual.uid) : null;
     const dia = tr ? Number(tr.dataset.dia) : null;
     const lugares = iselLista(m.lugares_visitar);
+    const descripcion = String(m.descripcion || '').split(/\r?\n/).map(p => p.trim()).filter(Boolean);
     const incluye = iselLista(m.incluye);
     const noIncluye = iselLista(m.no_incluye);
     const llegada = iselLlegada();
@@ -1221,11 +1222,12 @@ function renderDetalle() {
                 <p class="idet-vinculo-nota">Solo en esta cotización: van en el día de este itinerario, se mueven y se quitan con él. ${porDefecto.length ? `Por defecto: <b>${porDefecto.map(t => escapeHtml(t.tour)).join('</b>, <b>')}</b>.` : 'No tiene por defecto.'} Las de por defecto se cambian con «Editar».</p>
             </section>`;
             })() : ''}
+            ${descripcion.length ? `<section><h4><i class="fas fa-align-left"></i>Descripción</h4>${descripcion.map(p => `<p class="idet-desc">${escapeHtml(p)}</p>`).join('')}</section>` : ''}
             ${lugares.length ? `<section><h4><i class="fas fa-location-dot"></i>Lugares a visitar</h4>
                 ${lugares.length > 1 ? `<ul class="idet-lugares">${lugares.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : `<p>${escapeHtml(lugares[0])}</p>`}</section>` : ''}
             ${incluye.length ? `<section><h4><i class="fas fa-circle-check"></i>Incluye</h4><ul class="idet-incluye">${incluye.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></section>` : ''}
             ${noIncluye.length ? `<section><h4><i class="fas fa-circle-xmark"></i>No incluye</h4><ul class="idet-no-incluye">${noIncluye.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></section>` : ''}
-            ${!lugares.length && !incluye.length && !noIncluye.length ? '<p class="idet-sin">Todavía no tiene lugares a visitar ni lo que incluye. Puedes completarlos con «Editar».</p>' : ''}
+            ${!descripcion.length && !lugares.length && !incluye.length && !noIncluye.length ? '<p class="idet-sin">Todavía no tiene descripción, lugares a visitar ni lo que incluye. Puedes completarlos con «Editar».</p>' : ''}
             <a class="idet-pdf" href="${urlPdfModulo(m)}" target="_blank" rel="noopener"${m.archivo_existe === false ? ' aria-disabled="true"' : ''}>
                 <i class="fas fa-file-pdf"></i><span>Ver el PDF del itinerario</span><i class="fas fa-arrow-up-right-from-square"></i>
             </a>
@@ -1355,6 +1357,7 @@ function renderDetalleEdicion(caja, e) {
                     </div>
                 </div>
             </div>
+            <label class="idet-campo"><span>Descripción del día</span><textarea class="if-descripcion" rows="5" placeholder="El texto del día para el PDF generado. Un párrafo por línea; el primero se destaca.">${escapeHtml(m.descripcion || '')}</textarea></label>
             <label class="idet-campo"><span>Lugares a visitar</span><textarea class="if-lugares" rows="3" placeholder="Uno por línea">${escapeHtml(m.lugares_visitar || '')}</textarea></label>
             <div class="idet-campos-2">
                 <label class="idet-campo"><span>Incluye</span><textarea class="if-incluye" rows="4" placeholder="Uno por línea">${escapeHtml(m.incluye || '')}</textarea></label>
@@ -1430,6 +1433,7 @@ function renderDetalleEdicion(caja, e) {
                 destino_id: destinoSel.value || null,
                 categoria_id: categoriaSel.value || null,
                 lugares_visitar: $('.if-lugares').value,
+                descripcion: $('.if-descripcion').value,
                 incluye: $('.if-incluye').value,
                 no_incluye: $('.if-no-incluye').value,
                 imagen, pdf,
