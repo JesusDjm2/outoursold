@@ -626,3 +626,32 @@ input[readonly] {
 @media (prefers-reduced-motion: reduce) {
     .historial-panel, .historial-cargando span { animation: none; }
 }
+
+/* Fila de Actividades vinculada a un itinerario (itinerario-vinculos.js): el ícono, junto al
+   de arrastre, la desvincula. */
+#tours-body tr.is-vinculada > td:first-child { white-space: nowrap; }
+.vinc-marca {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 26px; margin-left: 2px;
+    border-radius: 6px;
+    color: #0f766e; font-size: 0.7rem;
+    vertical-align: middle;
+}
+.vinc-marca:hover, .vinc-marca:focus-visible { background: #fef2f2; color: #dc2626; }
+.vinc-marca:hover i::before { content: "\f127"; } /* fa-link-slash: al pasar, muestra que desvincula */
+/* Su fecha la pone el itinerario: bloqueada. */
+#tours-body tr.is-vinculada td:nth-child(2) input[readonly] {
+    background: #f1f5f9; color: #475569; cursor: not-allowed;
+}
+#tours-body tr.is-vinculada td:nth-child(2) input[readonly]::-webkit-calendar-picker-indicator { display: none; }
+/* Vinculada: franja verde a la izquierda. Suelta: ícono de mano gris, sin acción. */
+#tours-body tr.is-vinculada > td:first-child { box-shadow: inset 3px 0 0 #14b8a6; }
+#tours-body tr.is-suelta > td:first-child { white-space: nowrap; }
+.vinc-marca.is-suelta { color: #94a3b8; cursor: default; }
+.vinc-marca.is-suelta:hover { background: none; color: #94a3b8; }
+.vinc-marca.is-suelta:hover i::before { content: "\f25a"; } /* sigue siendo la mano */
+.leyenda-vinculos { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.72rem; color: #64748b; }
+.leyenda-vinculos[hidden] { display: none; }
+.leyenda-vinculos span { display: inline-flex; align-items: center; gap: 5px; }
+.leyenda-vinculos .fa-link { color: #0f766e; }
+.leyenda-vinculos .fa-hand-pointer { color: #94a3b8; }

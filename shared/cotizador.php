@@ -261,7 +261,12 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             </table>
                         </div>
                         <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
-                            <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)">+ Fila</button>
+                            <button id="add-tour" class="px-3 py-1 rounded-md small text-white" style="background:var(--accent-1)" title="Agrega una actividad suelta: fecha manual, sin itinerario">+ Fila</button>
+                            <!-- Diferenciador vinculada / suelta (ver pintarMarcasVinculo, itinerario-vinculos.js). -->
+                            <span id="leyenda-vinculos" class="leyenda-vinculos" hidden>
+                                <span><i class="fas fa-link"></i>Del itinerario: fecha automática</span>
+                                <span><i class="fas fa-hand-pointer"></i>Agregada en Actividades: fecha manual</span>
+                            </span>
                             <button id="toggle-conf-tours" type="button" class="solo-cotizacion px-3 py-1 rounded-md small border" title="Ver y editar los precios confidenciales de esta cotización (no se guardan en el catálogo)">
                                 <i class="fas fa-eye mr-1"></i>Precios confid.
                             </button>
@@ -427,7 +432,8 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     </div>
     <script>
         window.APP_CONFIG = {
-            currencySymbol: <?= json_encode($currencySymbol) ?>
+            currencySymbol: <?= json_encode($currencySymbol) ?>,
+            monedaCodigo: <?= json_encode($navActive === 'pen' ? 'pen' : 'usd') ?>
         };
     </script>
     <link rel="stylesheet" href="../shared/notify.css?v=<?= filemtime(__DIR__ . '/notify.css') ?>">
@@ -441,6 +447,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script src="../itinerario/itinerario.js?v=<?= filemtime(__DIR__ . '/../itinerario/itinerario.js') ?>"></script>
     <script src="../shared/catalogo-shared.js?v=<?= filemtime(__DIR__ . '/catalogo-shared.js') ?>"></script>
     <script src="../shared/itinerario-selector.js?v=<?= filemtime(__DIR__ . '/itinerario-selector.js') ?>"></script>
+    <script src="../shared/itinerario-vinculos.js?v=<?= filemtime(__DIR__ . '/itinerario-vinculos.js') ?>"></script>
     <script src="../shared/cotizador.js?v=<?= filemtime(__DIR__ . '/cotizador.js') ?>"></script>
 </body>
 </html>

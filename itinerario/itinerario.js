@@ -545,10 +545,16 @@ function indicadoresDetalleItinerario(it) {
         ['incluye', 'fa-circle-check', 'Incluye'],
         ['no_incluye', 'fa-circle-xmark', 'No incluye']
     ];
-    return campos.map(([clave, icono, label]) => {
+    const chips = campos.map(([clave, icono, label]) => {
         const lleno = !!(it[clave] && it[clave].trim());
         return `<span class="itin-detalle-chip${lleno ? '' : ' is-vacio'}" title="${label}: ${lleno ? 'cargado' : 'vacío'}"><i class="fas ${icono}"></i>${label}</span>`;
     }).join('');
+    // Actividades vinculadas (solo en las páginas con moneda: Gestión de Datos USD/PEN).
+    if (typeof monedaActividades !== 'function' || !monedaActividades()) return chips;
+    const tours = toursVinculadosDeModulo(it);
+    return chips + (tours.length
+        ? tours.map(t => `<span class="itin-detalle-chip" title="Actividad vinculada: ${escapeHtml(t.tour)}"><i class="fas fa-link"></i>${escapeHtml(t.tour)}</span>`).join('')
+        : '<span class="itin-detalle-chip is-vacio" title="Sin actividades vinculadas"><i class="fas fa-link-slash"></i>Sin actividades</span>');
 }
 
 // Guarda cambios de un itinerario del catálogo (lo usan el editor de Gestión de Datos y el
@@ -567,6 +573,9 @@ async function guardarItinerarioCatalogo(it, cambios) {
     };
     if ('destino_id' in cambios) payload.destino_id = cambios.destino_id;
     if ('categoria_id' in cambios) payload.categoria_id = cambios.categoria_id;
+    // Actividades vinculadas por defecto (lista de ids), en la moneda de la página.
+    const moneda = typeof monedaActividades === 'function' ? monedaActividades() : null;
+    if (Array.isArray(cambios.tours) && moneda) payload[`tours_${moneda}`] = cambios.tours;
     if (cambios.imagen instanceof File) {
         const formData = new FormData();
         formData.append('imagen', cambios.imagen);
@@ -594,6 +603,9 @@ async function guardarItinerarioCatalogo(it, cambios) {
         body: JSON.stringify(payload)
     }).then(r => r.json());
     if (!data.success) throw new Error(data.error || 'Error desconocido');
+    if (data.desvinculados?.length) {
+        aviso += ` Algunas actividades estaban vinculadas a «${data.desvinculados.join('», «')}»: ahora van solo con este itinerario.`;
+    }
     await cargarIdioma(idiomaActivo);
     return { filename, aviso };
 }
@@ -639,6 +651,11 @@ function abrirEditorItinerario(it) {
                     <div class="cat-field cat-span-6">
                         <label for="ie-categoria">Categoría</label>
                         <select id="ie-categoria" disabled></select>
+                    </div>
+                    <div class="cat-field ie-actividad-campo hidden">
+                        <label>Actividades vinculadas <span class="ie-actividad-moneda text-slate-400 font-normal"></span></label>
+                        <div class="ie-actividad"></div>
+                        <small class="text-slate-400">Al agregar este itinerario a una cotización, se agregan estas actividades en el mismo día. Cada actividad va con un solo itinerario.</small>
                     </div>
                     <div class="cat-field">
                         <label>Imagen</label>
@@ -700,6 +717,16 @@ function abrirEditorItinerario(it) {
         grupoPreferido: modulosGrupo !== MODULOS_SIN_GRUPO ? modulosGrupo : null
     });
 
+    // Actividades vinculadas por defecto: solo donde hay moneda y catálogo de actividades
+    // (Gestión de Datos USD/PEN). undefined = sin cambios.
+    let toursElegidos;
+    const monedaTour = typeof monedaActividades === 'function' ? monedaActividades() : null;
+    if (monedaTour && typeof construirCampoActividades === 'function') {
+        $('.ie-actividad-campo').classList.remove('hidden');
+        $('.ie-actividad-moneda').textContent = `· ${monedaTour.toUpperCase()}`;
+        $('.ie-actividad').appendChild(construirCampoActividades(toursVinculadosDeModulo(it), (lista) => { toursElegidos = lista; }));
+    }
+
     // Imagen: 'actual' (sin cambios), un File nuevo, o null (quitada).
     let imagenElegida = 'actual';
     const preview = $('.ie-imagen-preview');
@@ -744,7 +771,8 @@ function abrirEditorItinerario(it) {
                 incluye: $('#ie-incluye').value,
                 no_incluye: $('#ie-no-incluye').value,
                 imagen: imagenElegida,
-                pdf: pdfNuevo
+                pdf: pdfNuevo,
+                ...(toursElegidos !== undefined ? { tours: toursElegidos.map(t => t.id) } : {})
             });
             cerrar();
             notifySuccess('Itinerario actualizado.' + aviso);

@@ -271,7 +271,29 @@ function filasToursDePaquete(tours, fLlegada) {
 // Hoteles (lo que hubiera, de otro paquete o agregado a mano) y los arma desde el día 1
 // (Fecha de Llegada de Datos Pax). Después se pueden seguir agregando filas a mano con
 // "+ Fila"; elegir otro paquete vuelve a reemplazar todo.
+// Los paquetes traen sus actividades: los itinerarios no agregan las suyas, se vinculan las
+// del paquete (itinerario-vinculos.js).
 async function aplicarPaquete(paquete) {
+    const foto = fotoFilasVinculo();
+    await conVinculosPausados(() => aplicarPaqueteContenido(paquete));
+    restaurarVinculosDePaquete(paquete, filasNuevasDesde(foto));
+    refrescarArmadoItinerario();
+}
+// Con vínculos guardados se respetan tal cual (las sueltas siguen sueltas); los paquetes de
+// antes se vinculan por coincidencia de día.
+function restaurarVinculosDePaquete(paquete, nuevas) {
+    if (paquete.itinerario?.vinculos) {
+        restaurarVinculosGuardados({
+            filasTour: nuevas.tours,
+            toursGuardados: paquete.tours || [],
+            filasItin: nuevas.itins,
+            modulos: paquete.itinerario.modulos
+        });
+    } else {
+        vincularPorCoincidencia(nuevas.itins);
+    }
+}
+async function aplicarPaqueteContenido(paquete) {
     const hayAlgoArmado =
         Array.from(document.querySelectorAll('#tours-body .tour-name')).some(el => el.value) ||
         Array.from(document.querySelectorAll('#hotels-body .hotel-name')).some(el => el.value) ||
@@ -540,7 +562,25 @@ function vaciarContenidoParaReemplazar() {
     renderPaqueteAplicado();
 }
 
+// Lo reusado trae sus vínculos (o, si es de antes, se vinculan por coincidencia); las
+// actividades vinculadas pasan al día que tome su itinerario en esta cotización.
 async function reusarHistorialCotizacion(c) {
+    const foto = fotoFilasVinculo();
+    await conVinculosPausados(() => reusarHistorialCotizacionContenido(c));
+    const nuevas = filasNuevasDesde(foto);
+    if (c.data.itinerarioArmado?.vinculos) {
+        restaurarVinculosGuardados({
+            filasTour: nuevas.tours,
+            toursGuardados: (c.data.tours || []).filter(t => t.tour),
+            filasItin: nuevas.itins,
+            modulos: c.data.itinerarioArmado.modulos
+        });
+    } else {
+        vincularPorCoincidencia(nuevas.itins);
+    }
+    refrescarArmadoItinerario();
+}
+async function reusarHistorialCotizacionContenido(c) {
     const modo = await preguntarModoReuso(c);
     if (!modo) return; // canceló: no se toca nada
     if (modo === 'reemplazar') vaciarContenidoParaReemplazar();
@@ -671,6 +711,12 @@ function resincronizarFechasConLlegada() {
     let anterior = null;
     filas.forEach(tr => {
         const input = tr.querySelector('td:nth-child(2) input');
+        // Vinculada a un itinerario: su fecha la pone el día del itinerario
+        // (sincronizarVinculosActividades, itinerario-vinculos.js).
+        if (itinerarioDeActividad(tr)) {
+            if (input.value) anterior = input.value;
+            return;
+        }
         let nueva;
         if (input.value && base) nueva = sumarDiasISO(fLlegada, diasEntreISO(base, input.value));
         else if (Number(tr.dataset.dia) >= 1) nueva = sumarDiasISO(fLlegada, Number(tr.dataset.dia) - 1);
@@ -732,6 +778,8 @@ function createTourRow(data = {}) {
         tr.remove();
         if (body && !body.querySelector('tr')) body.appendChild(createTourRow({ fecha: sugerirSiguienteFechaTour() }));
         calcularResumen();
+        // Era la actividad vinculada de un itinerario: su tarjeta deja de mostrar el vínculo.
+        if (tr.dataset.vinculo) refrescarArmadoItinerario();
     };
     tr.querySelector('input.cant').addEventListener('input', () => {
         tr.dataset.autoCant = 'false';
@@ -758,6 +806,8 @@ function createTourRow(data = {}) {
             tr.querySelector('.total-line').textContent = fmt(cant * tour.ppromo);
             calcularResumen();
         }
+        // Marca de vinculada / suelta (itinerario-vinculos.js); la fila puede no estar aún en la tabla.
+        if (tr.isConnected) pintarMarcasVinculo();
     });
 
     const selector = buildTourSelector(data.tour || '', (tourName) => {
@@ -989,10 +1039,13 @@ async function guardarComoPaquete() {
     // aplicar el paquete se respeta (ver diasDeActividades / filasToursDePaquete).
     const filasTours = Array.from(document.getElementById('tours-body').querySelectorAll('tr'))
         .map(tr => ({ tour: tr.querySelector('.tour-name').value, cant: tr.querySelector('.cant').value,
-                      fecha: tr.querySelector('td:nth-child(2) input').value, dia: tr.dataset.dia }))
+                      fecha: tr.querySelector('td:nth-child(2) input').value, dia: tr.dataset.dia,
+                      vinculo: indiceVinculoDeActividad(tr) }))
         .filter(t => t.tour);
     const diasTours = diasDeActividades(filasTours);
-    const tours = filasTours.map((t, i) => ({ tour: t.tour, cant: t.cant, ...(diasTours ? { dia: diasTours[i] } : {}) }));
+    // `vinculo`: itinerario al que va vinculada (índice en itinerario.modulos); sin él, suelta.
+    const tours = filasTours.map((t, i) => ({ tour: t.tour, cant: t.cant, ...(diasTours ? { dia: diasTours[i] } : {}),
+                                              ...(t.vinculo !== null ? { vinculo: t.vinculo } : {}) }));
     const hoteles = Array.from(document.getElementById('hotels-body').querySelectorAll('tr'))
         .map(tr => ({ aloj: tr.querySelector('.hotel-name').value, nhab: tr.querySelector('.nhab').value, noches: tr.querySelector('.noches').value }))
         .filter(h => h.aloj);
@@ -1010,7 +1063,7 @@ async function guardarComoPaquete() {
     try {
         const payload = {
             nombre, tours, hoteles,
-            itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos, dias } : null
+            itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos, dias, vinculos: 1 } : null
         };
         if (paqueteEditandoId) payload.id = paqueteEditandoId;
         const res = await fetch(`${API_URL}?path=guardar-paquete-tour`, {
@@ -1067,10 +1120,17 @@ async function cargarPaqueteParaEditar(id) {
     const idioma = paquete.itinerario?.idioma || 'en';
     document.querySelector('select[name="idioma"]').value = idioma;
     sincronizarTabsIdioma();
-    await activarIdioma(idioma);
-    if (paquete.itinerario?.modulos?.length) {
-        aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos, dias: paquete.itinerario.dias });
-    }
+    // Las actividades ya vienen del paquete: se vinculan como se guardaron.
+    const foto = fotoFilasVinculo();
+    await conVinculosPausados(async () => {
+        await activarIdioma(idioma);
+        if (paquete.itinerario?.modulos?.length) {
+            aplicarPaqueteItinerario({ modulos: paquete.itinerario.modulos, dias: paquete.itinerario.dias });
+        }
+    });
+    // Actividades: todas las de la tabla (se vació arriba y se llenó con las del paquete).
+    restaurarVinculosDePaquete(paquete, { tours: filasActividades(), itins: filasNuevasDesde(foto).itins });
+    refrescarArmadoItinerario();
 
     calcularResumen();
     activarModoEdicionPaquete(paquete);
@@ -1194,7 +1254,10 @@ async function guardarCotizacion() {
         preg: tr.querySelector('.preg').value,
         ppromo: tr.querySelector('.ppromo').value,
         pconf: tr.querySelector('.pconf').value,
-        pctotal: tr.querySelector('.pctotal').value
+        pctotal: tr.querySelector('.pctotal').value,
+        // Itinerario al que está vinculada (índice en itinerarioArmado.modulos), solo de
+        // esta cotización (ver itinerario-vinculos.js).
+        vinculo: indiceVinculoDeActividad(tr)
     }));
     const hotels = Array.from(document.getElementById('hotels-body').querySelectorAll('tr')).map(tr => ({
         cin: tr.querySelector('td:nth-child(2) input').value,
@@ -1227,7 +1290,10 @@ async function guardarCotizacion() {
                 pasajero: document.getElementById('itinerary-passenger').value,
                 titulo: document.getElementById('itinerary-title').value,
                 modulos: armado.map(x => x.filename),
-                dias: armado.map(x => x.dia)
+                dias: armado.map(x => x.dia),
+                // Los vínculos con Actividades van en tours[i].vinculo; esto dice que se
+                // guardaron (las de antes se vinculan por coincidencia al abrirlas).
+                vinculos: 1
             };
         })(),
         // Paquete predefinido con el que se armó (si se aplicó uno): se guarda dentro del
@@ -1290,7 +1356,26 @@ async function guardarCotizacion() {
     }
 }
 
+// Abre una guardada con sus vínculos itinerario ↔ actividad tal como quedaron (ver
+// itinerario-vinculos.js); las de antes de los vínculos, por coincidencia de día.
 async function cargarCotizacion(id) {
+    const foto = fotoFilasVinculo();
+    const data = await conVinculosPausados(() => cargarCotizacionContenido(id));
+    if (!data) return;
+    const nuevas = filasNuevasDesde(foto);
+    if (data.itinerarioArmado?.vinculos) {
+        restaurarVinculosGuardados({
+            filasTour: nuevas.tours,
+            toursGuardados: data.tours || [],
+            filasItin: nuevas.itins,
+            modulos: data.itinerarioArmado.modulos
+        });
+    } else {
+        vincularPorCoincidencia(nuevas.itins);
+    }
+    refrescarArmadoItinerario();
+}
+async function cargarCotizacionContenido(id) {
     try {
         const response = await fetch(`${API_URL}?path=cotizacion&id=${id}`);
         const data = await response.json();
@@ -1342,8 +1427,10 @@ async function cargarCotizacion(id) {
         currentCotizacionId = id;
         document.getElementById('current-cot-id-display').textContent = id;
         mostrarEstadoCotizacion(data.estado === 'borrador' ? 'borrador' : 'terminada');
+        return data;
     } catch (error) {
         notifyError("Error al cargar cotización: " + error.message);
+        return null;
     }
 }
 

@@ -29,3 +29,54 @@ function buildTourSelector(initialTourName, onResolved) {
 function buildHotelSelector(initialHotelName, onResolved) {
     return buildClasificacionSelector(hotelesHelpers, 'Alojamiento...', initialHotelName, onResolved);
 }
+
+// ===== Actividades vinculadas a un itinerario (migración 042) =====
+// Cada itinerario tiene, por moneda, una lista de actividades por defecto (tours_usd /
+// tours_pen, en orden). La moneda sale de la página (Cotizador o Gestión de Datos de
+// USD/PEN); la página standalone de Itinerario no tiene moneda, así que ahí no se muestra.
+function monedaActividades() {
+    const m = window.APP_CONFIG?.monedaCodigo;
+    return m === 'usd' || m === 'pen' ? m : null;
+}
+function toursVinculadosDeModulo(modulo) {
+    const moneda = monedaActividades();
+    const ids = moneda && modulo ? (modulo[`tours_${moneda}`] || []) : [];
+    if (!ids.length || typeof toursData === 'undefined') return [];
+    return ids.map(id => toursData.find(t => Number(t.id) === Number(id))).filter(Boolean);
+}
+// Lista de actividades (chips con su X) y un selector para sumar otra. onChange(tours[]).
+// opciones.onQuitar(tour) / onAgregar(tour): si vienen, se usan en lugar de onChange.
+function construirCampoActividades(toursIniciales, onChange, { textoAgregar = 'Agregar actividad...', tituloQuitar = 'Quitar' } = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = 'campo-actividades';
+    let lista = [...toursIniciales];
+    const pintar = () => {
+        wrap.innerHTML = '';
+        if (lista.length) {
+            const chips = document.createElement('div');
+            chips.className = 'campo-actividades-lista';
+            lista.forEach((tour, i) => {
+                const chip = document.createElement('span');
+                chip.className = 'campo-actividades-chip';
+                chip.innerHTML = `<i class="fas fa-link"></i><span></span><button type="button" title="${escapeHtml(tituloQuitar)}" aria-label="${escapeHtml(tituloQuitar)}"><i class="fas fa-xmark"></i></button>`;
+                chip.querySelector('span').textContent = tour.tour;
+                chip.querySelector('button').addEventListener('click', () => {
+                    lista.splice(i, 1);
+                    pintar();
+                    onChange([...lista], { quitado: tour });
+                });
+                chips.appendChild(chip);
+            });
+            wrap.appendChild(chips);
+        }
+        wrap.appendChild(buildClasificacionSelector(toursHelpers, textoAgregar, '', (nombre, item) => {
+            const elegido = item || toursData.find(t => t.tour === nombre);
+            if (!elegido || lista.some(t => t.tour === elegido.tour)) { pintar(); return; }
+            lista.push(elegido);
+            pintar();
+            onChange([...lista], { agregado: elegido });
+        }));
+    };
+    pintar();
+    return wrap;
+}

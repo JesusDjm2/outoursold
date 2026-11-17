@@ -174,6 +174,8 @@ function refrescarArmadoItinerario() {
     if (armadoUI.saltos && !filaPorUid(armadoUI.saltosTras)) armadoUI.saltos = 0;
     itemsArmado().forEach(x => { x.tr.dataset.dia = String(x.dia); body.appendChild(x.tr); });
     if (armadoUI.destino !== null && armadoUI.destino > maxDiaArmado()) armadoUI.destino = null;
+    // Actividades vinculadas: agregar, reemplazar y mover de día (itinerario-vinculos.js).
+    if (typeof sincronizarVinculosActividades === 'function') sincronizarVinculosActividades();
     renderGrilla();
     if (armadoUI.panelAbierto) renderPanelCabecera(), pintarEstadoTarjetasPanel();
 }
@@ -243,12 +245,14 @@ function tarjetaElegidaHtml(x) {
     const titulo = e ? e.m.titulo : x.filename;
     const fecha = iselFechaCorta(x.dia);
     const reemplazando = armadoUI.reemplazar === x.uid;
+    const actividades = typeof filasActividadDe === 'function' ? filasActividadDe(x.uid).map(nombreActividadDeFila).filter(Boolean) : [];
     return `<div class="itin-card${e ? '' : ' is-fuera'}${reemplazando ? ' is-reemplazando' : ''}" data-uid="${x.uid}">
         <button type="button" class="itin-card-main" data-accion="detalle" aria-label="Día ${n}${fecha ? ` (${escapeHtml(fecha)})` : ''}: ${escapeHtml(titulo)}. Ver detalles. Mantén presionado para moverlo">
             ${e ? iselMediaHtml(e) : '<span class="isel-img-vacia is-fuera"><i class="fas fa-triangle-exclamation"></i></span>'}
             <span class="itin-card-fecha">
                 <b class="itin-card-badge-dia">Día ${n}</b>
                 ${fecha ? `<span class="itin-card-badge-fecha">${escapeHtml(fecha)}</span>` : ''}
+                ${actividades.length ? `<span class="itin-card-badge-actividad" title="Actividades vinculadas: ${escapeHtml(actividades.join(', '))}"><i class="fas fa-link"></i>${actividades.length > 1 ? actividades.length : ''}</span>` : ''}
             </span>
             <span class="itin-card-titulo">${escapeHtml(titulo)}</span>
         </button>
@@ -592,6 +596,7 @@ function moverLibrePendiente(destinoUid, antes) {
 function iselQuitarFilaCerrandoDia(tr) {
     const dia = Number(tr.dataset.dia);
     const inicio = itemsArmado()[0]?.dia ?? dia;
+    if (typeof quitarActividadVinculada === 'function') quitarActividadVinculada(tr);
     tr.remove();
     const quedan = filasArmado().map(f => Number(f.dataset.dia));
     if (quedan.includes(dia)) return false;
@@ -1034,6 +1039,7 @@ function quitarDesdePanel(tr) {
     if (armadoUI.destino === null || dia === itemsArmado()[0].dia) {
         if (iselQuitarFilaCerrandoDia(tr)) armadoUI.destino = null;
     } else {
+        if (typeof quitarActividadVinculada === 'function') quitarActividadVinculada(tr);
         tr.remove();
     }
     refrescarArmadoItinerario();
@@ -1207,6 +1213,14 @@ function renderDetalle() {
                     <span class="idet-seg" role="group" aria-label="Día libre">${libresHtml}</span>
                 </div>` : ''}
             </div>` : ''}
+            ${tr && typeof vinculosActivos === 'function' && vinculosActivos() ? (() => {
+                const porDefecto = toursVinculadosDeModulo(m);
+                return `<section class="idet-vinculo">
+                <h4><i class="fas fa-link"></i>Actividades vinculadas</h4>
+                <div class="idet-vinculo-campo"></div>
+                <p class="idet-vinculo-nota">Solo en esta cotización: van en el día de este itinerario, se mueven y se quitan con él. ${porDefecto.length ? `Por defecto: <b>${porDefecto.map(t => escapeHtml(t.tour)).join('</b>, <b>')}</b>.` : 'No tiene por defecto.'} Las de por defecto se cambian con «Editar».</p>
+            </section>`;
+            })() : ''}
             ${lugares.length ? `<section><h4><i class="fas fa-location-dot"></i>Lugares a visitar</h4>
                 ${lugares.length > 1 ? `<ul class="idet-lugares">${lugares.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul>` : `<p>${escapeHtml(lugares[0])}</p>`}</section>` : ''}
             ${incluye.length ? `<section><h4><i class="fas fa-circle-check"></i>Incluye</h4><ul class="idet-incluye">${incluye.map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ul></section>` : ''}
@@ -1229,6 +1243,23 @@ function renderDetalle() {
 function enlazarDetalle(caja, e) {
     caja.querySelector('.idet-cerrar')?.addEventListener('click', cerrarDetalleItinerario);
     const tr = detalleActual.uid ? filaPorUid(detalleActual.uid) : null;
+    // Actividades vinculadas en esta cotización (itinerario-vinculos.js): sumar o quitar.
+    const campoVinculo = caja.querySelector('.idet-vinculo-campo');
+    if (campoVinculo && tr) {
+        const actuales = filasActividadDe(tr.dataset.uid).map(nombreActividadDeFila).filter(Boolean)
+            .map(nombre => toursData.find(t => t.tour === nombre) || { tour: nombre });
+        campoVinculo.appendChild(construirCampoActividades(actuales, (lista, { agregado, quitado }) => {
+            if (agregado) {
+                agregarActividadVinculada(tr, agregado);
+                iselToast(`Día ${tr.dataset.dia}: se agregó ${agregado.tour}`);
+            } else if (quitado) {
+                const fila = filasActividadDe(tr.dataset.uid).find(r => nombreActividadDeFila(r) === quitado.tour);
+                if (fila) soltarActividadVinculada(fila, true);
+                iselToast(`Día ${tr.dataset.dia}: se quitó ${quitado.tour}`);
+            }
+            renderDetalle();
+        }, { tituloQuitar: 'Quitar de la cotización' }));
+    }
     // reenfocar: volver al campo tras aplicar (no cuando se aplicó porque el usuario salió de él).
     const cambiarDia = (dia, reenfocar = true) => {
         if (!tr || !Number.isFinite(dia) || !detalleActual) return;
@@ -1308,6 +1339,11 @@ function renderDetalleEdicion(caja, e) {
                     <label class="idet-campo"><span>Categoría</span><select class="if-categoria" disabled></select></label>
                 </div>
             </fieldset>
+            ${typeof vinculosActivos === 'function' && vinculosActivos() ? `<div class="idet-campo">
+                <span>Actividades vinculadas por defecto · ${monedaActividades().toUpperCase()}</span>
+                <div class="if-actividad"></div>
+                <small class="if-ayuda">Se agregan en el mismo día al sumar este itinerario a una cotización. Cada actividad va con un solo itinerario.</small>
+            </div>` : ''}
             <div class="idet-campo">
                 <span>Imagen</span>
                 <div class="if-imagen">
@@ -1345,6 +1381,10 @@ function renderDetalleEdicion(caja, e) {
         contGrupos: $('.if-grupos'), destinoSel, categoriaSel,
         destinoId: m.destino_id, categoriaId: m.categoria_id, grupoPreferido: armadoUI.grupo
     });
+    // Actividad por defecto (catálogo). undefined = sin cambios.
+    const toursAntes = typeof toursVinculadosDeModulo === 'function' ? toursVinculadosDeModulo(m) : [];
+    let toursElegidos;
+    $('.if-actividad')?.appendChild(construirCampoActividades(toursAntes, (lista) => { toursElegidos = lista; }));
     let imagen = 'actual';
     let pdf = null;
     const pintarImagen = () => {
@@ -1392,11 +1432,21 @@ function renderDetalleEdicion(caja, e) {
                 lugares_visitar: $('.if-lugares').value,
                 incluye: $('.if-incluye').value,
                 no_incluye: $('.if-no-incluye').value,
-                imagen, pdf
+                imagen, pdf,
+                ...(toursElegidos !== undefined ? { tours: toursElegidos.map(t => t.id) } : {})
             });
-            // Si el PDF era compartido y quedó con otro nombre, esta cotización pasa a usar el nuevo.
+            // Si el PDF era compartido y quedó con otro nombre, esta cotización pasa a usar el
+            // nuevo (es el mismo itinerario: su actividad vinculada no cambia por eso).
             if (filename !== anterior) {
-                filasArmado().forEach(tr => { if (filenameDeFila(tr) === anterior) tr.querySelector('.module-filename').value = filename; });
+                filasArmado().forEach(tr => {
+                    if (filenameDeFila(tr) !== anterior) return;
+                    tr.querySelector('.module-filename').value = filename;
+                    if (tr.dataset.vincFile === anterior) tr.dataset.vincFile = filename;
+                });
+            }
+            // Nueva actividad por defecto: también en esta cotización (salvo las cambiadas a mano).
+            if (toursElegidos !== undefined) {
+                aplicarVinculosPorDefectoNuevos(filename, toursAntes, toursElegidos);
             }
             if (!detalleActual) return;
             detalleActual.filename = filename;

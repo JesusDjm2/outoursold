@@ -752,6 +752,9 @@ try {
                 $fila = ['tour' => trim($t['tour'] ?? ''), 'cant' => floatval($t['cant'] ?? 1)];
                 $dia = intval($t['dia'] ?? 0);
                 if ($dia >= 1 && $dia <= 366) $fila['dia'] = $dia;
+                // `vinculo` (opcional): índice en itinerario.modulos del itinerario al que va
+                // vinculada; sin él es una actividad suelta (ver itinerario-vinculos.js).
+                if (isset($t['vinculo']) && is_numeric($t['vinculo']) && intval($t['vinculo']) >= 0) $fila['vinculo'] = intval($t['vinculo']);
                 return $fila;
             }, $tours), fn($t) => $t['tour'] !== ''));
             if ($tours && count(array_filter($tours, fn($t) => isset($t['dia']))) !== count($tours)) {
@@ -790,7 +793,8 @@ try {
             $toursJson = json_encode($tours, JSON_UNESCAPED_UNICODE);
             $hotelesJson = $hoteles ? json_encode($hoteles, JSON_UNESCAPED_UNICODE) : null;
             $itinerarioJson = $modulos
-                ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos] + ($diasValidos ? ['dias' => $dias] : []), JSON_UNESCAPED_UNICODE)
+                ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos] + ($diasValidos ? ['dias' => $dias] : [])
+                    + (!empty($itinerario['vinculos']) ? ['vinculos' => 1] : []), JSON_UNESCAPED_UNICODE)
                 : null;
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaPaquetesTours, $data['id'])) break;

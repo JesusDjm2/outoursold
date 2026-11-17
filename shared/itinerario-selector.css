@@ -162,7 +162,7 @@
     border: 1px solid #fcd34d;
     background: #fff;
     color: #b45309;
-    font-size: 0.6rem;
+    font-size: 0.6rem; font-weight: 700;
     transition: background 0.15s;
 }
 .itin-libre-card-ctrl button:hover, .itin-libre-card-quitar:hover { background: #fef3c7; }
@@ -655,3 +655,17 @@ html.idet-abierto, html.idet-abierto body { overflow: hidden; }
 /* Clasificación del popup de edición: Con / Sin hotel primero, luego destino y categoría. */
 .if-clasif { margin: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .if-clasif legend { padding: 0 6px; margin-left: -6px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; }
+
+/* ===== Actividad vinculada al itinerario (itinerario-vinculos.js) ===== */
+.itin-card-badge-actividad {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 18px; padding: 0 4px; gap: 3px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.94); color: #0f766e;
+    font-size: 0.6rem; font-weight: 700;
+}
+.idet-vinculo { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.idet-body section.idet-vinculo h4 i { color: #0f766e; }
+.idet-vinculo-nota { margin-top: 6px; font-size: 0.74rem; line-height: 1.4; color: #64748b; }
+.idet-vinculo-nota b { color: #334155; font-weight: 600; }
+.if-ayuda { font-size: 0.72rem; color: #94a3b8; }

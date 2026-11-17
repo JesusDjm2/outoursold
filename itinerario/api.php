@@ -39,6 +39,7 @@ $tablaConfig = "itinerario_config_$idioma";
 $tablaPaquetes = "paquetes_itinerarios_$idioma";
 $tablaPaginasFijas = "paginas_fijas_$idioma";
 $tablaGenerados = "itinerario_generados_$idioma";
+$tablaVinculos = "itinerario_tours_$idioma";
 
 $path = $_GET['path'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
@@ -172,7 +173,21 @@ try {
             );
             $stmt->execute($pd);
             $modulos = $stmt->fetchAll();
+            // Actividades vinculadas por defecto (migración 042), en orden, por moneda.
+            $toursPorModulo = [];
+            if ($modulos) {
+                $ids = array_column($modulos, 'id');
+                $marcas = implode(',', array_fill(0, count($ids), '?'));
+                $stmtTours = $db->prepare("SELECT itinerario_id, tour_usd_id, tour_pen_id FROM $tablaVinculos WHERE itinerario_id IN ($marcas) ORDER BY orden, id");
+                $stmtTours->execute($ids);
+                foreach ($stmtTours->fetchAll() as $v) {
+                    if ($v['tour_usd_id']) $toursPorModulo[$v['itinerario_id']]['usd'][] = (int) $v['tour_usd_id'];
+                    if ($v['tour_pen_id']) $toursPorModulo[$v['itinerario_id']]['pen'][] = (int) $v['tour_pen_id'];
+                }
+            }
             foreach ($modulos as &$m) {
+                $m['tours_usd'] = $toursPorModulo[$m['id']]['usd'] ?? [];
+                $m['tours_pen'] = $toursPorModulo[$m['id']]['pen'] ?? [];
                 $rutaPdf = __DIR__ . "/uploads/$idioma/" . $m['filename'];
                 $m['archivo_existe'] = is_file($rutaPdf);
                 // Para que "Ver PDF" no muestre la versión vieja del caché tras reemplazarlo.
@@ -508,28 +523,62 @@ try {
                 $campos[] = 'imagen = ?';
                 $valores[] = $imagenNueva;
             }
-            if (empty($campos)) {
+            // Actividades vinculadas por defecto (migración 042): tours_usd / tours_pen, la
+            // lista completa de ids en orden (vacía = ninguna). Un itinerario puede tener
+            // varias; cada actividad va con un solo itinerario de este idioma: si ya estaba
+            // en otro, pasa a este y se avisa de cuál salió.
+            $toursNuevos = [];
+            $tourAjeno = false;
+            foreach (['usd', 'pen'] as $monedaTour) {
+                $clave = "tours_$monedaTour";
+                if (!array_key_exists($clave, $data)) continue;
+                $lista = array_values(array_unique(array_filter(array_map('intval', is_array($data[$clave]) ? $data[$clave] : []))));
+                foreach ($lista as $tourId) {
+                    if (!esDelAmbito($db, "tours_$monedaTour", $tourId)) { $tourAjeno = true; break 2; }
+                }
+                $toursNuevos[$monedaTour] = $lista;
+            }
+            if ($tourAjeno) {
+                http_response_code(400);
+                echo json_encode(['error' => 'La actividad elegida no es de tu agencia.']);
+                break;
+            }
+            if (empty($campos) && empty($toursNuevos)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Nada que actualizar.']);
                 break;
             }
-            $valores[] = $id;
-            $stmt = $db->prepare("UPDATE $tablaModulos SET " . implode(', ', $campos) . " WHERE id = ?");
-            $stmt->execute($valores);
-            if ($stmt->rowCount() === 0) {
-                // Puede ser "sin cambios" o "no existe"; confirmamos con un SELECT.
-                $check = $db->prepare("SELECT id FROM $tablaModulos WHERE id = ?");
-                $check->execute([$id]);
-                if (!$check->fetch()) {
-                    http_response_code(404);
-                    echo json_encode(['error' => 'Módulo no encontrado.']);
-                    break;
+            $check = $db->prepare("SELECT id FROM $tablaModulos WHERE id = ?");
+            $check->execute([$id]);
+            if (!$check->fetch()) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Módulo no encontrado.']);
+                break;
+            }
+            $desvinculados = [];
+            $db->beginTransaction();
+            if ($campos) {
+                $valores[] = $id;
+                $db->prepare("UPDATE $tablaModulos SET " . implode(', ', $campos) . " WHERE id = ?")->execute($valores);
+            }
+            foreach ($toursNuevos as $monedaTour => $lista) {
+                $campoTour = "tour_{$monedaTour}_id";
+                $db->prepare("DELETE FROM $tablaVinculos WHERE itinerario_id = ? AND $campoTour IS NOT NULL")->execute([$id]);
+                foreach ($lista as $orden => $tourId) {
+                    $stmtOtro = $db->prepare("SELECT m.titulo FROM $tablaVinculos v JOIN $tablaModulos m ON m.id = v.itinerario_id WHERE v.$campoTour = ?");
+                    $stmtOtro->execute([$tourId]);
+                    array_push($desvinculados, ...$stmtOtro->fetchAll(PDO::FETCH_COLUMN));
+                    $db->prepare("DELETE FROM $tablaVinculos WHERE $campoTour = ?")->execute([$tourId]);
+                    $db->prepare("INSERT INTO $tablaVinculos (itinerario_id, $campoTour, orden) VALUES (?, ?, ?)")->execute([$id, $tourId, $orden]);
                 }
             }
+            $db->commit();
+            // (Las propias ya se borraron antes de buscar: solo quedan otros itinerarios.)
+            $desvinculados = array_values(array_unique($desvinculados));
             if ($imagenAnterior && $imagenAnterior !== ($imagenNueva ?? null)) {
                 borrarImagenSiSinReferencias($db, $tablaModulos, $idioma, $imagenAnterior);
             }
-            echo json_encode(['success' => true]);
+            echo json_encode(['success' => true, 'desvinculados' => $desvinculados]);
             break;
 
         case 'guardar-clasificaciones-modulos':
@@ -833,5 +882,6 @@ try {
             echo json_encode(['error' => 'Ruta no encontrada']);
     }
 } catch (Exception $e) {
+    if ($db->inTransaction()) $db->rollBack();
     responderErrorAmigable($e);
 }

@@ -97,3 +97,23 @@
 .cascade-search-result-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cascade-search-result-ruta { color: #94a3b8; font-size: 0.68rem; font-weight: 400; }
 .cascade-leaf.cascade-search-result.is-selected .cascade-search-result-ruta { color: inherit; opacity: 0.75; }
+
+/* Actividades vinculadas a un itinerario (construirCampoActividades, catalogo-shared.js): chips
+   con su X y, debajo, el selector para sumar otra. En Cotizador y en Gestión de Datos. */
+.campo-actividades { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.campo-actividades-lista { display: flex; flex-wrap: wrap; gap: 6px; }
+.campo-actividades-chip {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+    padding: 3px 4px 3px 9px;
+    border: 1px solid #99f6e4; border-radius: 999px;
+    background: #f0fdfa; color: #134e4a;
+    font-size: 0.78rem; font-weight: 600;
+}
+.campo-actividades-chip > i { color: #0f766e; font-size: 0.68rem; }
+.campo-actividades-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campo-actividades-chip button {
+    flex: none; width: 20px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; color: #64748b; font-size: 0.68rem;
+}
+.campo-actividades-chip button:hover { background: #fee2e2; color: #dc2626; }
