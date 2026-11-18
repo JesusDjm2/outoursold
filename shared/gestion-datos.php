@@ -16,10 +16,9 @@ $heroImagenUrl = resolverHeroImagenUrl($db, $navShared);
 $heroPosY = resolverHeroPosY($db);
 $accentColorStyle = resolverAccentColorStyle($db);
 $logoUrl = resolverLogoUrl($db, $navShared);
-// Pestañas superiores: "moneda" (Gestión USD / PEN, con sus subpestañas) o las vistas que
-// no dependen de la moneda de la página: Itinerarios (por idioma) y Paquetes predefinidos
-// (USD y PEN juntos).
-$vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_GET['vista'] : 'moneda';
+// Pestañas superiores: Itinerarios (por idioma; la de entrada, sin ?vista), "moneda"
+// (Gestión USD / PEN, con sus subpestañas) y Paquetes predefinidos (USD y PEN juntos).
+$vista = in_array($_GET['vista'] ?? '', ['moneda', 'paquetes'], true) ? $_GET['vista'] : 'itinerarios';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -69,9 +68,11 @@ $vista = in_array($_GET['vista'] ?? '', ['itinerarios', 'paquetes'], true) ? $_G
             <div class="filter-tabs-bar">
                 <div class="max-w-7xl mx-auto px-4 md:px-6">
                     <div class="filter-tabs">
-                        <a href="../usd/gestion.php" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-usd' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión USD</a>
-                        <a href="../pen/gestion.php" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-pen' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión PEN</a>
+                        <!-- Itinerarios primero: es lo que arma la cotización (sus actividades
+                             vinculadas) y el PDF del itinerario. -->
                         <a href="gestion.php?vista=itinerarios" class="filter-tab <?= $vista === 'itinerarios' ? 'active' : '' ?>"><i class="fas fa-route"></i>Itinerarios</a>
+                        <a href="../usd/gestion.php?vista=moneda" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-usd' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión USD</a>
+                        <a href="../pen/gestion.php?vista=moneda" class="filter-tab <?= $vista === 'moneda' && $navActive === 'gestion-pen' ? 'active' : '' ?>"><i class="fas fa-database"></i>Gestión PEN</a>
                         <a href="gestion.php?vista=paquetes" class="filter-tab <?= $vista === 'paquetes' ? 'active' : '' ?>"><i class="fas fa-box-archive"></i>Paquetes predefinidos</a>
                     </div>
                 </div>
