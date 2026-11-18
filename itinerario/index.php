@@ -21,7 +21,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <link rel="icon" type="image/png" href="../shared/favicon-outoors.png?v=<?= filemtime(__DIR__ . '/../shared/favicon-outoors.png') ?>">
     <link rel="apple-touch-icon" href="../shared/apple-touch-icon.png?v=<?= filemtime(__DIR__ . '/../shared/apple-touch-icon.png') ?>">
     <link rel="manifest" href="../shared/site.webmanifest">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -72,7 +71,6 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </header>
         <div class="p-4 md:p-6">
         <div class="max-w-7xl mx-auto">
-
         <div class="flex mb-6 bg-white rounded-xl p-1 shadow-md" id="itinerario-main-tabs">
             <button class="nav-tab flex-1 rounded-xl font-medium active" data-tab="itinerario">
                 <i class="fas fa-route"></i><span>Nuevo Itinerario</span>
@@ -125,7 +123,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                 </div>
             </div>
         </div>
-
+        
         <div id="gestion-section" class="tab-content hidden">
             <div class="flex gap-1 mb-4 bg-white rounded-lg p-1 shadow-md w-fit" id="itinerario-gestion-subtabs">
                 <button class="subnav-tab active" data-subtab="modulos">
@@ -333,7 +331,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
         </div>
         </div>
     </div>
-
+    
     <div id="loading-modal" class="modal">
         <div class="itinerario-loading-content">
             <h3 class="text-lg font-semibold mb-4">Generando PDF</h3>
