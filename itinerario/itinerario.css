@@ -192,3 +192,26 @@ tr.draggable:active {
     .modos-pdf-seg { justify-self: stretch; }
     .modos-pdf-seg button { flex: 1; padding: 6px 8px; }
 }
+
+/* ===== Vincular actividades (montarVinculosDosMonedas, itinerario.js) =====
+   Un bloque por moneda; dentro, chips elegidas, sugeridas de un clic y el selector. */
+.vinc-monedas { display: grid; gap: 10px; }
+.vinc-moneda { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.vinc-moneda-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.vinc-moneda-tag { padding: 2px 8px; border-radius: 6px; background: #0f172a; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; }
+.vinc-moneda-desc { font-size: 0.72rem; color: #94a3b8; }
+.vinc-cargando { display: inline-flex; align-items: center; gap: 6px; font-size: 0.76rem; color: #94a3b8; }
+.campo-actividades-sugeridas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.campo-actividades-sug-titulo { display: inline-flex; align-items: center; gap: 5px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; }
+.campo-actividades-sug-titulo i { color: var(--accent-1, #e80c13); }
+.campo-actividades-sug {
+    display: inline-flex; align-items: center; gap: 5px; max-width: 100%;
+    padding: 3px 10px 3px 8px; border: 1px dashed #cbd5e1; border-radius: 999px;
+    background: #f8fafc; color: #334155; font-size: 0.76rem; font-weight: 500;
+}
+.campo-actividades-sug span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campo-actividades-sug i { font-size: 0.62rem; color: var(--accent-1, #e80c13); }
+.campo-actividades-sug:hover { border-style: solid; border-color: var(--accent-1, #e80c13); background: #fff; }
+.campo-actividades-sug em { font-style: normal; font-size: 0.64rem; font-weight: 700; padding: 0 5px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+/* Chip de la lista: itinerario sin actividades (pendiente de vincular). */
+.itin-detalle-chip.is-pendiente { background: #fffbeb; color: #b45309; border-color: #fde68a; }

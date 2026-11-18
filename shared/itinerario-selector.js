@@ -1342,9 +1342,9 @@ function renderDetalleEdicion(caja, e) {
                 </div>
             </fieldset>
             ${typeof vinculosActivos === 'function' && vinculosActivos() ? `<div class="idet-campo">
-                <span>Actividades vinculadas por defecto · ${monedaActividades().toUpperCase()}</span>
+                <span>Actividades vinculadas por defecto</span>
                 <div class="if-actividad"></div>
-                <small class="if-ayuda">Se agregan en el mismo día al sumar este itinerario a una cotización. Cada actividad va con un solo itinerario.</small>
+                <small class="if-ayuda">Se agregan las de la moneda de la cotización, en el mismo día, al sumar este itinerario. Cada actividad va con un solo itinerario.</small>
             </div>` : ''}
             <div class="idet-campo">
                 <span>Imagen</span>
@@ -1386,8 +1386,7 @@ function renderDetalleEdicion(caja, e) {
     });
     // Actividad por defecto (catálogo). undefined = sin cambios.
     const toursAntes = typeof toursVinculadosDeModulo === 'function' ? toursVinculadosDeModulo(m) : [];
-    let toursElegidos;
-    $('.if-actividad')?.appendChild(construirCampoActividades(toursAntes, (lista) => { toursElegidos = lista; }));
+    const vinculos = $('.if-actividad') ? montarVinculosDosMonedas($('.if-actividad'), m) : null;
     let imagen = 'actual';
     let pdf = null;
     const pintarImagen = () => {
@@ -1437,7 +1436,7 @@ function renderDetalleEdicion(caja, e) {
                 incluye: $('.if-incluye').value,
                 no_incluye: $('.if-no-incluye').value,
                 imagen, pdf,
-                ...(toursElegidos !== undefined ? { tours: toursElegidos.map(t => t.id) } : {})
+                ...(vinculos && vinculos.cambios() ? { toursPorMoneda: vinculos.cambios() } : {})
             });
             // Si el PDF era compartido y quedó con otro nombre, esta cotización pasa a usar el
             // nuevo (es el mismo itinerario: su actividad vinculada no cambia por eso).
@@ -1449,6 +1448,8 @@ function renderDetalleEdicion(caja, e) {
                 });
             }
             // Nueva actividad por defecto: también en esta cotización (salvo las cambiadas a mano).
+            // En esta cotización, solo cuentan las de su moneda.
+            const toursElegidos = vinculos?.elegidas(monedaActividades());
             if (toursElegidos !== undefined) {
                 aplicarVinculosPorDefectoNuevos(filename, toursAntes, toursElegidos);
             }

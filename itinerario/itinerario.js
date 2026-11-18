@@ -525,6 +525,26 @@ function renderModulosGrupos() {
     }
 }
 
+// Filtro "Sin actividades": itinerarios del grupo abierto que no suman ninguna actividad
+// (en ninguna moneda) al agregarlos a una cotización.
+let modulosSoloSinActividades = false;
+function moduloTieneActividades(it) {
+    return (it.tours_usd || []).length > 0 || (it.tours_pen || []).length > 0;
+}
+function pintarFiltroSinActividades() {
+    const btn = document.getElementById('itinerarios-sin-actividades');
+    if (!btn) return;
+    const pendientes = modulosActivos().filter(it => (!modulosGrupo || grupoDeModulo(it) === modulosGrupo) && !moduloTieneActividades(it)).length;
+    btn.querySelector('.filtro-chip-n').textContent = pendientes;
+    btn.classList.toggle('is-activo', modulosSoloSinActividades);
+    btn.setAttribute('aria-pressed', String(modulosSoloSinActividades));
+    btn.hidden = !pendientes && !modulosSoloSinActividades;
+}
+document.getElementById('itinerarios-sin-actividades')?.addEventListener('click', () => {
+    modulosSoloSinActividades = !modulosSoloSinActividades;
+    renderModulosTable();
+});
+
 function renderModulosTable() {
     const tbody = document.getElementById('itinerario-modulos-table-body');
     if (!tbody) return; // no existe en Cotizador — la gestión de módulos vive en Gestión de Datos
@@ -541,8 +561,10 @@ function renderModulosTable() {
         if (modulosNodo.categoria === 'sin' && it.categoria_id) return false;
         if (typeof modulosNodo.categoria === 'number' && Number(it.categoria_id) !== modulosNodo.categoria) return false;
         if (term && !it.titulo.toLowerCase().includes(term)) return false;
+        if (modulosSoloSinActividades && moduloTieneActividades(it)) return false;
         return true;
     });
+    pintarFiltroSinActividades();
     tbody.innerHTML = '';
     modulosCambiosPendientes.clear();
     actualizarBotonGuardarModulos();
@@ -553,7 +575,7 @@ function renderModulosTable() {
         const donde = modulosGrupo === MODULOS_SIN_GRUPO ? ' sin clasificar'
             : destinoNodo ? ` en ${destinoNodo.nombreBase}${categoriaNodo ? ' › ' + categoriaNodo.nombre : modulosNodo.categoria === 'sin' ? ' sin categoría' : ''}`
             : modulosGrupo ? ` en ${nombreGrupoDestino(modulosGrupo)}` : '';
-        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${term ? 'Sin resultados para tu búsqueda.' : `Aún no tienes itinerarios${escapeHtml(donde)} en este idioma. Súbelos con «Subir PDFs» o clasifícalos con su destino.`}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" class="cat-empty">${modulosSoloSinActividades ? 'Todos los itinerarios de aquí ya tienen actividades vinculadas.' : term ? 'Sin resultados para tu búsqueda.' : `Aún no tienes itinerarios${escapeHtml(donde)} en este idioma. Súbelos con «Subir PDFs» o clasifícalos con su destino.`}</td></tr>`;
     } else {
         visibles.forEach(it => tbody.appendChild(buildModuloRow(it)));
     }
@@ -641,12 +663,13 @@ function indicadoresDetalleItinerario(it) {
         const lleno = !!(it[clave] && it[clave].trim());
         return `<span class="itin-detalle-chip${lleno ? '' : ' is-vacio'}" title="${label}: ${lleno ? 'cargado' : 'vacío'}"><i class="fas ${icono}"></i>${label}</span>`;
     }).join('');
-    // Actividades vinculadas (solo en las páginas con moneda: Gestión de Datos USD/PEN).
+    // Actividades vinculadas, por moneda (solo en las páginas con moneda: Gestión de Datos).
     if (typeof monedaActividades !== 'function' || !monedaActividades()) return chips;
-    const tours = toursVinculadosDeModulo(it);
-    return chips + (tours.length
-        ? tours.map(t => `<span class="itin-detalle-chip" title="Actividad vinculada: ${escapeHtml(t.tour)}"><i class="fas fa-link"></i>${escapeHtml(t.tour)}</span>`).join('')
-        : '<span class="itin-detalle-chip is-vacio" title="Sin actividades vinculadas"><i class="fas fa-link-slash"></i>Sin actividades</span>');
+    const nUsd = (it.tours_usd || []).length, nPen = (it.tours_pen || []).length;
+    if (!nUsd && !nPen) return chips + '<span class="itin-detalle-chip is-pendiente" title="Sin actividades vinculadas: al agregarlo a una cotización no suma ninguna"><i class="fas fa-link-slash"></i>Sin actividades</span>';
+    const nombres = m => toursVinculadosDeModulo(it, m).map(t => t.tour).join(', ');
+    const parte = (m, n) => `<span class="itin-detalle-chip${n ? '' : ' is-vacio'}" title="${n ? `Actividades ${m.toUpperCase()}: ${escapeHtml(nombres(m) || n)}` : `Sin actividades en ${m.toUpperCase()}`}"><i class="fas fa-link"></i>${m.toUpperCase()} ${n}</span>`;
+    return chips + parte('usd', nUsd) + parte('pen', nPen);
 }
 
 // Guarda cambios de un itinerario del catálogo (lo usan el editor de Gestión de Datos y el
@@ -666,9 +689,10 @@ async function guardarItinerarioCatalogo(it, cambios) {
     };
     if ('destino_id' in cambios) payload.destino_id = cambios.destino_id;
     if ('categoria_id' in cambios) payload.categoria_id = cambios.categoria_id;
-    // Actividades vinculadas por defecto (lista de ids), en la moneda de la página.
-    const moneda = typeof monedaActividades === 'function' ? monedaActividades() : null;
-    if (Array.isArray(cambios.tours) && moneda) payload[`tours_${moneda}`] = cambios.tours;
+    // Actividades vinculadas por defecto: { usd: [ids], pen: [ids] } (solo las monedas que cambiaron).
+    Object.entries(cambios.toursPorMoneda || {}).forEach(([moneda, ids]) => {
+        if (['usd', 'pen'].includes(moneda) && Array.isArray(ids)) payload[`tours_${moneda}`] = ids;
+    });
     if (cambios.imagen instanceof File) {
         const formData = new FormData();
         formData.append('imagen', cambios.imagen);
@@ -701,6 +725,76 @@ async function guardarItinerarioCatalogo(it, cambios) {
     }
     await cargarIdioma(idiomaActivo);
     return { filename, aviso };
+}
+
+// ===== Vincular actividades: sugerencias, ocupadas y las dos monedas =====
+const PALABRAS_VACIAS_SUGERENCIAS = new Set(['tour', 'tours', 'full', 'half', 'day', 'days', 'dia', 'dias', 'with', 'con', 'sin', 'para', 'desde', 'hacia', 'the', 'and', 'del', 'las', 'los', 'por', 'una', 'uno', 'que', 'into', 'from', 'visita', 'visit', 'excursion', 'servicio', 'privado', 'private', 'shared', 'compartido']);
+function palabrasClave(texto) {
+    return new Set(String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        .split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !PALABRAS_VACIAS_SUGERENCIAS.has(w)));
+}
+// Actividades que se parecen al itinerario: mismo destino (por nombre, los de Actividades e
+// Itinerarios son tablas distintas) y palabras en común con su título y categoría.
+function sugerirActividadesPara(modulo, moneda) {
+    const destinoItin = itinDestinosData.find(d => Number(d.id) === Number(modulo?.destino_id))?.nombreBase || '';
+    const categoriaItin = itinCategoriasData.find(c => Number(c.id) === Number(modulo?.categoria_id))?.nombre || '';
+    const clave = palabrasClave(`${modulo?.titulo || ''} ${categoriaItin}`);
+    const destinoClave = [...palabrasClave(destinoItin)].join(' ');
+    const destinos = typeof destinosData !== 'undefined' ? destinosData : [];
+    return toursDeMoneda(moneda).map(tour => {
+        const destinoTour = destinos.find(d => Number(d.id) === Number(tour.destino_id))?.nombre || '';
+        const mismoDestino = destinoClave && [...palabrasClave(destinoTour)].join(' ') === destinoClave;
+        const comunes = [...palabrasClave(tour.tour)].filter(w => clave.has(w));
+        const puntos = (mismoDestino ? 2 : 0) + comunes.length * 2;
+        const motivo = [mismoDestino && `Mismo destino (${destinoItin})`, comunes.length && `Coincide: ${comunes.join(', ')}`].filter(Boolean).join(' · ');
+        return { tour, puntos, comunes: comunes.length, motivo };
+    }).filter(x => x.comunes > 0 || (x.puntos >= 2 && clave.size === 0))
+      .sort((a, b) => b.puntos - a.puntos || a.tour.tour.localeCompare(b.tour.tour))
+      .slice(0, 6);
+}
+// Título del otro itinerario (de este idioma) que ya tiene esa actividad, o null.
+function itinerarioQueTieneActividad(tour, moneda, excepto) {
+    const otro = modulosActivos().find(m => m.id !== excepto?.id && (m[`tours_${moneda}`] || []).some(id => Number(id) === Number(tour.id)));
+    return otro ? otro.titulo : null;
+}
+// Bloques "Actividades USD" y "Actividades PEN" (la de la página primero) en `cont`.
+// Devuelve { cambios() → { usd?: [ids], pen?: [ids] } | null, elegidas(moneda) → tours | undefined }.
+function montarVinculosDosMonedas(cont, modulo) {
+    const elegidas = {};
+    const actual = monedaActividades();
+    const orden = [actual, ...MONEDAS_ACTIVIDADES.filter(m => m !== actual)];
+    cont.innerHTML = '<div class="vinc-monedas"></div>';
+    const caja = cont.firstChild;
+    orden.forEach(moneda => {
+        const bloque = document.createElement('div');
+        bloque.className = 'vinc-moneda';
+        bloque.innerHTML = `<div class="vinc-moneda-cab"><span class="vinc-moneda-tag">${moneda.toUpperCase()}</span><span class="vinc-moneda-desc">${moneda === actual ? 'Moneda de esta página' : 'Cotizaciones en ' + moneda.toUpperCase()}</span></div><div class="vinc-moneda-campo"><span class="vinc-cargando"><i class="fas fa-spinner fa-spin"></i>Cargando actividades...</span></div>`;
+        caja.appendChild(bloque);
+    });
+    asegurarToursMonedas().then(() => {
+        orden.forEach((moneda, i) => {
+            const campo = caja.children[i].querySelector('.vinc-moneda-campo');
+            campo.innerHTML = '';
+            if (moneda !== actual && !toursDeMoneda(moneda).length) {
+                campo.innerHTML = `<span class="vinc-cargando">No tienes actividades en ${moneda.toUpperCase()} (Gestión ${moneda.toUpperCase()} › Tours).</span>`;
+                return;
+            }
+            campo.appendChild(construirCampoActividades(toursVinculadosDeModulo(modulo, moneda), (lista) => { elegidas[moneda] = lista; }, {
+                moneda,
+                textoAgregar: `Agregar actividad ${moneda.toUpperCase()}...`,
+                sugerir: () => sugerirActividadesPara(modulo, moneda),
+                ocupadaEn: (tour) => itinerarioQueTieneActividad(tour, moneda, modulo)
+            }));
+        });
+    });
+    return {
+        cambios: () => {
+            const c = {};
+            Object.entries(elegidas).forEach(([m, lista]) => { c[m] = lista.map(t => t.id); });
+            return Object.keys(c).length ? c : null;
+        },
+        elegidas: moneda => elegidas[moneda]
+    };
 }
 
 // Formulario completo de un itinerario (el lápiz de la fila). Se arma en el momento, así
@@ -746,9 +840,9 @@ function abrirEditorItinerario(it) {
                         <select id="ie-categoria" disabled></select>
                     </div>
                     <div class="cat-field ie-actividad-campo hidden">
-                        <label>Actividades vinculadas <span class="ie-actividad-moneda text-slate-400 font-normal"></span></label>
+                        <label>Actividades vinculadas</label>
                         <div class="ie-actividad"></div>
-                        <small class="text-slate-400">Al agregar este itinerario a una cotización, se agregan estas actividades en el mismo día. Cada actividad va con un solo itinerario.</small>
+                        <small class="text-slate-400">Al agregar este itinerario a una cotización, se agregan las de la moneda de esa cotización, en el mismo día. Cada actividad va con un solo itinerario.</small>
                     </div>
                     <div class="cat-field">
                         <label>Imagen</label>
@@ -817,12 +911,10 @@ function abrirEditorItinerario(it) {
 
     // Actividades vinculadas por defecto: solo donde hay moneda y catálogo de actividades
     // (Gestión de Datos USD/PEN). undefined = sin cambios.
-    let toursElegidos;
-    const monedaTour = typeof monedaActividades === 'function' ? monedaActividades() : null;
-    if (monedaTour && typeof construirCampoActividades === 'function') {
+    let vinculos = null;
+    if (typeof monedaActividades === 'function' && monedaActividades() && typeof construirCampoActividades === 'function') {
         $('.ie-actividad-campo').classList.remove('hidden');
-        $('.ie-actividad-moneda').textContent = `· ${monedaTour.toUpperCase()}`;
-        $('.ie-actividad').appendChild(construirCampoActividades(toursVinculadosDeModulo(it), (lista) => { toursElegidos = lista; }));
+        vinculos = montarVinculosDosMonedas($('.ie-actividad'), it);
     }
 
     // Imagen: 'actual' (sin cambios), un File nuevo, o null (quitada).
@@ -871,7 +963,7 @@ function abrirEditorItinerario(it) {
                 no_incluye: $('#ie-no-incluye').value,
                 imagen: imagenElegida,
                 pdf: pdfNuevo,
-                ...(toursElegidos !== undefined ? { tours: toursElegidos.map(t => t.id) } : {})
+                ...(vinculos && vinculos.cambios() ? { toursPorMoneda: vinculos.cambios() } : {})
             });
             cerrar();
             notifySuccess('Itinerario actualizado.' + aviso);

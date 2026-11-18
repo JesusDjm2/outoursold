@@ -484,6 +484,8 @@ $vista = in_array($_GET['vista'] ?? '', ['moneda', 'paquetes'], true) ? $_GET['v
                                     <i class="fas fa-search"></i>
                                     <input id="itinerario-modulos-search" type="text" placeholder="Buscar itinerario...">
                                 </div>
+                                <!-- Pendientes: itinerarios sin actividades vinculadas (pintarFiltroSinActividades, itinerario.js). -->
+                                <button type="button" id="itinerarios-sin-actividades" class="filtro-chip" aria-pressed="false" title="Ver solo los itinerarios sin actividades vinculadas: al agregarlos a una cotización no suman ninguna" hidden><i class="fas fa-link-slash"></i>Sin actividades<span class="filtro-chip-n">0</span></button>
                                 <button type="button" id="itinerarios-nuevo-toggle" class="cat-new-btn"><i class="fas fa-upload"></i>Subir PDFs</button>
                             </div>
                         </div>
