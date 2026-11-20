@@ -375,9 +375,10 @@ function moverItinerario(uid, destino, antes) {
 // - Cualquier otro, hacia adelante: él y los días siguientes se corren lo mismo y los días
 //   que deja atrás quedan libres (Día 4 → Día 5: el 4 queda libre y el 5 pasa al 6).
 // - Cualquier otro, hacia atrás: solo a uno de los días libres que tiene justo antes (ver
-//   iselPrimerLibreAntes). Ocupa ese día libre y nada más se mueve; si su día queda vacío,
-//   pasa a ser libre (o, si era el último, el viaje termina antes).
-//   Ej.: Día 1 el 2 oct, libres 3 y 4, itinerario el 5 → puede pasar al 3 o al 4.
+//   iselPrimerLibreAntes). Ocupa ese día libre y los días siguientes se adelantan lo mismo,
+//   sin perder la correlación: Días 1 a 10 con el 4 y el 5 libres, el 6 pasa al 4 → el 7
+//   pasa al 5, y así; el viaje queda en 8 días. Si comparte su día con otro itinerario, solo
+//   él ocupa el día libre y los demás no se mueven.
 
 // Primer día del bloque de días libres que está justo antes de `dia` (sin otro itinerario
 // en medio); `dia` si no tiene libres antes. Nunca antes del primer día del itinerario.
@@ -413,11 +414,21 @@ function iselCambiarDiaDeFila(tr, dia) {
                 : 'Solo se puede cambiar a una fecha posterior: no hay días libres antes de este día.');
             return;
         }
+        const soloEnSuDia = !items.some(x => x.dia === actual && x.tr !== tr);
+        const delta = dia - actual;
+        if (soloEnSuDia) {
+            filasArmado().forEach(f => {
+                if (Number(f.dataset.dia) > actual) f.dataset.dia = String(Number(f.dataset.dia) + delta);
+            });
+            if (armadoUI.destino !== null && armadoUI.destino > actual) armadoUI.destino += delta;
+        }
         tr.dataset.dia = String(dia);
         refrescarArmadoItinerario();
         resaltarTarjeta(tr.dataset.uid);
         const titulo = iselEntradaDe(filenameDeFila(tr))?.m.titulo || filenameDeFila(tr);
-        iselToast(`${titulo} ahora es el Día ${dia}, en lugar del día libre`);
+        iselToast(soloEnSuDia
+            ? `${titulo} ahora es el Día ${dia}, en lugar del día libre: los días siguientes se adelantaron`
+            : `${titulo} ahora es el Día ${dia}, en lugar del día libre`);
         return;
     }
     const delta = dia - actual;

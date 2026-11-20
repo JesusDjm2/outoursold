@@ -95,12 +95,14 @@ body {
    vista del Cotizador. Datos Pax y Resumen de Factura quedan visibles pero deshabilitados;
    se ocultan las opciones que solo tienen sentido en una cotización (Aplicar paquete,
    Historial, Precios confidenciales) y todo costo (Total Línea, totales del Resumen): un
-   paquete no guarda precios. */
+   paquete no guarda precios. Del Resumen solo queda activa Reserva (%), que sí se guarda. */
 body.modo-paquete .solo-cotizacion,
 body.modo-paquete .col-confidencial,
 body.modo-paquete .col-costo { display: none !important; }
+body.modo-paquete #resumen-campos > .col-costo { display: block !important; }
+body.modo-paquete .resumen-filas > :not(.resumen-reserva) { display: none !important; }
 body.modo-paquete #datos-pax-section,
-body.modo-paquete #resumen-campos { opacity: 0.5; pointer-events: none; user-select: none; }
+body.modo-paquete #resumen-campos > :first-child { opacity: 0.5; pointer-events: none; user-select: none; }
 body.modo-paquete #guardar-cotizacion { opacity: 0.5; cursor: not-allowed; }
 /* Encabezados de tabla: gris en vez del negro/bold por defecto del navegador, para que
    pesen menos visualmente que el contenido de las filas — antes solo estaba puesto para
@@ -650,6 +652,27 @@ input[readonly] {
 .vinc-marca.is-suelta { color: #94a3b8; cursor: default; }
 .vinc-marca.is-suelta:hover { background: none; color: #94a3b8; }
 .vinc-marca.is-suelta:hover i::before { content: "\f25a"; } /* sigue siendo la mano */
+/* Hoteles se puede quedar sin filas: el encabezado guarda los anchos que tendría con una,
+   en vez de que "Hoteles / Hospedajes" se coma todo el ancho. */
+#hotels-table thead th:nth-child(1) { min-width: 35px; }
+#hotels-table thead th:nth-child(2), #hotels-table thead th:nth-child(3) { min-width: 129px; }
+#hotels-table thead th:nth-child(5), #hotels-table thead th:nth-child(6) { min-width: 47px; }
+#hotels-table thead th:nth-child(11) { min-width: 63px; }
+#hotels-table thead th:nth-child(12) { min-width: 32px; }
+
+/* "Día N" sobre la fecha vacía de una actividad (sin F. Llegada todavía): ver pintarDiaSinFecha. */
+.tour-fecha { position: relative; }
+.tour-dia-sin-fecha:empty { display: none; }
+.tour-dia-sin-fecha {
+    position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #f1f5f9; color: #334155;
+    font-size: 0.72rem; font-weight: 600;
+    pointer-events: none; /* el clic llega al campo de fecha */
+}
+#tours-body tr.is-vinculada .tour-dia-sin-fecha { background: #ccfbf1; color: #0f766e; }
+.tour-fecha input.is-con-dia::-webkit-datetime-edit { color: transparent; }
 .leyenda-vinculos { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.72rem; color: #64748b; }
 .leyenda-vinculos[hidden] { display: none; }
 .leyenda-vinculos span { display: inline-flex; align-items: center; gap: 5px; }

@@ -136,12 +136,11 @@
         }
     }
 
-    // ===== Logos: el del encabezado y el de los PDF son independientes =====
-    // - Logo del encabezado (#hero-logo-btn, subir-logo-hero): reemplaza el título/subtítulo
-    //   del Hero (ver #page-hero-content en cotizador.php/itinerario/index.php).
-    // - Logo de los PDF (#pdf-logo-btn, subir-logo): el de la agencia en el PDF de la
-    //   cotización y del itinerario. Mientras la agencia no tenga logo propio de encabezado,
-    //   el encabezado muestra este, así que también se actualiza ahí (hero_propio = false).
+    // ===== Logo del encabezado =====
+    // #hero-logo-btn (subir-logo-hero): reemplaza el título/subtítulo del Hero (ver
+    // #page-hero-content en cotizador.php/itinerario/index.php). El logo de los PDF es
+    // independiente y se cambia solo desde los datos de la empresa (Mi Empresa, y el admin
+    // en Usuarios › Agencias), no desde el Hero.
     function pintarLogoEnHero(result) {
         // Fade-in en vez de un pop abrupto: arranca en opacity:0 y sube al siguiente frame
         // (ver transition en .page-hero-logo, hero.css).
@@ -187,12 +186,6 @@
         pregunta: '¿Reemplazar el logo del encabezado? El de los PDF no cambia.',
         exito: 'Logo del encabezado actualizado.',
         alSubir: pintarLogoEnHero
-    });
-    enlazarSubidaLogo({
-        btnId: 'pdf-logo-btn', inputId: 'pdf-logo-input', ruta: 'subir-logo',
-        pregunta: '¿Reemplazar el logo de tus PDF (cotización e itinerario)?',
-        exito: 'Logo de los PDF actualizado.',
-        alSubir: (result) => { if (!result.hero_propio) pintarLogoEnHero(result); }
     });
 
     // ===== Color de marca (cuentagotas) =====

@@ -353,6 +353,8 @@ async function aplicarPaqueteContenido(paquete) {
         hotelsBody.appendChild(createHotelRow({ cin: fLlegada }));
     }
 
+    // Reserva (%) del paquete; los de antes no la traen y se deja la de la cotización.
+    if (paquete.porcentaje_reserva != null) document.getElementById('porcentaje_reserva').value = paquete.porcentaje_reserva;
     calcularResumen();
     paqueteAplicadoId = paquete.id;
     paqueteAplicadoNombre = paquete.nombre;
@@ -526,30 +528,6 @@ function vistaTieneContenido() {
         || conValor('#itinerary-builder-body .module-filename');
 }
 
-// Reusar desde el historial con la vista ya armada: Reemplazar (lo de la cotización elegida
-// toma el lugar de Actividades, Hoteles e Itinerario) o Agregar (se suma a lo que hay).
-// Devuelve 'reemplazar' | 'agregar' | null (canceló). Con la vista vacía no pregunta.
-async function preguntarModoReuso(c) {
-    if (!vistaTieneContenido()) return 'agregar';
-    const nombre = c.data.pax?.nombre_pax?.trim() || c.id;
-    const r = await Swal.fire({
-        icon: 'question',
-        title: '¿Reemplazar o agregar?',
-        text: `Ya tienes actividades, hoteles o itinerario en esta cotización. ¿Quieres reemplazarlos por los de «${nombre}» o agregarlos a lo que ya tienes?`,
-        showDenyButton: true,
-        showCancelButton: true,
-        confirmButtonText: 'Reemplazar',
-        denyButtonText: 'Agregar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#e80c13',
-        denyButtonColor: '#475569',
-        cancelButtonColor: '#94a3b8'
-    });
-    if (r.isConfirmed) return 'reemplazar';
-    if (r.isDenied) return 'agregar';
-    return null;
-}
-
 // Vacía Actividades, Hoteles e Itinerario (no toca Datos Pax, precios ni notas) para
 // reemplazarlos por los de otra cotización. El paquete aplicado deja de valer.
 function vaciarContenidoParaReemplazar() {
@@ -580,10 +558,9 @@ async function reusarHistorialCotizacion(c) {
     }
     refrescarArmadoItinerario();
 }
+// Sin preguntar: lo de la cotización elegida reemplaza Actividades, Hoteles e Itinerario.
 async function reusarHistorialCotizacionContenido(c) {
-    const modo = await preguntarModoReuso(c);
-    if (!modo) return; // canceló: no se toca nada
-    if (modo === 'reemplazar') vaciarContenidoParaReemplazar();
+    if (vistaTieneContenido()) vaciarContenidoParaReemplazar();
 
     // Sin "cant" explícito, cada fila nace en modo "auto" (igual que una fila agregada a
     // mano o un paquete aplicado) y sigue a N° PAX hasta que el usuario la edite — antes
@@ -642,15 +619,13 @@ async function reusarHistorialCotizacionContenido(c) {
         }
     }
 
-    // Reemplazado sin actividades u hoteles: una fila en blanco, como en una cotización nueva.
-    if (modo === 'reemplazar') {
-        if (!document.querySelector('#tours-body tr')) document.getElementById('tours-body').appendChild(createTourRow());
-        if (!document.querySelector('#hotels-body tr')) document.getElementById('hotels-body').appendChild(createHotelRow());
-    }
+    // Sin actividades u hoteles: una fila en blanco, como en una cotización nueva.
+    if (!document.querySelector('#tours-body tr')) document.getElementById('tours-body').appendChild(createTourRow());
+    if (!document.querySelector('#hotels-body tr')) document.getElementById('hotels-body').appendChild(createHotelRow());
     calcularResumen();
     cerrarHistorialTours();
     // Aviso breve que se va solo (iselToast, itinerario-selector.js), no un modal a cerrar.
-    if (typeof iselToast === 'function') iselToast(modo === 'reemplazar' ? 'Se reemplazó con lo de la cotización elegida' : 'Se agregó lo de la cotización elegida');
+    if (typeof iselToast === 'function') iselToast('Se reemplazó con lo de la cotización elegida');
 }
 
 // Sugiere la fecha de una nueva fila de actividad: el día siguiente a la fecha más
@@ -740,6 +715,30 @@ function resincronizarFechasConLlegada() {
 }
 
 // ===== FILAS =====
+// Sin F. Llegada las actividades no tienen fecha, solo su día (data-dia, de un paquete o del
+// día de su itinerario): se muestra "Día N" en la celda de la fecha hasta que la tengan.
+function pintarDiaSinFecha(tr) {
+    const input = tr.querySelector('.tour-fecha input');
+    const etiqueta = tr.querySelector('.tour-dia-sin-fecha');
+    if (!input || !etiqueta) return;
+    const dia = !input.value && Number(tr.dataset.dia) >= 1 ? Number(tr.dataset.dia) : null;
+    const texto = dia ? `Día ${dia}` : '';
+    // Solo si cambia: escribir el texto también es una mutación y el observador de abajo
+    // volvería a llamar a esta función sin fin.
+    if (etiqueta.textContent !== texto) etiqueta.textContent = texto;
+    if (input.classList.contains('is-con-dia') !== !!dia) input.classList.toggle('is-con-dia', !!dia);
+}
+// data-dia y la fecha también cambian por código (paquetes, días del itinerario, F. Llegada):
+// al agregar o quitar filas, o al cambiar su día, se vuelve a pintar la etiqueta. Son dos
+// observadores para no escuchar los cambios de texto dentro de las filas (la propia etiqueta).
+(function observarDiasDeActividades() {
+    const body = document.getElementById('tours-body');
+    if (!body) return;
+    const repintar = () => body.querySelectorAll(':scope > tr').forEach(pintarDiaSinFecha);
+    new MutationObserver(repintar).observe(body, { childList: true });
+    new MutationObserver(repintar).observe(body, { subtree: true, attributes: true, attributeFilter: ['data-dia'] });
+})();
+
 function createTourRow(data = {}) {
     const tr = document.createElement('tr');
     tr.className = 'draggable';
@@ -758,7 +757,7 @@ function createTourRow(data = {}) {
 
     tr.innerHTML = `
         <td class="pl-2"><div class="handle">≡</div></td>
-        <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.fecha || ''}"></td>
+        <td><div class="tour-fecha"><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.fecha || ''}"><span class="tour-dia-sin-fecha" aria-hidden="true"></span></div></td>
         <td class="tour-selector-cell"></td>
         <td><input class="input w-14 rounded px-2 py-1 border text-right cant" type="number" min="0" value="${initialCant}"></td>
         <td><input class="input w-20 rounded px-2 py-1 border distr" type="text" value="${data.distr || ''}" readonly></td>
@@ -772,6 +771,8 @@ function createTourRow(data = {}) {
     // Día del viaje de un paquete aplicado sin F. Llegada (sin fecha todavía): lo usan
     // resincronizarFechasConLlegada para ponerle fecha y guardarComoPaquete para no perderlo.
     if (data.dia && !data.fecha) tr.dataset.dia = String(data.dia);
+    tr.querySelector('.tour-fecha input').addEventListener('input', () => pintarDiaSinFecha(tr));
+    pintarDiaSinFecha(tr);
     // Nunca deja la tabla vacía: sin filas, su encabezado se desarma (columnas sin ancho).
     tr.querySelector('button').onclick = () => {
         const body = tr.parentElement;
@@ -865,7 +866,7 @@ function createHotelRow(data = {}) {
         <td><input class="input w-full rounded px-2 py-1 border" type="date" value="${data.cout || ''}"></td>
         <td class="hotel-selector-cell"></td>
         <td><input class="input w-full max-w-20 rounded px-2 py-1 border text-right nhab" type="number" min="0" value="${initialNhab}"></td>
-        <td><input class="input w-full max-w-20 rounded px-2 py-1 border text-right noches" type="number" min="1" value="${initialNoches}"></td>
+        <td><input class="input w-full max-w-20 rounded px-2 py-1 border text-right noches" type="number" min="1" value="${initialNoches}" readonly tabindex="-1" title="Se calcula con el CheckIn y el CheckOut"></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right preg" type="number" step="0.01" value="${data.preg || 0}" readonly></td>
         <td hidden><input class="input w-full rounded px-2 py-1 border text-right ppromo" type="number" step="0.01" value="${initialPpromo}" readonly></td>
         <td class="col-confidencial"><input class="input w-full max-w-28 rounded px-2 py-1 border text-right pconf" type="number" step="0.01" min="0" value="${data.pconf || 0}"></td>
@@ -873,11 +874,9 @@ function createHotelRow(data = {}) {
         <td class="text-right total-line col-costo">${fmt(initialTotal)}</td>
         <td class="pr-2 text-right"><button class="text-red-500 small"><i class="fas fa-trash"></i></button></td>
     `;
-    // Nunca deja la tabla vacía: sin filas, su encabezado se desarma (columnas sin ancho).
+    // Se pueden quitar todas: la tabla queda en limpio y "+ Fila" agrega una nueva.
     tr.querySelector('button').onclick = () => {
-        const body = tr.parentElement;
         tr.remove();
-        if (body && !body.querySelector('tr')) body.appendChild(createHotelRow({ cin: sugerirSiguienteCheckinHotel() }));
         calcularResumen();
     };
     tr.querySelectorAll('input.nhab, input.noches').forEach(input => {
@@ -917,6 +916,7 @@ function createHotelRow(data = {}) {
     hotelCell.appendChild(hotelSelector);
     hotelCell.appendChild(hotelInput);
 
+    // Noches: no se editan, siempre salen de CheckIn y CheckOut.
     const checkin = tr.querySelector('td:nth-child(2) input');
     const checkout = tr.querySelector('td:nth-child(3) input');
     const nochesInput = tr.querySelector('.noches');
@@ -1063,6 +1063,7 @@ async function guardarComoPaquete() {
     try {
         const payload = {
             nombre, tours, hoteles,
+            porcentaje_reserva: document.getElementById('porcentaje_reserva').value,
             itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos, dias, vinculos: 1 } : null
         };
         if (paqueteEditandoId) payload.id = paqueteEditandoId;
@@ -1073,17 +1074,20 @@ async function guardarComoPaquete() {
         });
         const result = await res.json();
         if (!result.success) throw new Error(result.error || 'Error desconocido');
-        const eraEdicion = !!paqueteEditandoId;
-        // La vista no se limpia: lo armado queda a la vista. Editando, se sigue en el mismo
-        // paquete (con su nombre nuevo) y se sale con "Salir de la edición".
-        if (eraEdicion) {
-            paqueteEditandoNombre = nombre;
-            document.getElementById('paquete-edit-nombre').textContent = nombre;
-        }
-        await notifySuccess(eraEdicion
+        const idEditado = paqueteEditandoId;
+        await notifySuccess(idEditado
             ? `Paquete "${nombre}" actualizado.`
             : `Paquete "${nombre}" guardado. Ya está disponible en "Aplicar paquete predefinido" y en Gestión de Datos > Paquetes.`);
         await refrescarPaquetesData();
+        // Editando: se sale de la edición y se vuelve al Cotizador con el paquete ya
+        // actualizado aplicado, como si se acabara de elegir en "Aplicar paquete...". Creando
+        // uno nuevo, lo armado queda a la vista tal cual.
+        if (idEditado) {
+            salirModoEdicionPaquete();
+            nuevaCotizacion(false);
+            const actualizado = paquetesData.find(p => String(p.id) === String(idEditado));
+            if (actualizado) await aplicarPaquete(actualizado);
+        }
     } catch (e) {
         notifyError('Error al guardar el paquete: ' + e.message);
     }
@@ -1132,18 +1136,19 @@ async function cargarPaqueteParaEditar(id) {
     restaurarVinculosDePaquete(paquete, { tours: filasActividades(), itins: filasNuevasDesde(foto).itins });
     refrescarArmadoItinerario();
 
+    if (paquete.porcentaje_reserva != null) document.getElementById('porcentaje_reserva').value = paquete.porcentaje_reserva;
     calcularResumen();
     activarModoEdicionPaquete(paquete);
 }
 
 // Campos de la cotización que no aplican a un paquete: quedan a la vista pero
-// deshabilitados mientras se edita uno (Datos Pax, notas y montos del Resumen).
+// deshabilitados mientras se edita uno (Datos Pax, notas y montos del Resumen). Reserva (%)
+// no: el paquete la guarda.
 function camposSoloCotizacion() {
     return [
         ...document.querySelectorAll('#form-pax input, #form-pax select'),
         document.getElementById('precio-adicional'),
-        document.getElementById('descuento-especial'),
-        document.getElementById('porcentaje_reserva')
+        document.getElementById('descuento-especial')
     ];
 }
 
