@@ -705,14 +705,15 @@ try {
             break;
 
         case 'paquetes-tours':
-            // Si las migraciones 044 (porcentaje_reserva) o 030 (hoteles/itinerario) todavía no
-            // se aplicaron en esta base, se cae al SELECT anterior en vez de romper el arranque
-            // del Cotizador (que pide los paquetes al cargar).
+            // Si las migraciones 045 (n_pax), 044 (porcentaje_reserva) o 030 (hoteles/itinerario)
+            // todavía no se aplicaron en esta base, se cae al SELECT anterior en vez de romper
+            // el arranque del Cotizador (que pide los paquetes al cargar).
             [$fd, $pd] = filtroDueno();
             $columnasPaquete = [
-                'hoteles, itinerario, porcentaje_reserva',
-                'hoteles, itinerario, NULL AS porcentaje_reserva',
-                'NULL AS hoteles, NULL AS itinerario, NULL AS porcentaje_reserva'
+                'hoteles, itinerario, porcentaje_reserva, n_pax',
+                'hoteles, itinerario, porcentaje_reserva, NULL AS n_pax',
+                'hoteles, itinerario, NULL AS porcentaje_reserva, NULL AS n_pax',
+                'NULL AS hoteles, NULL AS itinerario, NULL AS porcentaje_reserva, NULL AS n_pax'
             ];
             foreach ($columnasPaquete as $i => $columnas) {
                 try {
@@ -730,6 +731,7 @@ try {
                 $row['hoteles'] = $row['hoteles'] ? (json_decode($row['hoteles'], true) ?: []) : [];
                 $row['itinerario'] = $row['itinerario'] ? json_decode($row['itinerario'], true) : null;
                 $row['porcentaje_reserva'] = $row['porcentaje_reserva'] !== null ? (float) $row['porcentaje_reserva'] : null;
+                $row['n_pax'] = $row['n_pax'] !== null ? (int) $row['n_pax'] : null;
                 $paquetes[] = $row;
             }
             echo json_encode($paquetes);
@@ -804,28 +806,29 @@ try {
                 ? json_encode(['idioma' => $idiomaItinerario, 'modulos' => $modulos] + ($diasValidos ? ['dias' => $dias] : [])
                     + (!empty($itinerario['vinculos']) ? ['vinculos' => 1] : []), JSON_UNESCAPED_UNICODE)
                 : null;
-            // Porcentaje de reserva del paquete (migración 044), de 0 a 100; si la base aún no
-            // tiene la columna, el paquete se guarda igual, sin él.
-            $porcentaje = isset($data['porcentaje_reserva']) && is_numeric($data['porcentaje_reserva'])
-                && $data['porcentaje_reserva'] >= 0 && $data['porcentaje_reserva'] <= 100
-                ? round((float) $data['porcentaje_reserva'], 2) : null;
-            $conPorcentaje = (bool) $db->query("SHOW COLUMNS FROM $tablaPaquetesTours LIKE 'porcentaje_reserva'")->fetch();
+            // Opcionales del paquete: Reserva (%) de 0 a 100 (migración 044) y N° PAX de 0 a 999
+            // (migración 045). Si la base aún no tiene la columna, el paquete se guarda igual, sin él.
+            $enRango = fn($v, $min, $max) => isset($v) && is_numeric($v) && $v >= $min && $v <= $max ? $v : null;
+            $porcentaje = $enRango($data['porcentaje_reserva'] ?? null, 0, 100);
+            $nPax = $enRango($data['n_pax'] ?? null, 0, 999);
+            $opcionales = [];
+            foreach (['porcentaje_reserva' => $porcentaje !== null ? round((float) $porcentaje, 2) : null,
+                      'n_pax' => $nPax !== null ? (int) $nPax : null] as $columna => $v) {
+                if ($db->query("SHOW COLUMNS FROM $tablaPaquetesTours LIKE '$columna'")->fetch()) $opcionales[$columna] = $v;
+            }
+            $columnas = array_merge(['nombre', 'tours', 'hoteles', 'itinerario'], array_keys($opcionales));
+            $valores = array_merge([$nombre, $toursJson, $hotelesJson, $itinerarioJson], array_values($opcionales));
             if (!empty($data['id'])) {
                 if (!verificarDueno($db, $tablaPaquetesTours, $data['id'])) break;
-                $stmt = $db->prepare($conPorcentaje
-                    ? "UPDATE $tablaPaquetesTours SET nombre = ?, tours = ?, hoteles = ?, itinerario = ?, porcentaje_reserva = ? WHERE id = ?"
-                    : "UPDATE $tablaPaquetesTours SET nombre = ?, tours = ?, hoteles = ?, itinerario = ? WHERE id = ?");
-                $stmt->execute($conPorcentaje
-                    ? [$nombre, $toursJson, $hotelesJson, $itinerarioJson, $porcentaje, $data['id']]
-                    : [$nombre, $toursJson, $hotelesJson, $itinerarioJson, $data['id']]);
+                $set = implode(', ', array_map(fn($c) => "$c = ?", $columnas));
+                $stmt = $db->prepare("UPDATE $tablaPaquetesTours SET $set WHERE id = ?");
+                $stmt->execute(array_merge($valores, [$data['id']]));
                 echo json_encode(['success' => true, 'id' => $data['id']]);
             } else {
-                $stmt = $db->prepare($conPorcentaje
-                    ? "INSERT INTO $tablaPaquetesTours (nombre, tours, hoteles, itinerario, porcentaje_reserva, creado_por) VALUES (?, ?, ?, ?, ?, ?)"
-                    : "INSERT INTO $tablaPaquetesTours (nombre, tours, hoteles, itinerario, creado_por) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute($conPorcentaje
-                    ? [$nombre, $toursJson, $hotelesJson, $itinerarioJson, $porcentaje, $_SESSION['user_id']]
-                    : [$nombre, $toursJson, $hotelesJson, $itinerarioJson, $_SESSION['user_id']]);
+                $lista = implode(', ', array_merge($columnas, ['creado_por']));
+                $marcas = implode(', ', array_fill(0, count($columnas) + 1, '?'));
+                $stmt = $db->prepare("INSERT INTO $tablaPaquetesTours ($lista) VALUES ($marcas)");
+                $stmt->execute(array_merge($valores, [$_SESSION['user_id']]));
                 echo json_encode(['success' => true, 'id' => $db->lastInsertId()]);
             }
             break;

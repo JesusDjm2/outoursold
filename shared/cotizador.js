@@ -267,6 +267,19 @@ function filasToursDePaquete(tours, fLlegada) {
     });
 }
 
+// N° PAX guardado en el paquete (migración 045); los de antes no lo traen y se deja el de
+// la cotización.
+function ponerNPaxDePaquete(paquete) {
+    if (paquete.n_pax != null) document.querySelector('input[name="n_pax"]').value = paquete.n_pax;
+}
+// Cant. de una actividad del paquete: undefined si es igual al N° PAX del paquete (la fila
+// sigue a N° PAX, "auto"); si se cambió a mano, esa cantidad fija. Los paquetes de antes,
+// sin N° PAX, aplican todas en "auto", como siempre.
+function cantPropiaDeActividad(paquete, tour) {
+    if (paquete.n_pax == null || tour?.cant === undefined) return undefined;
+    return Number(tour.cant) === Number(paquete.n_pax) ? undefined : tour.cant;
+}
+
 // Aplica un paquete a la cotización. Uno solo a la vez: REEMPLAZA Itinerario, Actividades y
 // Hoteles (lo que hubiera, de otro paquete o agregado a mano) y los arma desde el día 1
 // (Fecha de Llegada de Datos Pax). Después se pueden seguir agregando filas a mano con
@@ -326,13 +339,17 @@ async function aplicarPaqueteContenido(paquete) {
         addItineraryBuilderRow('itinerary-builder-body', true);
     }
 
+    // N° PAX del paquete antes de las actividades: las que siguen a N° PAX nacen con él.
+    ponerNPaxDePaquete(paquete);
+
     // Actividades: cada una en su día del paquete desde la Fecha de Llegada (varias pueden
     // ser del mismo día; ver filasToursDePaquete). Sin "cant" explícito cada fila nace en
     // modo "auto" y sigue a N° PAX, igual que una fila agregada a mano.
     const toursBody = document.getElementById('tours-body');
     toursBody.innerHTML = '';
     if (paquete.tours?.length) {
-        agregarFilasTours(filasToursDePaquete(paquete.tours, fLlegada), true);
+        agregarFilasTours(filasToursDePaquete(paquete.tours, fLlegada)
+            .map((fila, i) => ({ ...fila, cant: cantPropiaDeActividad(paquete, paquete.tours[i]) })), true);
     } else {
         toursBody.appendChild(createTourRow({ fecha: fLlegada }));
     }
@@ -1064,6 +1081,7 @@ async function guardarComoPaquete() {
         const payload = {
             nombre, tours, hoteles,
             porcentaje_reserva: document.getElementById('porcentaje_reserva').value,
+            n_pax: document.querySelector('input[name="n_pax"]').value,
             itinerario: modulos.length ? { idioma: document.querySelector('select[name="idioma"]').value, modulos, dias, vinculos: 1 } : null
         };
         if (paqueteEditandoId) payload.id = paqueteEditandoId;
@@ -1112,10 +1130,17 @@ async function cargarPaqueteParaEditar(id) {
     inputLlegada.dataset.previa = inputLlegada.value;
     actualizarEstadosCamposFecha();
     const fechasTours = filasToursDePaquete(paquete.tours, inputLlegada.value);
+    ponerNPaxDePaquete(paquete);
 
+    // Las que coinciden con el N° PAX del paquete siguen a N° PAX; las de los paquetes de
+    // antes (sin N° PAX) se editan con la cantidad que se guardó.
     const toursBody = document.getElementById('tours-body');
     toursBody.innerHTML = '';
-    (paquete.tours.length ? paquete.tours : [{}]).forEach((t, i) => toursBody.appendChild(createTourRow({ ...t, fecha: fechasTours[i]?.fecha || '' })));
+    (paquete.tours.length ? paquete.tours : [{}]).forEach((t, i) => {
+        const { cant, ...resto } = t;
+        const cantFila = paquete.n_pax == null ? cant : cantPropiaDeActividad(paquete, t);
+        toursBody.appendChild(createTourRow({ ...resto, ...(cantFila !== undefined ? { cant: cantFila } : {}), fecha: fechasTours[i]?.fecha || '' }));
+    });
 
     const hotelsBody = document.getElementById('hotels-body');
     hotelsBody.innerHTML = '';
@@ -1142,11 +1167,11 @@ async function cargarPaqueteParaEditar(id) {
 }
 
 // Campos de la cotización que no aplican a un paquete: quedan a la vista pero
-// deshabilitados mientras se edita uno (Datos Pax, notas y montos del Resumen). Reserva (%)
-// no: el paquete la guarda.
+// deshabilitados mientras se edita uno (Datos Pax, notas y montos del Resumen). N° PAX y
+// Reserva (%) no: el paquete los guarda.
 function camposSoloCotizacion() {
     return [
-        ...document.querySelectorAll('#form-pax input, #form-pax select'),
+        ...document.querySelectorAll('#form-pax input:not([name="n_pax"]), #form-pax select'),
         document.getElementById('precio-adicional'),
         document.getElementById('descuento-especial')
     ];

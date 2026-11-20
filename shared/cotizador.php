@@ -151,9 +151,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                         <!-- Fecha de la cotización: no se edita, es el día en que se crea (ver
                              nuevaCotizacion/guardarCotizacion); al abrir una guardada, la suya. -->
                         <input type="hidden" name="fecha_cot">
-                        <div class="field field-prefix">
+                        <!-- campo-paquete: sigue editable al editar un paquete predefinido (lo guarda). -->
+                        <div class="field field-prefix campo-paquete">
                             <span class="field-prefix-label">N° PAX</span>
-                            <input type="number" name="n_pax" value="1" min="1" title="Número de pasajeros">
+                            <input type="number" name="n_pax" value="0" min="0" title="Número de pasajeros">
                         </div>
                         <div class="field pais-combobox" style="position:relative">
                             <input type="text" name="pais" id="input-pais" placeholder="Buscar país..." title="País de procedencia del pasajero" autocomplete="off">
@@ -249,7 +250,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                                         <th class="w-40">Fecha</th>
                                         <th class="w-full">Tour / Actividad</th>
                                         <th class="w-16">Cant.</th>
-                                        <th class="w-24">Distr.</th>
+                                        <th class="w-24">Concepto</th>
                                         <th class="w-24" hidden>P.Reg</th>
                                         <th class="w-24" hidden>P.Promo</th>
                                         <th class="w-24 col-confidencial" title="Uso interno de esta cotización">Precio Conf.</th>

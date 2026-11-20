@@ -95,13 +95,13 @@ body {
    vista del Cotizador. Datos Pax y Resumen de Factura quedan visibles pero deshabilitados;
    se ocultan las opciones que solo tienen sentido en una cotización (Aplicar paquete,
    Historial, Precios confidenciales) y todo costo (Total Línea, totales del Resumen): un
-   paquete no guarda precios. Del Resumen solo queda activa Reserva (%), que sí se guarda. */
+   paquete no guarda precios. Solo quedan activos N° PAX y Reserva (%), que sí se guardan. */
 body.modo-paquete .solo-cotizacion,
 body.modo-paquete .col-confidencial,
 body.modo-paquete .col-costo { display: none !important; }
 body.modo-paquete #resumen-campos > .col-costo { display: block !important; }
 body.modo-paquete .resumen-filas > :not(.resumen-reserva) { display: none !important; }
-body.modo-paquete #datos-pax-section,
+body.modo-paquete #form-pax > :not(.campo-paquete),
 body.modo-paquete #resumen-campos > :first-child { opacity: 0.5; pointer-events: none; user-select: none; }
 body.modo-paquete #guardar-cotizacion { opacity: 0.5; cursor: not-allowed; }
 /* Encabezados de tabla: gris en vez del negro/bold por defecto del navegador, para que
