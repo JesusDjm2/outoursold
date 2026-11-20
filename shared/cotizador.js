@@ -1588,6 +1588,26 @@ async function abrirDisenoPdfCotizacion() {
     if (typeof iselToast === 'function') iselToast(modosPaginasCotizacion ? 'Diseño del PDF personalizado para esta cotización' : 'Se usa el diseño del PDF de la agencia');
 }
 
+// Enlace para el pasajero: necesita la cotización guardada (la página muestra lo guardado).
+async function abrirEnlaceDesdeCotizador() {
+    if (!currentCotizacionId) {
+        notifyWarning('Primero guarda la cotización: el enlace muestra lo que está guardado.');
+        return;
+    }
+    if (formularioTieneDatosSinGuardar()) {
+        notifyWarning('Tienes cambios sin guardar: el enlace muestra la última versión guardada. Guarda para que el pasajero los vea.');
+    }
+    const form = document.getElementById('form-pax');
+    await abrirEnlacePasajero({
+        id: currentCotizacionId,
+        apiBase: API_URL,
+        pasajero: form.querySelector('[name="nombre_pax"]').value,
+        contacto: form.querySelector('[name="contacto"]').value,
+        codPais: form.querySelector('[name="cod_pais"]').value,
+        idioma: document.querySelector('select[name="idioma"]').value
+    });
+}
+
 function restaurarItinerarioArmado(armado) {
     modosPaginasCotizacion = armado?.paginas || null;
     pintarBotonDisenoPdf();
@@ -2020,6 +2040,7 @@ async function init() {
     document.getElementById('guardar-cotizacion').addEventListener('click', guardarCotizacion);
     document.getElementById('guardar-como-paquete').addEventListener('click', guardarComoPaquete);
     document.getElementById('itin-pdf-diseno')?.addEventListener('click', abrirDisenoPdfCotizacion);
+    document.getElementById('itin-enlace')?.addEventListener('click', abrirEnlaceDesdeCotizador);
     document.getElementById('solo-lectura-pdf').addEventListener('click', () => mostrarVistaPreviaPdf(currentCotizacionId));
     document.getElementById('solo-lectura-salir').addEventListener('click', () => nuevaCotizacion(false));
     document.querySelector('input[name="n_pax"]').addEventListener('input', sincronizarCantidadTours);

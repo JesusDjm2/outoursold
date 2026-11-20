@@ -49,6 +49,7 @@ function hcResumen(array $data) {
     return [
         'nombre_pax' => $texto('nombre_pax'),
         'contacto'   => $texto('contacto'),
+        'cod_pais'   => $texto('cod_pais'),
         'pais'       => $texto('pais'),
         'n_pax'      => (int) hcNumero($pax['n_pax'] ?? 0),
         'f_llegada'  => $texto('f_llegada'),

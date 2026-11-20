@@ -126,6 +126,7 @@ $accentColorStyle = resolverAccentColorStyle($db);
     </div>
     <script src="notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
     <script src="pdf-visor.js?v=<?= filemtime(__DIR__ . '/pdf-visor.js') ?>"></script>
+    <script src="enlace-pasajero.js?v=<?= filemtime(__DIR__ . '/enlace-pasajero.js') ?>"></script>
     <script src="historial-cotizaciones.js?v=<?= filemtime(__DIR__ . '/historial-cotizaciones.js') ?>"></script>
     <script>window.ME_API_URL = 'mi-empresa-api.php';</script>
     <script src="hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>

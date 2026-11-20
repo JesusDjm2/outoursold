@@ -161,6 +161,7 @@ function hcFilaHtml(c, i) {
             ${c.modulos
                 ? `<button type="button" class="hc-btn-icono" data-accion="itinerario" title="Ver el PDF del itinerario" aria-label="PDF del itinerario ${hcEsc(c.id)}"><i class="fas fa-route"></i></button>`
                 : '<span class="hc-btn-icono is-apagado" title="Sin itinerario armado" aria-hidden="true"><i class="fas fa-route"></i></span>'}
+            <button type="button" class="hc-btn-icono" data-accion="enlace" title="Enlace para el pasajero" aria-label="Enlace para el pasajero de ${hcEsc(c.id)}"><i class="fas fa-link"></i></button>
             <button type="button" class="hc-btn-icono is-peligro" data-accion="eliminar" title="Mover a la papelera" aria-label="Eliminar ${hcEsc(c.id)}"><i class="fas fa-trash"></i></button>`}
         </td>
     </tr>`;
@@ -403,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return hcCargar();
         }
         const c = hc.filas[Number(btn.closest('tr')?.dataset.i)];
+        if (c && btn.dataset.accion === 'enlace') abrirEnlacePasajero({ id: c.id, apiBase: `../${c.moneda}/api.php`, pasajero: c.nombre_pax, contacto: c.contacto, codPais: c.cod_pais, idioma: c.idioma || 'es' });
         if (c && btn.dataset.accion === 'pdf') hcVerPdf(c, 'pdf');
         if (c && btn.dataset.accion === 'itinerario') hcVerPdf(c, 'itinerario');
         if (c && btn.dataset.accion === 'eliminar') hcEliminar(c);

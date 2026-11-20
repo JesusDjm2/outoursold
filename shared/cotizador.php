@@ -210,6 +210,10 @@ $logoUrl = resolverLogoUrl($db, $navShared);
                             <button type="button" id="itin-pdf-diseno" class="itin-pdf-diseno solo-cotizacion" title="Diseño del PDF del itinerario: PDF subidos o páginas generadas con tu marca">
                                 <i class="fas fa-wand-magic-sparkles"></i><span>Diseño PDF</span><b id="itin-pdf-diseno-marca" hidden>Personalizado</b>
                             </button>
+                            <!-- Enlace público del itinerario para el pasajero (shared/enlace-pasajero.js). -->
+                            <button type="button" id="itin-enlace" class="itin-pdf-diseno solo-cotizacion" title="Enlace para el pasajero: su itinerario en una página web para abrir desde el celular">
+                                <i class="fas fa-link"></i><span>Enlace pasajero</span>
+                            </button>
                             <div class="field itin-campo">
                                 <input type="text" id="itinerary-title" maxlength="120" placeholder="Nombre del itinerario" aria-label="Nombre del itinerario" title="Aparece en la portada y en las páginas finales del PDF del itinerario. Por defecto son los días y noches de la cotización; puedes cambiarlo.">
                             </div>
@@ -451,6 +455,7 @@ $logoUrl = resolverLogoUrl($db, $navShared);
     <script src="../shared/catalogo-shared.js?v=<?= filemtime(__DIR__ . '/catalogo-shared.js') ?>"></script>
     <script src="../shared/itinerario-selector.js?v=<?= filemtime(__DIR__ . '/itinerario-selector.js') ?>"></script>
     <script src="../shared/itinerario-vinculos.js?v=<?= filemtime(__DIR__ . '/itinerario-vinculos.js') ?>"></script>
+    <script src="../shared/enlace-pasajero.js?v=<?= filemtime(__DIR__ . '/enlace-pasajero.js') ?>"></script>
     <script src="../shared/cotizador.js?v=<?= filemtime(__DIR__ . '/cotizador.js') ?>"></script>
 </body>
 </html>

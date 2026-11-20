@@ -888,6 +888,55 @@ try {
             echo json_encode(['results' => $results, 'total' => $total]);
             break;
 
+        // ===== Enlace para el pasajero (migración 046, página pública viaje/?t=TOKEN) =====
+        // Solo de cotizaciones de mi agencia. GET: el activo (o null). POST crear: lo crea si
+        // no hay (o actualiza "mostrar precios" del que hay). POST revocar: deja de abrir.
+        case 'enlace-pasajero':
+        case 'crear-enlace-pasajero':
+        case 'revocar-enlace-pasajero':
+            $datosEnlace = $method === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?: []) : $_GET;
+            $idCot = (string) ($datosEnlace['id'] ?? '');
+            if ($idCot === '' || !cotizacionEsDelAmbito($db, $tablaCotizaciones, $idCot)) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Cotización no encontrada.']);
+                break;
+            }
+            $buscarEnlace = function () use ($db, $currency, $idCot) {
+                $stmt = $db->prepare("SELECT token, mostrar_precios, vistas, ultima_vista, creado_en FROM itinerario_enlaces
+                                      WHERE moneda = ? AND cotizacion_id = ? AND revocado_en IS NULL ORDER BY creado_en DESC LIMIT 1");
+                $stmt->execute([$currency, $idCot]);
+                $fila = $stmt->fetch();
+                if (!$fila) return null;
+                $fila['mostrar_precios'] = (bool) $fila['mostrar_precios'];
+                $fila['vistas'] = (int) $fila['vistas'];
+                return $fila;
+            };
+            if ($path === 'enlace-pasajero') {
+                echo json_encode(['enlace' => $buscarEnlace()]);
+                break;
+            }
+            if ($method !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+            }
+            if ($path === 'revocar-enlace-pasajero') {
+                $db->prepare("UPDATE itinerario_enlaces SET revocado_en = NOW() WHERE moneda = ? AND cotizacion_id = ? AND revocado_en IS NULL")
+                    ->execute([$currency, $idCot]);
+                echo json_encode(['success' => true, 'enlace' => null]);
+                break;
+            }
+            $mostrarPrecios = !array_key_exists('mostrar_precios', $datosEnlace) || !empty($datosEnlace['mostrar_precios']) ? 1 : 0;
+            $actual = $buscarEnlace();
+            if ($actual) {
+                $db->prepare("UPDATE itinerario_enlaces SET mostrar_precios = ? WHERE token = ?")->execute([$mostrarPrecios, $actual['token']]);
+            } else {
+                $db->prepare("INSERT INTO itinerario_enlaces (token, moneda, cotizacion_id, mostrar_precios, creado_por) VALUES (?, ?, ?, ?, ?)")
+                    ->execute([bin2hex(random_bytes(16)), $currency, $idCot, $mostrarPrecios, $_SESSION['user_id']]);
+            }
+            echo json_encode(['success' => true, 'enlace' => $buscarEnlace()]);
+            break;
+
         case 'cotizacion':
             // Las de mi agencia se abren normal. El admin además puede ABRIR la de otra
             // agencia (desde Agencias › Cotizaciones) en solo lectura: el cabecero
