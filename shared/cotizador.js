@@ -1955,6 +1955,48 @@ function abrirPdfPreviewNuevaPestana() {
 }
 
 // ===== INICIALIZACIÓN =====
+// ===== Modo embebido (Historial de cotizaciones) =====
+// El Historial carga esta página oculta en un iframe (?cotizacion=ID&ver=pdf|itinerario&embebido=1)
+// para mostrar el PDF en su propio popup sin ir al Cotizador: acá se arma el PDF con la misma
+// lógica de siempre y se le devuelve como Blob (postMessage). Nada se guarda.
+const MODO_EMBEBIDO = new URLSearchParams(location.search).get('embebido') === '1' && window.parent !== window;
+function avisarAlHistorial(mensaje) {
+    window.parent.postMessage({ origen: 'cotizador-embebido', ...mensaje }, location.origin);
+}
+async function generarPdfParaHistorial(id, ver) {
+    try {
+        const cot = cotizaciones[id];
+        if (!cot) throw new Error('No se encontró la cotización o no tienes acceso a ella.');
+        if (ver === 'itinerario') {
+            if (!cot.itinerarioArmado?.modulos?.length) throw new Error('Esta cotización no tiene itinerario armado.');
+            const { blob, nombre } = await new Promise((resolver, rechazar) => {
+                let capturado = false;
+                // handleGenerateItinerary (itinerario.js) termina abriendo su vista previa: se
+                // toma ese PDF. Sus avisos de error pasan a ser el error del Historial.
+                window.abrirVistaPreviaPDF = (url, _descargar, nombreArchivo) => {
+                    capturado = true;
+                    fetch(url).then(r => r.blob()).then(b => resolver({ blob: b, nombre: nombreArchivo })).catch(rechazar);
+                };
+                window.notifyError = m => rechazar(new Error(String(m).replace(/^Error al generar PDF:\s*/, '')));
+                window.notifyWarning = m => rechazar(new Error(String(m)));
+                handleGenerateItinerary().then(() => { if (!capturado) rechazar(new Error('No se pudo generar el PDF del itinerario.')); }, rechazar);
+            });
+            avisarAlHistorial({ tipo: 'pdf', blob, nombre });
+            return;
+        }
+        const agencia = await obtenerAgenciaDeCotizacion(id);
+        const bytes = await construirPdfBytes(cot, agencia, cot.pax?.idioma || 'es');
+        avisarAlHistorial({
+            tipo: 'pdf',
+            blob: new Blob([bytes], { type: 'application/pdf' }),
+            nombre: `Cotizacion_${cot.id}_${cot.pax?.nombre_pax || 'cliente'}.pdf`
+        });
+    } catch (error) {
+        console.error('PDF para el Historial:', error);
+        avisarAlHistorial({ tipo: 'error', mensaje: error.message || 'No se pudo generar el PDF.' });
+    }
+}
+
 async function init() {
     await cargarDatosIniciales();
     // Itinerario (itinerario/itinerario.js, embebido — ver window.ITINERARIO_API_BASE en
@@ -2095,7 +2137,10 @@ async function init() {
     // abre la vista previa de cotización y con &ver=itinerario abre la del itinerario.
     const paramsUrl = new URLSearchParams(window.location.search);
     const cotizacionUrlId = paramsUrl.get('cotizacion');
-    if (cotizacionUrlId) {
+    if (cotizacionUrlId && MODO_EMBEBIDO) {
+        await cargarCotizacion(cotizacionUrlId);
+        await generarPdfParaHistorial(cotizacionUrlId, paramsUrl.get('ver'));
+    } else if (cotizacionUrlId) {
         await cargarCotizacion(cotizacionUrlId);
         const verParam = paramsUrl.get('ver');
         if (verParam === 'pdf') {
@@ -2148,7 +2193,7 @@ async function init() {
     // Mismo criterio que formularioTieneDatosSinGuardar(): si hay algo escrito que no se
     // guardó, avisa también al cerrar/recargar la pestaña, no solo al navegar dentro de la app.
     window.addEventListener('beforeunload', (e) => {
-        if (!formularioTieneDatosSinGuardar()) return;
+        if (MODO_EMBEBIDO || !formularioTieneDatosSinGuardar()) return;
         e.preventDefault();
         e.returnValue = '';
     });

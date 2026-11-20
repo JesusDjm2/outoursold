@@ -99,7 +99,33 @@ $accentColorStyle = resolverAccentColorStyle($db);
             </div>
         </main>
     </div>
+    <!-- Popup del PDF (cotización o itinerario), sin salir del Historial. El PDF lo arma el
+         Cotizador cargado oculto (modo embebido, ver hcVerPdf en historial-cotizaciones.js). -->
+    <div id="hc-pdf" class="hc-pdf" hidden>
+        <div class="hc-pdf-caja" role="dialog" aria-modal="true" aria-labelledby="hc-pdf-titulo">
+            <div class="hc-pdf-cab">
+                <div class="hc-pdf-tit">
+                    <i id="hc-pdf-icono" class="fas fa-file-pdf"></i>
+                    <div>
+                        <h3 id="hc-pdf-titulo">PDF</h3>
+                        <p id="hc-pdf-sub"></p>
+                    </div>
+                </div>
+                <button type="button" class="hc-pdf-x" data-pdf="cerrar" aria-label="Cerrar"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="hc-pdf-cuerpo">
+                <div id="hc-pdf-estado" class="hc-pdf-estado"><i class="fas fa-spinner fa-spin"></i><span>Generando el PDF...</span></div>
+                <iframe id="hc-pdf-frame" class="hc-pdf-frame" title="Vista previa del PDF" hidden></iframe>
+            </div>
+            <div class="hc-pdf-pie">
+                <button type="button" class="hc-pdf-btn" data-pdf="nueva" disabled><i class="fas fa-arrow-up-right-from-square"></i>Abrir en nueva ventana</button>
+                <a class="hc-pdf-btn" data-pdf="editar" href="#"><i class="fas fa-pen"></i>Editar cotización</a>
+                <button type="button" class="hc-pdf-btn is-suave" data-pdf="cerrar">Cerrar</button>
+            </div>
+        </div>
+    </div>
     <script src="notify.js?v=<?= filemtime(__DIR__ . '/notify.js') ?>"></script>
+    <script src="pdf-visor.js?v=<?= filemtime(__DIR__ . '/pdf-visor.js') ?>"></script>
     <script src="historial-cotizaciones.js?v=<?= filemtime(__DIR__ . '/historial-cotizaciones.js') ?>"></script>
     <script>window.ME_API_URL = 'mi-empresa-api.php';</script>
     <script src="hero-edit.js?v=<?= filemtime(__DIR__ . '/hero-edit.js') ?>"></script>

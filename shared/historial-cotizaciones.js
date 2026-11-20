@@ -156,10 +156,10 @@ function hcFilaHtml(c, i) {
             <span class="hc-moneda">${moneda.codigo}</span>
         </td>
         <td class="hc-acciones">${c.eliminada ? hcAccionesPapelera(c) : `
-            <a class="hc-btn-icono" href="${hcUrlCotizador(c)}" title="Abrir en el Cotizador" aria-label="Abrir ${hcEsc(c.id)} en el Cotizador"><i class="fas fa-folder-open"></i></a>
-            <a class="hc-btn-icono" href="${hcUrlCotizador(c, 'pdf')}" title="PDF de la cotización" aria-label="PDF de la cotización ${hcEsc(c.id)}"><i class="fas fa-file-pdf"></i></a>
+            <a class="hc-btn-icono" href="${hcUrlCotizador(c)}" title="Editar en el Cotizador" aria-label="Editar ${hcEsc(c.id)} en el Cotizador"><i class="fas fa-pen"></i></a>
+            <button type="button" class="hc-btn-icono" data-accion="pdf" title="Ver el PDF de la cotización" aria-label="PDF de la cotización ${hcEsc(c.id)}"><i class="fas fa-file-pdf"></i></button>
             ${c.modulos
-                ? `<a class="hc-btn-icono" href="${hcUrlCotizador(c, 'itinerario')}" title="PDF del itinerario" aria-label="PDF del itinerario ${hcEsc(c.id)}"><i class="fas fa-route"></i></a>`
+                ? `<button type="button" class="hc-btn-icono" data-accion="itinerario" title="Ver el PDF del itinerario" aria-label="PDF del itinerario ${hcEsc(c.id)}"><i class="fas fa-route"></i></button>`
                 : '<span class="hc-btn-icono is-apagado" title="Sin itinerario armado" aria-hidden="true"><i class="fas fa-route"></i></span>'}
             <button type="button" class="hc-btn-icono is-peligro" data-accion="eliminar" title="Mover a la papelera" aria-label="Eliminar ${hcEsc(c.id)}"><i class="fas fa-trash"></i></button>`}
         </td>
@@ -179,6 +179,108 @@ function hcAccionesPapelera(c) {
 function hcUrlCotizador(c, ver) {
     return `../${c.moneda}/index.php?cotizacion=${encodeURIComponent(c.id)}${ver ? `&ver=${ver}` : ''}`;
 }
+
+// ===== Popup del PDF =====
+// El PDF lo arma el Cotizador, cargado oculto en un iframe en modo embebido
+// (?embebido=1, ver generarPdfParaHistorial en cotizador.js), que lo devuelve por postMessage.
+// Así el Historial no duplica la lógica de los PDF y no hace falta ir al Cotizador.
+const hcPdf = { turno: 0, generador: null, url: null, blob: null, nombre: '', foco: null, limite: null };
+
+function hcVerPdf(c, ver) {
+    const modal = document.getElementById('hc-pdf');
+    const turno = ++hcPdf.turno;
+    hcPdfLiberar();
+    hcPdf.foco = document.activeElement;
+    const esItinerario = ver === 'itinerario';
+    document.getElementById('hc-pdf-icono').className = `fas ${esItinerario ? 'fa-route' : 'fa-file-pdf'}`;
+    document.getElementById('hc-pdf-titulo').textContent = esItinerario ? 'PDF del itinerario' : 'PDF de la cotización';
+    document.getElementById('hc-pdf-sub').textContent = [c.id, (c.nombre_pax || '').trim() || 'Sin nombre'].join(' · ');
+    modal.querySelector('[data-pdf="editar"]').href = hcUrlCotizador(c);
+    modal.querySelector('[data-pdf="nueva"]').disabled = true;
+    hcPdfEstado(`Generando el PDF ${esItinerario ? 'del itinerario' : 'de la cotización'}...`);
+    modal.hidden = false;
+    document.documentElement.classList.add('hc-pdf-abierto');
+    modal.querySelector('.hc-pdf-x').focus();
+
+    const iframe = document.createElement('iframe');
+    iframe.className = 'hc-pdf-generador';
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.tabIndex = -1;
+    iframe.src = `${hcUrlCotizador(c, ver)}&embebido=1`;
+    document.body.appendChild(iframe);
+    hcPdf.generador = iframe;
+    // Si en 2 minutos no respondió (sin conexión, error de la página), se avisa.
+    hcPdf.limite = setTimeout(() => { if (turno === hcPdf.turno) hcPdfError('El PDF tardó demasiado en generarse. Inténtalo de nuevo.'); }, 120000);
+}
+
+window.addEventListener('message', (ev) => {
+    const datos = ev.data;
+    if (ev.origin !== location.origin || datos?.origen !== 'cotizador-embebido') return;
+    if (!hcPdf.generador || ev.source !== hcPdf.generador.contentWindow) return;
+    hcPdfQuitarGenerador();
+    if (datos.tipo === 'error') { hcPdfError(datos.mensaje); return; }
+    hcPdf.blob = datos.blob;
+    hcPdf.nombre = datos.nombre || 'documento.pdf';
+    hcPdf.url = URL.createObjectURL(datos.blob);
+    document.getElementById('hc-pdf-estado').hidden = true;
+    const frame = document.getElementById('hc-pdf-frame');
+    frame.hidden = false;
+    // PC: visor del navegador; celulares y tablets: páginas dibujadas (pdf-visor.js).
+    pdfVisorMostrar(frame, hcPdf.url);
+    document.querySelector('#hc-pdf [data-pdf="nueva"]').disabled = false;
+});
+
+function hcPdfEstado(texto) {
+    const estado = document.getElementById('hc-pdf-estado');
+    estado.className = 'hc-pdf-estado';
+    estado.innerHTML = `<i class="fas fa-spinner fa-spin"></i><span>${hcEsc(texto)}</span>`;
+    estado.hidden = false;
+    pdfVisorLimpiar(document.getElementById('hc-pdf-frame'));
+    document.getElementById('hc-pdf-frame').hidden = true;
+}
+function hcPdfError(mensaje) {
+    hcPdfQuitarGenerador();
+    const estado = document.getElementById('hc-pdf-estado');
+    estado.className = 'hc-pdf-estado is-error';
+    estado.innerHTML = `<i class="fas fa-triangle-exclamation"></i><span>${hcEsc(mensaje || 'No se pudo generar el PDF.')}</span>`;
+    estado.hidden = false;
+}
+function hcPdfQuitarGenerador() {
+    clearTimeout(hcPdf.limite);
+    hcPdf.generador?.remove();
+    hcPdf.generador = null;
+}
+function hcPdfLiberar() {
+    hcPdfQuitarGenerador();
+    if (hcPdf.url) URL.revokeObjectURL(hcPdf.url);
+    hcPdf.url = null;
+    hcPdf.blob = null;
+}
+function hcCerrarPdf() {
+    const modal = document.getElementById('hc-pdf');
+    if (modal.hidden) return;
+    hcPdf.turno++;
+    modal.hidden = true;
+    document.documentElement.classList.remove('hc-pdf-abierto');
+    pdfVisorLimpiar(document.getElementById('hc-pdf-frame'));
+    hcPdfLiberar();
+    if (hcPdf.foco && document.contains(hcPdf.foco)) hcPdf.foco.focus({ preventScroll: true });
+}
+// Abre el PDF en otra pestaña; si el navegador lo bloquea (o en iPhone/iPad), lo descarga.
+function hcPdfNuevaVentana() {
+    if (!hcPdf.url) return;
+    const ventana = !pdfVisorEsIOS() && window.open(hcPdf.url, '_blank');
+    if (!ventana) pdfDescargarBlob(hcPdf.blob, hcPdf.nombre);
+}
+document.getElementById('hc-pdf')?.addEventListener('click', (ev) => {
+    if (ev.target.id === 'hc-pdf') return hcCerrarPdf(); // clic fuera de la caja
+    const accion = ev.target.closest('[data-pdf]')?.dataset.pdf;
+    if (accion === 'cerrar') hcCerrarPdf();
+    if (accion === 'nueva') hcPdfNuevaVentana();
+});
+document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && !document.getElementById('hc-pdf').hidden) hcCerrarPdf();
+});
 
 function hcPintarTabla() {
     const cuerpo = document.getElementById('hc-cuerpo');
@@ -301,6 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return hcCargar();
         }
         const c = hc.filas[Number(btn.closest('tr')?.dataset.i)];
+        if (c && btn.dataset.accion === 'pdf') hcVerPdf(c, 'pdf');
+        if (c && btn.dataset.accion === 'itinerario') hcVerPdf(c, 'itinerario');
         if (c && btn.dataset.accion === 'eliminar') hcEliminar(c);
         if (c && btn.dataset.accion === 'restaurar') hcRestaurar(c);
         if (c && btn.dataset.accion === 'definitivo') hcEliminarDefinitivo(c);
